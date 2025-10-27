@@ -10,6 +10,7 @@ import com.fongmi.android.tv.server.process.Media;
 import com.fongmi.android.tv.server.process.Parse;
 import com.fongmi.android.tv.server.process.Proxy;
 import com.github.catvod.utils.Asset;
+import com.github.catvod.utils.Util;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ public class Nano extends NanoHTTPD {
     private List<Process> process;
 
     public Nano(int port) {
-        super(port);
+        super(Util.getIp().isEmpty() ? "127.0.0.1" : Util.getIp(), port);
         addProcess();
     }
 
