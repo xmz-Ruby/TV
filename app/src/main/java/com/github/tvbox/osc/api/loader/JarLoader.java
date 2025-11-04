@@ -108,8 +108,10 @@ public class JarLoader {
             if (!loaders.containsKey(jaKey)) parseJar(jaKey, jar);
             Spider spider = (Spider) loaders.get(jaKey).loadClass("com.github.catvod.spider." + api.split("csp_")[1]).newInstance();
             spider.init(App.get(), ext);
-            spiders.put(spKey, spider);
-            return spider;
+            // 使用安全包装器包装外部 spider，防止其修改播放器
+            Spider wrappedSpider = new SafeSpiderWrapper(spider);
+            spiders.put(spKey, wrappedSpider);
+            return wrappedSpider;
         } catch (Throwable e) {
             e.printStackTrace();
             return new SpiderNull();

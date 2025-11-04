@@ -306,6 +306,14 @@ public class Setting {
         Prefers.put("danmu_alpha", alpha);
     }
 
+    public static boolean isSpiderSafeMode() {
+        return Prefers.getBoolean("spider_safe_mode", true);
+    }
+
+    public static void putSpiderSafeMode(boolean safeMode) {
+        Prefers.put("spider_safe_mode", safeMode);
+    }
+
     public static boolean isCaption() {
         return Prefers.getBoolean("caption");
     }
