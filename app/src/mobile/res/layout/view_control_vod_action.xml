@@ -89,5 +89,11 @@
             style="@style/Control.Action"
             android:text="@string/detail_episode" />
 
+        <TextView
+            android:id="@+id/danmuSearch"
+            style="@style/Control.Action"
+            android:text="弹幕搜索"
+            android:visibility="gone" />
+
     </LinearLayout>
 </HorizontalScrollView>

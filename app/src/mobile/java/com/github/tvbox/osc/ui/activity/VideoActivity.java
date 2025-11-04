@@ -86,6 +86,7 @@ import com.github.tvbox.osc.ui.custom.CustomMovement;
 import com.github.tvbox.osc.ui.custom.SpaceItemDecoration;
 import com.github.tvbox.osc.ui.dialog.CastDialog;
 import com.github.tvbox.osc.ui.dialog.ControlDialog;
+import com.github.tvbox.osc.ui.dialog.DanmakuSearchDialog;
 import com.github.tvbox.osc.ui.dialog.DanmuDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeGridDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeListDialog;
@@ -392,6 +393,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mBinding.control.action.ending.setOnClickListener(view -> onEnding());
         mBinding.control.action.opening.setOnClickListener(view -> onOpening());
         mBinding.control.action.episodes.setOnClickListener(view -> onEpisodes());
+        mBinding.control.action.danmuSearch.setOnClickListener(view -> onDanmuSearch());
         mBinding.control.action.text.setOnLongClickListener(view -> onTextLong());
         mBinding.control.action.player.setOnLongClickListener(view -> onChoose());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
@@ -801,9 +803,12 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void onDanmu() {
-        Setting.putDanmu(!Setting.isDanmu());
+        boolean newState = !Setting.isDanmu();
+        Setting.putDanmu(newState);
+        Setting.putDanmuLoad(newState); // 同步更新弹幕加载设置
         checkDanmuImg();
         showDanmu();
+        showControl(); // 刷新控制栏以更新弹幕搜索按钮的显示状态
     }
 
     private void onDanmuSetting() {
@@ -958,6 +963,17 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mDialogs.add(EpisodeListDialog.create(this).episodes(mEpisodeAdapter.getItems()).show());
     }
 
+    private void onDanmuSearch() {
+        Episode episode = mEpisodeAdapter.getActivated();
+        String episodeName = episode != null ? episode.getName() : "";
+        int episodeIndex = episode != null ? mEpisodeAdapter.getPosition() : -1;
+        DanmakuSearchDialog.create()
+                .videoTitle(mBinding.name.getText().toString())
+                .episodeName(episodeName)
+                .episodeIndex(episodeIndex)
+                .show(this);
+    }
+
     private boolean onChoose() {
         if (mPlayers.isEmpty()) return false;
         mPlayers.choose(this, mBinding.control.title.getText());
@@ -1076,8 +1092,9 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private void showControl() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) return;
-        mBinding.control.danmu.setVisibility(isLock() || !mBinding.danmaku.isPrepared() ? View.GONE : View.VISIBLE);
+        mBinding.control.danmu.setVisibility(isLock() ? View.GONE : View.VISIBLE);
         mBinding.control.danmuSetting.setVisibility(isLock() || !Setting.isDanmuLoad() || !isVisible(mBinding.danmaku) ? View.GONE : View.VISIBLE);
+        mBinding.control.action.danmuSearch.setVisibility(isLock() || !Setting.isDanmuLoad() ? View.GONE : View.VISIBLE);
         mBinding.control.setting.setVisibility(mHistory == null || isFullscreen() ? View.GONE : View.VISIBLE);
         mBinding.control.batteryInfo.setVisibility(isFullscreen() ? View.VISIBLE : View.GONE);
         mBinding.control.right.rotate.setVisibility(isFullscreen() && !isLock() ? View.VISIBLE : View.GONE);
