@@ -1,0 +1,10 @@
+requests
+lxml
+pycryptodome
+ujson
+pyquery
+jsonpath-ng
+json5
+#jinja2
+cachetools
+beautifulsoup4
