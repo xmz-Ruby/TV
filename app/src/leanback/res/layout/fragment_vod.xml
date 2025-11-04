@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.fongmi.android.tv.ui.custom.CustomVerticalGridView
+    <com.github.tvbox.osc.ui.custom.CustomVerticalGridView
         android:id="@+id/recycler"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

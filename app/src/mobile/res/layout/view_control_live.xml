@@ -82,7 +82,7 @@
         android:layout_marginBottom="8dp"
         android:orientation="vertical">
 
-        <com.fongmi.android.tv.ui.custom.CustomSeekView
+        <com.github.tvbox.osc.ui.custom.CustomSeekView
             android:id="@+id/seek"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

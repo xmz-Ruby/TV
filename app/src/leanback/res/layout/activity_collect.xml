@@ -20,7 +20,7 @@
         android:textSize="24sp"
         tools:text="@string/collect_result" />
 
-    <com.fongmi.android.tv.ui.custom.CustomHorizontalGridView
+    <com.github.tvbox.osc.ui.custom.CustomHorizontalGridView
         android:id="@+id/recycler"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -32,7 +32,7 @@
         app:focusOutEnd="true"
         app:focusOutFront="true" />
 
-    <com.fongmi.android.tv.ui.custom.CustomViewPager
+    <com.github.tvbox.osc.ui.custom.CustomViewPager
         android:id="@+id/pager"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

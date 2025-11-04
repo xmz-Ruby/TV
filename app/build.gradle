@@ -3,13 +3,13 @@ plugins {
 }
 
 android {
-    namespace 'com.fongmi.android.tv'
+    namespace 'com.github.tvbox.osc'
 
     compileSdk 35
     flavorDimensions = ["mode", "api", "abi"]
 
     defaultConfig {
-        applicationId "com.fongmi.android.tv"
+        applicationId "com.github.tvbox.osc"
         minSdk 21
         //noinspection ExpiredTargetSdkVersion
         targetSdk 28

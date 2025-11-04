@@ -1,5 +1,5 @@
 # TV
--keep class com.fongmi.android.tv.bean.** { *; }
+-keep class com.github.tvbox.osc.bean.** { *; }
 
 # Gson
 -keepattributes Signature
