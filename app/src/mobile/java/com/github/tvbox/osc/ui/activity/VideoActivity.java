@@ -1311,6 +1311,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         if (event.getType() == RefreshEvent.Type.DETAIL) getDetail();
         else if (event.getType() == RefreshEvent.Type.PLAYER) onRefresh();
         else if (event.getType() == RefreshEvent.Type.DANMAKU) checkDanmu(event.getPath());
+        else if (event.getType() == RefreshEvent.Type.DANMAKU_SETTING) setDanmuViewSettings();
         else if (event.getType() == RefreshEvent.Type.SUBTITLE) mPlayers.setSub(Sub.from(event.getPath()));
     }
 

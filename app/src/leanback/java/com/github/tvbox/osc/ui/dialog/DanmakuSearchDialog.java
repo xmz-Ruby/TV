@@ -56,7 +56,7 @@ public class DanmakuSearchDialog extends BaseDialog {
     // 集数标识的正则表达式
     private static final Pattern EPISODE_PATTERN = Pattern.compile("第\\d+集|\\d+集|EP?\\d+|S\\d+E\\d+|\\d{8}|\\d{4}-\\d{2}-\\d{2}", Pattern.CASE_INSENSITIVE);
     // 从标题中提取集数的正则表达式
-    private static final Pattern EPISODE_NUMBER_PATTERN = Pattern.compile("第(\\d+)[话集]|EP?(\\d+)|S\\d+E(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EPISODE_NUMBER_PATTERN = Pattern.compile("第(\\d+)[话集]|EP?(\\d+)|S\\d+E(\\d+)|\\[(\\d+)\\]", Pattern.CASE_INSENSITIVE);
 
     public static DanmakuSearchDialog create() {
         return new DanmakuSearchDialog();
@@ -451,38 +451,40 @@ public class DanmakuSearchDialog extends BaseDialog {
 
         android.util.Log.d("DanmakuSearch", "开始自动匹配 - episodeName: " + episodeName + ", episodeIndex: " + episodeIndex);
 
-        // 规则0: 从episodeName中提取序号前缀（格式：[序号]原名称）
-        int prefixNumber = extractPrefixNumber(episodeName);
-        if (prefixNumber > 0) {
-            android.util.Log.d("DanmakuSearch", "从episodeName提取到序号前缀: " + prefixNumber);
-            // 使用提取的序号进行匹配
-            for (int i = 0; i < episodes.size(); i++) {
-                DanmakuEpisode ep = episodes.get(i);
+        // 规则0: 优先从episodeName中解析标准集数格式（S01E16、EP16等）
+        if (!TextUtils.isEmpty(episodeName)) {
+            int parsedFromName = parseEpisodeNumber(episodeName);
+            if (parsedFromName > 0) {
+                android.util.Log.d("DanmakuSearch", "从episodeName解析到集数: " + parsedFromName);
+                // 使用解析的集数进行匹配
+                for (int i = 0; i < episodes.size(); i++) {
+                    DanmakuEpisode ep = episodes.get(i);
 
-                // 先尝试使用接口返回的episodeNumber
-                String epNumber = ep.getEpisodeNumber();
-                if (!TextUtils.isEmpty(epNumber)) {
-                    try {
-                        int epNum = Integer.parseInt(epNumber);
-                        if (epNum == prefixNumber) {
-                            android.util.Log.d("DanmakuSearch", "序号前缀匹配成功(episodeNumber) - 位置: " + i);
+                    // 先尝试使用接口返回的episodeNumber
+                    String epNumber = ep.getEpisodeNumber();
+                    if (!TextUtils.isEmpty(epNumber)) {
+                        try {
+                            int epNum = Integer.parseInt(epNumber);
+                            if (epNum == parsedFromName) {
+                                android.util.Log.d("DanmakuSearch", "标准格式匹配成功(episodeNumber) - 位置: " + i);
+                                return i;
+                            }
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+
+                    // 再尝试从标题中解析集数
+                    String title = ep.getEpisodeTitle();
+                    if (!TextUtils.isEmpty(title)) {
+                        int parsedNumber = parseEpisodeNumber(title);
+                        if (parsedNumber == parsedFromName) {
+                            android.util.Log.d("DanmakuSearch", "标准格式匹配成功(标题解析) - 位置: " + i);
                             return i;
                         }
-                    } catch (NumberFormatException ignored) {
                     }
                 }
-
-                // 再尝试从标题中解析集数
-                String title = ep.getEpisodeTitle();
-                if (!TextUtils.isEmpty(title)) {
-                    int parsedNumber = parseEpisodeNumber(title);
-                    if (parsedNumber == prefixNumber) {
-                        android.util.Log.d("DanmakuSearch", "序号前缀匹配成功(标题解析) - 位置: " + i);
-                        return i;
-                    }
-                }
+                android.util.Log.d("DanmakuSearch", "标准格式匹配失败");
             }
-            android.util.Log.d("DanmakuSearch", "序号前缀匹配失败");
         }
 
         // 规则1: 精准匹配剧集名
@@ -574,18 +576,28 @@ public class DanmakuSearchDialog extends BaseDialog {
      * @return 集数，-1表示解析失败
      */
     private int parseEpisodeNumber(String title) {
-        java.util.regex.Matcher matcher = EPISODE_NUMBER_PATTERN.matcher(title);
-        if (matcher.find()) {
-            for (int i = 1; i <= matcher.groupCount(); i++) {
-                String group = matcher.group(i);
-                if (group != null) {
-                    try {
-                        return Integer.parseInt(group);
-                    } catch (NumberFormatException ignored) {
-                    }
+        if (TextUtils.isEmpty(title)) return -1;
+
+        // 优先匹配标准格式：S01E16、EP16等（排除序号前缀）
+        // 按优先级顺序尝试匹配
+        String[] patterns = {
+            "S\\d+E(\\d+)",      // S01E16 - 最高优先级
+            "EP?(\\d+)",         // EP16 或 E16
+            "第(\\d+)[话集]",    // 第16集
+            "\\[(\\d+)\\]"       // [16] - 最低优先级
+        };
+
+        for (String patternStr : patterns) {
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(patternStr, java.util.regex.Pattern.CASE_INSENSITIVE);
+            java.util.regex.Matcher matcher = pattern.matcher(title);
+            if (matcher.find()) {
+                try {
+                    return Integer.parseInt(matcher.group(1));
+                } catch (NumberFormatException ignored) {
                 }
             }
         }
+
         return -1;
     }
 

@@ -64,6 +64,11 @@ public class DanmakuPage implements Process {
             return handleCast(params);
         }
 
+        // 获取/设置弹幕配置
+        if (url.startsWith("/danmaku/api/settings")) {
+            return handleSettings(params);
+        }
+
         return Nano.error("Unknown API endpoint");
     }
 
@@ -211,6 +216,63 @@ public class DanmakuPage implements Process {
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "弹幕投送成功");
+        return jsonResponse(response);
+    }
+
+    /**
+     * 处理弹幕设置请求
+     */
+    private NanoHTTPD.Response handleSettings(Map<String, String> params) {
+        String key = params.get("key");
+        String value = params.get("value");
+
+        // 如果有 key 和 value，则保存设置
+        if (key != null && value != null) {
+            try {
+                switch (key) {
+                    case "speed":
+                        int speed = Integer.parseInt(value);
+                        com.github.tvbox.osc.Setting.putDanmuSpeed(speed);
+                        break;
+                    case "size":
+                        float size = Float.parseFloat(value);
+                        com.github.tvbox.osc.Setting.putDanmuSize(size);
+                        break;
+                    case "line":
+                        int line = Integer.parseInt(value);
+                        com.github.tvbox.osc.Setting.putDanmuLine(line);
+                        break;
+                    case "alpha":
+                        int alpha = Integer.parseInt(value);
+                        com.github.tvbox.osc.Setting.putDanmuAlpha(alpha);
+                        break;
+                    default:
+                        return jsonResponse(createErrorResponse("未知的设置项"));
+                }
+
+                // 通知播放器更新弹幕设置
+                App.post(() -> com.github.tvbox.osc.event.RefreshEvent.danmakuSetting());
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "设置已保存");
+                return jsonResponse(response);
+
+            } catch (NumberFormatException e) {
+                return jsonResponse(createErrorResponse("设置值格式错误"));
+            }
+        }
+
+        // 否则返回当前设置
+        Map<String, Object> settings = new HashMap<>();
+        settings.put("speed", com.github.tvbox.osc.Setting.getDanmuSpeed());
+        settings.put("size", com.github.tvbox.osc.Setting.getDanmuSize());
+        settings.put("line", com.github.tvbox.osc.Setting.getDanmuLine(3));
+        settings.put("alpha", com.github.tvbox.osc.Setting.getDanmuAlpha());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", settings);
         return jsonResponse(response);
     }
 
@@ -396,11 +458,11 @@ public class DanmakuPage implements Process {
             "        .fab-container {\n" +
             "            position: fixed;\n" +
             "            right: 20px;\n" +
-            "            bottom: 20px;\n" +
+            "            bottom: 90px;\n" +
             "            display: none;\n" +
             "            flex-direction: column;\n" +
             "            gap: 10px;\n" +
-            "            z-index: 1000;\n" +
+            "            z-index: 998;\n" +
             "        }\n" +
             "        .fab-container.show {\n" +
             "            display: flex;\n" +
@@ -431,6 +493,89 @@ public class DanmakuPage implements Process {
             "            background: rgba(255,255,255,0.9);\n" +
             "            color: #667eea;\n" +
             "        }\n" +
+            "        .settings-modal {\n" +
+            "            display: none;\n" +
+            "            position: fixed;\n" +
+            "            top: 0;\n" +
+            "            left: 0;\n" +
+            "            right: 0;\n" +
+            "            bottom: 0;\n" +
+            "            background: rgba(0,0,0,0.5);\n" +
+            "            z-index: 2000;\n" +
+            "            align-items: center;\n" +
+            "            justify-content: center;\n" +
+            "        }\n" +
+            "        .settings-modal.show {\n" +
+            "            display: flex;\n" +
+            "        }\n" +
+            "        .settings-content {\n" +
+            "            background: white;\n" +
+            "            border-radius: 12px;\n" +
+            "            padding: 24px;\n" +
+            "            max-width: 400px;\n" +
+            "            width: 90%;\n" +
+            "            max-height: 80vh;\n" +
+            "            overflow-y: auto;\n" +
+            "        }\n" +
+            "        .settings-header {\n" +
+            "            font-size: 20px;\n" +
+            "            font-weight: bold;\n" +
+            "            margin-bottom: 20px;\n" +
+            "            color: #333;\n" +
+            "        }\n" +
+            "        .setting-item {\n" +
+            "            margin-bottom: 20px;\n" +
+            "        }\n" +
+            "        .setting-label {\n" +
+            "            font-size: 14px;\n" +
+            "            color: #666;\n" +
+            "            margin-bottom: 8px;\n" +
+            "            display: flex;\n" +
+            "            justify-content: space-between;\n" +
+            "        }\n" +
+            "        .setting-value {\n" +
+            "            font-weight: 500;\n" +
+            "            color: #667eea;\n" +
+            "        }\n" +
+            "        .slider-container {\n" +
+            "            width: 100%;\n" +
+            "        }\n" +
+            "        .slider {\n" +
+            "            width: 100%;\n" +
+            "            height: 6px;\n" +
+            "            border-radius: 3px;\n" +
+            "            background: #e0e0e0;\n" +
+            "            outline: none;\n" +
+            "            -webkit-appearance: none;\n" +
+            "        }\n" +
+            "        .slider::-webkit-slider-thumb {\n" +
+            "            -webkit-appearance: none;\n" +
+            "            appearance: none;\n" +
+            "            width: 20px;\n" +
+            "            height: 20px;\n" +
+            "            border-radius: 50%;\n" +
+            "            background: #667eea;\n" +
+            "            cursor: pointer;\n" +
+            "        }\n" +
+            "        .slider::-moz-range-thumb {\n" +
+            "            width: 20px;\n" +
+            "            height: 20px;\n" +
+            "            border-radius: 50%;\n" +
+            "            background: #667eea;\n" +
+            "            cursor: pointer;\n" +
+            "            border: none;\n" +
+            "        }\n" +
+            "        .close-btn {\n" +
+            "            width: 100%;\n" +
+            "            padding: 12px;\n" +
+            "            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n" +
+            "            color: white;\n" +
+            "            border: none;\n" +
+            "            border-radius: 8px;\n" +
+            "            font-size: 16px;\n" +
+            "            cursor: pointer;\n" +
+            "            margin-top: 10px;\n" +
+            "        }\n" +
             "    </style>\n" +
             "</head>\n" +
             "<body>\n" +
@@ -458,7 +603,66 @@ public class DanmakuPage implements Process {
             "    <div class=\"fab-container\" id=\"fabContainer\">\n" +
             "        <button class=\"fab-btn secondary\" id=\"topBtn\" title=\"回到顶部\">↑</button>\n" +
             "        <button class=\"fab-btn secondary\" id=\"bottomBtn\" title=\"跳到底部\">↓</button>\n" +
+            "        <button class=\"fab-btn secondary\" id=\"jumpBtn\" title=\"跳转到指定集\">#</button>\n" +
             "        <button class=\"fab-btn\" id=\"reverseBtn\" title=\"反转列表\">⇅</button>\n" +
+            "    </div>\n" +
+            "    \n" +
+            "    <!-- 设置按钮（始终显示） -->\n" +
+            "    <div style=\"position: fixed; right: 20px; bottom: 20px; z-index: 999; display: flex; flex-direction: column; gap: 10px;\">\n" +
+            "        <button class=\"fab-btn\" id=\"settingsBtn\" title=\"弹幕设置\">⚙</button>\n" +
+            "    </div>\n" +
+            "    \n" +
+            "    <!-- 弹幕设置弹窗 -->\n" +
+            "    <div class=\"settings-modal\" id=\"settingsModal\">\n" +
+            "        <div class=\"settings-content\">\n" +
+            "            <div class=\"settings-header\">弹幕设置</div>\n" +
+            "            \n" +
+            "            <div class=\"setting-item\">\n" +
+            "                <div class=\"setting-label\">\n" +
+            "                    <span>速度</span>\n" +
+            "                    <span class=\"setting-value\" id=\"speedValue\">正常</span>\n" +
+            "                </div>\n" +
+            "                <input type=\"range\" class=\"slider\" id=\"speedSlider\" min=\"0\" max=\"3\" step=\"1\" value=\"2\">\n" +
+            "            </div>\n" +
+            "            \n" +
+            "            <div class=\"setting-item\">\n" +
+            "                <div class=\"setting-label\">\n" +
+            "                    <span>大小</span>\n" +
+            "                    <span class=\"setting-value\" id=\"sizeValue\">1.0倍</span>\n" +
+            "                </div>\n" +
+            "                <input type=\"range\" class=\"slider\" id=\"sizeSlider\" min=\"0.6\" max=\"2\" step=\"0.1\" value=\"1\">\n" +
+            "            </div>\n" +
+            "            \n" +
+            "            <div class=\"setting-item\">\n" +
+            "                <div class=\"setting-label\">\n" +
+            "                    <span>行数</span>\n" +
+            "                    <span class=\"setting-value\" id=\"lineValue\">3行</span>\n" +
+            "                </div>\n" +
+            "                <input type=\"range\" class=\"slider\" id=\"lineSlider\" min=\"1\" max=\"15\" step=\"1\" value=\"3\">\n" +
+            "            </div>\n" +
+            "            \n" +
+            "            <div class=\"setting-item\">\n" +
+            "                <div class=\"setting-label\">\n" +
+            "                    <span>透明度</span>\n" +
+            "                    <span class=\"setting-value\" id=\"alphaValue\">90%</span>\n" +
+            "                </div>\n" +
+            "                <input type=\"range\" class=\"slider\" id=\"alphaSlider\" min=\"10\" max=\"100\" step=\"5\" value=\"90\">\n" +
+            "            </div>\n" +
+            "            \n" +
+            "            <button class=\"close-btn\" id=\"closeSettingsBtn\">关闭</button>\n" +
+            "        </div>\n" +
+            "    </div>\n" +
+            "    \n" +
+            "    <!-- 跳转弹窗 -->\n" +
+            "    <div class=\"settings-modal\" id=\"jumpModal\">\n" +
+            "        <div class=\"settings-content\" style=\"max-width: 300px;\">\n" +
+            "            <div class=\"settings-header\">跳转到指定集</div>\n" +
+            "            <div style=\"margin-bottom: 20px;\">\n" +
+            "                <input type=\"number\" id=\"jumpInput\" class=\"search-input\" placeholder=\"输入集数...\" style=\"width: 100%; margin: 0;\">\n" +
+            "            </div>\n" +
+            "            <button class=\"close-btn\" id=\"jumpConfirmBtn\">跳转</button>\n" +
+            "            <button class=\"close-btn\" id=\"closeJumpBtn\" style=\"background: #f0f0f0; color: #666; margin-top: 10px;\">取消</button>\n" +
+            "        </div>\n" +
             "    </div>\n" +
             "    \n" +
             "    <script>\n" +
@@ -467,6 +671,7 @@ public class DanmakuPage implements Process {
             "        let targetEpisodeNumber = null;\n" +
             "        let currentEpisodes = null;\n" +
             "        let isReversed = false;\n" +
+            "        let highlightedEpisodeId = null;\n" +
             "        \n" +
             "        // 初始化\n" +
             "        window.onload = function() {\n" +
@@ -680,6 +885,7 @@ public class DanmakuPage implements Process {
             "                const matchedIndex = autoMatchEpisode(episodes, episodeName, targetEpisodeNumber);\n" +
             "                \n" +
             "                if (matchedIndex >= 0) {\n" +
+            "                    highlightedEpisodeId = episodes[matchedIndex].episodeId;\n" +
             "                    setTimeout(() => {\n" +
             "                        const items = document.querySelectorAll('.result-item');\n" +
             "                        const matchedItem = items[matchedIndex];\n" +
@@ -691,6 +897,35 @@ public class DanmakuPage implements Process {
             "                        }\n" +
             "                    }, 200);\n" +
             "                }\n" +
+            "            }\n" +
+            "        }\n" +
+            "        \n" +
+            "        // 仅渲染剧集列表（不修改 currentEpisodes）\n" +
+            "        function renderEpisodeList(episodes, highlightEpisodeId) {\n" +
+            "            let html = '<div class=\"back-btn\" onclick=\"performSearch()\">← 返回搜索结果</div>';\n" +
+            "            let highlightIndex = -1;\n" +
+            "            episodes.forEach((episode, index) => {\n" +
+            "                const title = episode.episodeTitle || '第' + episode.episodeNumber + '集';\n" +
+            "                const isHighlight = highlightEpisodeId && episode.episodeId === highlightEpisodeId;\n" +
+            "                if (isHighlight) highlightIndex = index;\n" +
+            "                const bgStyle = isHighlight ? ' style=\"background: #fff3cd;\"' : '';\n" +
+            "                html += `\n" +
+            "                    <div class=\"result-item\" data-index=\"${index}\" data-episode-id=\"${episode.episodeId}\" onclick=\"castEpisode(${episode.episodeId}, '${escapeHtml(title)}')\"${bgStyle}>\n" +
+            "                        <div class=\"result-title\">${escapeHtml(title)}</div>\n" +
+            "                    </div>\n" +
+            "                `;\n" +
+            "            });\n" +
+            "            \n" +
+            "            document.getElementById('resultsContent').innerHTML = html;\n" +
+            "            \n" +
+            "            // 滚动到高亮项\n" +
+            "            if (highlightIndex >= 0) {\n" +
+            "                setTimeout(() => {\n" +
+            "                    const items = document.querySelectorAll('.result-item');\n" +
+            "                    if (items[highlightIndex]) {\n" +
+            "                        items[highlightIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });\n" +
+            "                    }\n" +
+            "                }, 100);\n" +
             "            }\n" +
             "        }\n" +
             "        \n" +
@@ -757,10 +992,176 @@ public class DanmakuPage implements Process {
             "            }\n" +
             "            \n" +
             "            isReversed = !isReversed;\n" +
-            "            const reversedEpisodes = [...currentEpisodes].reverse();\n" +
-            "            showEpisodeList(reversedEpisodes);\n" +
+            "            // 根据 isReversed 状态决定显示顺序\n" +
+            "            const displayEpisodes = isReversed ? [...currentEpisodes].reverse() : currentEpisodes;\n" +
+            "            renderEpisodeList(displayEpisodes, highlightedEpisodeId);\n" +
             "            showToast(isReversed ? '已反转列表' : '已恢复顺序');\n" +
             "        });\n" +
+            "        \n" +
+            "        // 跳转按钮\n" +
+            "        document.getElementById('jumpBtn').addEventListener('click', function() {\n" +
+            "            if (!currentEpisodes || currentEpisodes.length === 0) {\n" +
+            "                showToast('没有可跳转的列表');\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            document.getElementById('jumpModal').classList.add('show');\n" +
+            "            document.getElementById('jumpInput').value = '';\n" +
+            "            document.getElementById('jumpInput').focus();\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 关闭跳转弹窗\n" +
+            "        document.getElementById('closeJumpBtn').addEventListener('click', function() {\n" +
+            "            document.getElementById('jumpModal').classList.remove('show');\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 点击背景关闭跳转弹窗\n" +
+            "        document.getElementById('jumpModal').addEventListener('click', function(e) {\n" +
+            "            if (e.target === this) {\n" +
+            "                this.classList.remove('show');\n" +
+            "            }\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 跳转确认\n" +
+            "        function performJump() {\n" +
+            "            const episodeNum = parseInt(document.getElementById('jumpInput').value);\n" +
+            "            if (!episodeNum || episodeNum < 1) {\n" +
+            "                showToast('请输入有效的集数');\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            // 在当前显示的列表中查找\n" +
+            "            const displayEpisodes = isReversed ? [...currentEpisodes].reverse() : currentEpisodes;\n" +
+            "            let foundIndex = -1;\n" +
+            "            \n" +
+            "            for (let i = 0; i < displayEpisodes.length; i++) {\n" +
+            "                const ep = displayEpisodes[i];\n" +
+            "                // 尝试从 episodeNumber 或标题中匹配\n" +
+            "                if (ep.episodeNumber && parseInt(ep.episodeNumber) === episodeNum) {\n" +
+            "                    foundIndex = i;\n" +
+            "                    break;\n" +
+            "                }\n" +
+            "                const title = ep.episodeTitle || '';\n" +
+            "                const parsedNum = parseEpisodeNumber(title);\n" +
+            "                if (parsedNum === episodeNum) {\n" +
+            "                    foundIndex = i;\n" +
+            "                    break;\n" +
+            "                }\n" +
+            "            }\n" +
+            "            \n" +
+            "            if (foundIndex >= 0) {\n" +
+            "                highlightedEpisodeId = displayEpisodes[foundIndex].episodeId;\n" +
+            "                renderEpisodeList(displayEpisodes, highlightedEpisodeId);\n" +
+            "                document.getElementById('jumpModal').classList.remove('show');\n" +
+            "                const epTitle = displayEpisodes[foundIndex].episodeTitle || '第' + displayEpisodes[foundIndex].episodeNumber + '集';\n" +
+            "                showToast('已跳转到: ' + epTitle);\n" +
+            "            } else {\n" +
+            "                showToast('未找到第 ' + episodeNum + ' 集');\n" +
+            "            }\n" +
+            "        }\n" +
+            "        \n" +
+            "        document.getElementById('jumpConfirmBtn').addEventListener('click', performJump);\n" +
+            "        \n" +
+            "        // 回车跳转\n" +
+            "        document.getElementById('jumpInput').addEventListener('keypress', function(e) {\n" +
+            "            if (e.key === 'Enter') {\n" +
+            "                performJump();\n" +
+            "            }\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 弹幕设置功能\n" +
+            "        const speedTexts = ['最快', '快', '正常', '慢'];\n" +
+            "        let danmakuSettings = {\n" +
+            "            speed: 2,\n" +
+            "            size: 1.0,\n" +
+            "            line: 3,\n" +
+            "            alpha: 90\n" +
+            "        };\n" +
+            "        \n" +
+            "        // 加载设置\n" +
+            "        function loadSettings() {\n" +
+            "            fetch('/danmaku/api/settings')\n" +
+            "                .then(res => res.json())\n" +
+            "                .then(data => {\n" +
+            "                    if (data.success) {\n" +
+            "                        danmakuSettings = data.data;\n" +
+            "                        updateSettingsUI();\n" +
+            "                    }\n" +
+            "                })\n" +
+            "                .catch(err => console.log('加载设置失败:', err));\n" +
+            "        }\n" +
+            "        \n" +
+            "        // 更新设置 UI\n" +
+            "        function updateSettingsUI() {\n" +
+            "            document.getElementById('speedSlider').value = danmakuSettings.speed;\n" +
+            "            document.getElementById('sizeSlider').value = danmakuSettings.size;\n" +
+            "            document.getElementById('lineSlider').value = danmakuSettings.line;\n" +
+            "            document.getElementById('alphaSlider').value = danmakuSettings.alpha;\n" +
+            "            \n" +
+            "            document.getElementById('speedValue').textContent = speedTexts[danmakuSettings.speed];\n" +
+            "            document.getElementById('sizeValue').textContent = danmakuSettings.size.toFixed(1) + '倍';\n" +
+            "            document.getElementById('lineValue').textContent = danmakuSettings.line + '行';\n" +
+            "            document.getElementById('alphaValue').textContent = danmakuSettings.alpha + '%';\n" +
+            "        }\n" +
+            "        \n" +
+            "        // 保存设置\n" +
+            "        function saveSetting(key, value) {\n" +
+            "            fetch('/danmaku/api/settings?key=' + key + '&value=' + value)\n" +
+            "                .then(res => res.json())\n" +
+            "                .then(data => {\n" +
+            "                    if (data.success) {\n" +
+            "                        danmakuSettings[key] = parseFloat(value);\n" +
+            "                    }\n" +
+            "                })\n" +
+            "                .catch(err => console.log('保存设置失败:', err));\n" +
+            "        }\n" +
+            "        \n" +
+            "        // 打开设置弹窗\n" +
+            "        document.getElementById('settingsBtn').addEventListener('click', function() {\n" +
+            "            document.getElementById('settingsModal').classList.add('show');\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 关闭设置弹窗\n" +
+            "        document.getElementById('closeSettingsBtn').addEventListener('click', function() {\n" +
+            "            document.getElementById('settingsModal').classList.remove('show');\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 点击背景关闭\n" +
+            "        document.getElementById('settingsModal').addEventListener('click', function(e) {\n" +
+            "            if (e.target === this) {\n" +
+            "                this.classList.remove('show');\n" +
+            "            }\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 速度滑块\n" +
+            "        document.getElementById('speedSlider').addEventListener('input', function() {\n" +
+            "            const value = parseInt(this.value);\n" +
+            "            document.getElementById('speedValue').textContent = speedTexts[value];\n" +
+            "            saveSetting('speed', value);\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 大小滑块\n" +
+            "        document.getElementById('sizeSlider').addEventListener('input', function() {\n" +
+            "            const value = parseFloat(this.value);\n" +
+            "            document.getElementById('sizeValue').textContent = value.toFixed(1) + '倍';\n" +
+            "            saveSetting('size', value);\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 行数滑块\n" +
+            "        document.getElementById('lineSlider').addEventListener('input', function() {\n" +
+            "            const value = parseInt(this.value);\n" +
+            "            document.getElementById('lineValue').textContent = value + '行';\n" +
+            "            saveSetting('line', value);\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 透明度滑块\n" +
+            "        document.getElementById('alphaSlider').addEventListener('input', function() {\n" +
+            "            const value = parseInt(this.value);\n" +
+            "            document.getElementById('alphaValue').textContent = value + '%';\n" +
+            "            saveSetting('alpha', value);\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 页面加载时加载设置\n" +
+            "        loadSettings();\n" +
             "    </script>\n" +
             "</body>\n" +
             "</html>";

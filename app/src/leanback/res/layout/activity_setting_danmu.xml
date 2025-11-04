@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -41,146 +42,127 @@
 
         </LinearLayout>
 
+        <!-- 弹幕速度 -->
         <LinearLayout
-            android:id="@+id/danmuSpeed"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:background="@drawable/selector_item"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/danmuSpeedLabel"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp"
                 android:text="@string/player_danmu_speed"
                 android:textColor="@color/white"
                 android:textSize="18sp" />
 
-            <TextView
-                android:id="@+id/danmuSpeedText"
+            <com.google.android.material.slider.Slider
+                android:id="@+id/danmuSpeedSlider"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="end"
-                android:textColor="@color/white"
-                android:textSize="18sp"
-                tools:text="慢" />
+                android:background="@drawable/selector_item"
+                android:padding="8dp"
+                android:stepSize="1"
+                android:valueFrom="0"
+                android:valueTo="3"
+                app:thumbColor="@color/blue_500"
+                app:trackColorActive="@color/blue_500"
+                app:trackColorInactive="@color/blue_50" />
 
         </LinearLayout>
 
+        <!-- 弹幕大小 -->
         <LinearLayout
-            android:id="@+id/danmuSize"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:background="@drawable/selector_item"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/danmuSizeLabel"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp"
                 android:text="@string/player_danmu_size"
                 android:textColor="@color/white"
                 android:textSize="18sp" />
 
-            <TextView
-                android:id="@+id/danmuSizeText"
-                android:layout_width="0dp"
+            <com.google.android.material.slider.Slider
+                android:id="@+id/danmuSizeSlider"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="end"
-                android:textColor="@color/white"
-                android:textSize="18sp"
-                tools:text="1" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="@string/times"
-                android:textColor="@color/white"
-                android:textSize="18sp" />
+                android:background="@drawable/selector_item"
+                android:padding="8dp"
+                android:stepSize="0.1"
+                android:valueFrom="0.6"
+                android:valueTo="2"
+                app:thumbColor="@color/blue_500"
+                app:trackColorActive="@color/blue_500"
+                app:trackColorInactive="@color/blue_50" />
 
         </LinearLayout>
 
+        <!-- 弹幕行数 -->
         <LinearLayout
-            android:id="@+id/danmuLine"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:background="@drawable/selector_item"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/danmuLineLabel"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp"
                 android:text="@string/player_danmu_line"
                 android:textColor="@color/white"
                 android:textSize="18sp" />
 
-            <TextView
-                android:id="@+id/danmuLineText"
-                android:layout_width="0dp"
+            <com.google.android.material.slider.Slider
+                android:id="@+id/danmuLineSlider"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="end"
-                android:textColor="@color/white"
-                android:textSize="18sp"
-                tools:text="1" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="@string/lines"
-                android:textColor="@color/white"
-                android:textSize="18sp" />
+                android:background="@drawable/selector_item"
+                android:padding="8dp"
+                android:stepSize="1"
+                android:valueFrom="1"
+                android:valueTo="15"
+                app:thumbColor="@color/blue_500"
+                app:trackColorActive="@color/blue_500"
+                app:trackColorInactive="@color/blue_50" />
 
         </LinearLayout>
 
+        <!-- 弹幕透明度 -->
         <LinearLayout
-            android:id="@+id/danmuAlpha"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:background="@drawable/selector_item"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/danmuAlphaLabel"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp"
                 android:text="@string/player_danmu_alpha"
                 android:textColor="@color/white"
                 android:textSize="18sp" />
 
-            <TextView
-                android:id="@+id/danmuAlphaText"
-                android:layout_width="0dp"
+            <com.google.android.material.slider.Slider
+                android:id="@+id/danmuAlphaSlider"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="end"
-                android:textColor="@color/white"
-                android:textSize="18sp"
-                tools:text="80" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="%"
-                android:textColor="@color/white"
-                android:textSize="18sp" />
+                android:background="@drawable/selector_item"
+                android:padding="8dp"
+                android:stepSize="5"
+                android:valueFrom="10"
+                android:valueTo="100"
+                app:thumbColor="@color/blue_500"
+                app:trackColorActive="@color/blue_500"
+                app:trackColorInactive="@color/blue_50" />
 
         </LinearLayout>
     </LinearLayout>

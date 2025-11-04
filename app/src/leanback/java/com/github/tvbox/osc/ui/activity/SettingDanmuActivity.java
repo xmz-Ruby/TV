@@ -9,20 +9,12 @@ import androidx.viewbinding.ViewBinding;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.databinding.ActivitySettingDanmuBinding;
-import com.github.tvbox.osc.impl.DanmuAlphaCallback;
-import com.github.tvbox.osc.impl.DanmuLineCallback;
-import com.github.tvbox.osc.impl.DanmuSizeCallback;
 import com.github.tvbox.osc.ui.base.BaseActivity;
-import com.github.tvbox.osc.ui.dialog.DanmuAlphaDialog;
-import com.github.tvbox.osc.ui.dialog.DanmuLineDialog;
-import com.github.tvbox.osc.ui.dialog.DanmuSizeDialog;
 import com.github.tvbox.osc.utils.ResUtil;
 
-public class SettingDanmuActivity extends BaseActivity implements DanmuLineCallback, DanmuSizeCallback, DanmuAlphaCallback {
+public class SettingDanmuActivity extends BaseActivity {
 
     private ActivitySettingDanmuBinding mBinding;
-
-    private String[] danmuSpeed;
 
     @Override
     protected ViewBinding getBinding() {
@@ -41,33 +33,51 @@ public class SettingDanmuActivity extends BaseActivity implements DanmuLineCallb
     protected void initView() {
         mBinding.danmuLoad.requestFocus();
         mBinding.danmuLoadText.setText(getSwitch(Setting.isDanmuLoad()));
-        mBinding.danmuSizeText.setText(String.valueOf(Setting.getDanmuSize()));
-        mBinding.danmuLineText.setText(String.valueOf(Setting.getDanmuLine(3)));
-        mBinding.danmuAlphaText.setText(String.valueOf(Setting.getDanmuAlpha()));
-        mBinding.danmuSpeedText.setText((danmuSpeed = ResUtil.getStringArray(R.array.select_danmu_speed))[Setting.getDanmuSpeed()]);
+
+        // 设置 Slider 初始值
+        mBinding.danmuSpeedSlider.setValue(Setting.getDanmuSpeed());
+        mBinding.danmuSizeSlider.setValue(Setting.getDanmuSize());
+        mBinding.danmuLineSlider.setValue(Setting.getDanmuLine(3));
+        mBinding.danmuAlphaSlider.setValue(Setting.getDanmuAlpha());
+
+        // 更新标签显示
+        updateSpeedLabel(Setting.getDanmuSpeed());
+        updateSizeLabel(Setting.getDanmuSize());
+        updateLineLabel(Setting.getDanmuLine(3));
+        updateAlphaLabel(Setting.getDanmuAlpha());
     }
 
     @Override
     protected void initEvent() {
-        mBinding.danmuSize.setOnClickListener(this::onDanmuSize);
-        mBinding.danmuLine.setOnClickListener(this::onDanmuLine);
         mBinding.danmuLoad.setOnClickListener(this::setDanmuLoad);
-        mBinding.danmuAlpha.setOnClickListener(this::onDanmuAlpha);
-        mBinding.danmuSpeed.setOnClickListener(this::setDanmuSpeed);
-    }
 
-    private void onDanmuSize(View view) {
-        DanmuSizeDialog.create(this).show();
-    }
+        // 速度滑块监听
+        mBinding.danmuSpeedSlider.addOnChangeListener((slider, value, fromUser) -> {
+            int speed = (int) value;
+            Setting.putDanmuSpeed(speed);
+            updateSpeedLabel(speed);
+        });
 
-    @Override
-    public void setDanmuSize(float size) {
-        mBinding.danmuSizeText.setText(String.valueOf(size));
-        Setting.putDanmuSize(size);
-    }
+        // 大小滑块监听
+        mBinding.danmuSizeSlider.addOnChangeListener((slider, value, fromUser) -> {
+            float size = (float) (Math.round(value * 100.0) / 100.0);
+            Setting.putDanmuSize(size);
+            updateSizeLabel(size);
+        });
 
-    private void onDanmuLine(View view) {
-        DanmuLineDialog.create(this).show();
+        // 行数滑块监听
+        mBinding.danmuLineSlider.addOnChangeListener((slider, value, fromUser) -> {
+            int line = (int) value;
+            Setting.putDanmuLine(line);
+            updateLineLabel(line);
+        });
+
+        // 透明度滑块监听
+        mBinding.danmuAlphaSlider.addOnChangeListener((slider, value, fromUser) -> {
+            int alpha = (int) value;
+            Setting.putDanmuAlpha(alpha);
+            updateAlphaLabel(alpha);
+        });
     }
 
     private void setDanmuLoad(View view) {
@@ -75,26 +85,21 @@ public class SettingDanmuActivity extends BaseActivity implements DanmuLineCallb
         mBinding.danmuLoadText.setText(getSwitch(Setting.isDanmuLoad()));
     }
 
-    @Override
-    public void setDanmuLine(int line) {
-        mBinding.danmuLineText.setText(String.valueOf(line));
-        Setting.putDanmuLine(line);
+    private void updateSpeedLabel(int speed) {
+        String[] speedTexts = {"最快", "快", "正常", "慢"};
+        mBinding.danmuSpeedLabel.setText(getString(R.string.player_danmu_speed) + ": " + speedTexts[speed]);
     }
 
-    private void onDanmuAlpha(View view) {
-        DanmuAlphaDialog.create(this).show();
+    private void updateSizeLabel(float size) {
+        mBinding.danmuSizeLabel.setText(getString(R.string.player_danmu_size) + ": " + String.format("%.1f", size) + ResUtil.getString(R.string.times));
     }
 
-    @Override
-    public void setDanmuAlpha(int alpha) {
-        mBinding.danmuAlphaText.setText(String.valueOf(alpha));
-        Setting.putDanmuAlpha(alpha);
+    private void updateLineLabel(int line) {
+        mBinding.danmuLineLabel.setText(getString(R.string.player_danmu_line) + ": " + line + ResUtil.getString(R.string.lines));
     }
 
-    private void setDanmuSpeed(View view) {
-        int index = Setting.getDanmuSpeed();
-        Setting.putDanmuSpeed(index = index == danmuSpeed.length - 1 ? 0 : ++index);
-        mBinding.danmuSpeedText.setText(danmuSpeed[index]);
+    private void updateAlphaLabel(int alpha) {
+        mBinding.danmuAlphaLabel.setText(getString(R.string.player_danmu_alpha) + ": " + alpha + "%");
     }
 
 
