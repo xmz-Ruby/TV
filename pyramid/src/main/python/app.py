@@ -1,6 +1,8 @@
 import os
+import sys
 import requests
 from importlib.machinery import SourceFileLoader
+from urllib.parse import quote, urlparse, urlunparse
 import json
 
 
@@ -9,12 +11,55 @@ def spider(cache, api):
     path = cache + '/' + name
     download(path, api)
     name = name.split('.')[0]
-    return SourceFileLoader(name, path).load_module().Spider()
+
+    # Add the directory containing app.py to sys.path so spider files can import base/t4 modules
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    if app_dir not in sys.path:
+        sys.path.insert(0, app_dir)
+
+    try:
+        module = SourceFileLoader(name, path).load_module()
+        if not hasattr(module, 'Spider'):
+            raise AttributeError(f"Module '{name}' loaded successfully but has no 'Spider' attribute. Module attributes: {dir(module)}")
+        return module.Spider()
+    except Exception as e:
+        import traceback
+        print(f"Error loading spider module '{name}' from '{path}':")
+        print(f"sys.path: {sys.path}")
+        print(f"Error: {e}")
+        traceback.print_exc()
+        raise
+
+
+def encode_url(url):
+    """
+    Encode URL to handle Chinese characters and other special characters.
+    Only encodes the path and query parts, preserving the scheme and netloc.
+    """
+    parsed = urlparse(url)
+    # Encode the path, but preserve already encoded characters
+    # Split path into segments and encode each segment
+    path_parts = parsed.path.split('/')
+    encoded_parts = [quote(part, safe='') for part in path_parts]
+    encoded_path = '/'.join(encoded_parts)
+
+    # Reconstruct the URL with encoded path
+    encoded_url = urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        encoded_path,
+        parsed.params,
+        parsed.query,
+        parsed.fragment
+    ))
+    return encoded_url
 
 
 def download(path, api):
     if api.startswith('http'):
-        writeFile(path, redirect(api).content)
+        # Encode URL to handle Chinese characters and other special characters
+        encoded_url = encode_url(api)
+        writeFile(path, redirect(encoded_url).content)
     else:
         writeFile(path, str.encode(api))
 
