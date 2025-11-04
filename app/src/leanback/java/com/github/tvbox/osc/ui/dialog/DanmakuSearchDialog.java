@@ -48,6 +48,7 @@ public class DanmakuSearchDialog extends BaseDialog {
     private DanmakuAnimePresenter animePresenter;
     private DanmakuEpisodePresenter episodePresenter;
     private String videoTitle;
+    private String episodeName;
     private DanmakuAnime selectedAnime;
 
     // 集数标识的正则表达式
@@ -59,6 +60,11 @@ public class DanmakuSearchDialog extends BaseDialog {
 
     public DanmakuSearchDialog videoTitle(String title) {
         this.videoTitle = title;
+        return this;
+    }
+
+    public DanmakuSearchDialog episodeName(String name) {
+        this.episodeName = name;
         return this;
     }
 
@@ -75,7 +81,15 @@ public class DanmakuSearchDialog extends BaseDialog {
     }
 
     @Override
+    protected boolean transparent() {
+        return false;
+    }
+
+    @Override
     protected void initView() {
+        // 设置弹层背景不透明度，使内容更清晰
+        setDimAmount(0.7f);
+
         // 设置标题
         if (!TextUtils.isEmpty(videoTitle)) {
             binding.title.setText(cleanTitle(videoTitle));
@@ -135,12 +149,15 @@ public class DanmakuSearchDialog extends BaseDialog {
      */
     private void showQRCode() {
         try {
-            String name = URLEncoder.encode(videoTitle, "UTF-8");
-            String episode = URLEncoder.encode(videoTitle, "UTF-8"); // 可以传递当前集数
-            String url = Server.get().getAddress("/danmaku?name=" + name + "&episode=" + episode);
+            String name = URLEncoder.encode(cleanTitle(videoTitle), "UTF-8");
+            // 使用当前播放的集名，如果没有则使用视频标题
+            String episode = URLEncoder.encode(TextUtils.isEmpty(episodeName) ? videoTitle : episodeName, "UTF-8");
+            // 使用局域网IP而非127.0.0.1
+            String baseUrl = Server.get().getAddress(false);
+            String url = baseUrl + "/danmaku?name=" + name + "&episode=" + episode;
 
             binding.qrcode.setImageBitmap(QRCode.getBitmap(url, 200, 0));
-            binding.qrcodeInfo.setText("扫码进入弹幕投送页面\n" + Server.get().getAddress());
+            binding.qrcodeInfo.setText("扫码进入弹幕投送页面\n" + baseUrl);
             binding.qrcodeLayout.setVisibility(View.VISIBLE);
 
             // 隐藏列表

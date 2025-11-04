@@ -2,14 +2,10 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
 
-    <solid android:color="@color/blue_500" />
+    <!-- 未选中时使用淡灰色半透明背景 -->
+    <solid android:color="@color/black_20" />
 
-    <!-- 添加明显的边框，使焦点更清晰 -->
-    <stroke
-        android:width="3dp"
-        android:color="@color/white" />
-
-    <corners android:radius="4dp" />
+    <corners android:radius="6dp" />
 
     <padding
         android:bottom="8dp"

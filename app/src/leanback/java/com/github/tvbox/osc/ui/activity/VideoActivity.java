@@ -928,7 +928,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void onDanmuSearch() {
-        DanmakuSearchDialog.create().videoTitle(mBinding.name.getText().toString()).show(this);
+        String episodeName = getEpisode() != null ? getEpisode().getName() : "";
+        DanmakuSearchDialog.create()
+                .videoTitle(mBinding.name.getText().toString())
+                .episodeName(episodeName)
+                .show(this);
         hideControl();
     }
 

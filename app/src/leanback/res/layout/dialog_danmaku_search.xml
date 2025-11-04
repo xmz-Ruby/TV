@@ -25,7 +25,7 @@
             android:textStyle="bold"
             android:focusable="true"
             android:clickable="true"
-            android:background="?android:attr/selectableItemBackground" />
+            android:background="@drawable/selector_title_button" />
 
         <TextView
             android:id="@+id/search"
@@ -36,7 +36,8 @@
             android:focusable="true"
             android:clickable="true"
             android:padding="8dp"
-            android:background="?android:attr/selectableItemBackground" />
+            android:layout_marginStart="8dp"
+            android:background="@drawable/selector_title_button" />
 
         <TextView
             android:id="@+id/close"
@@ -48,7 +49,7 @@
             android:clickable="true"
             android:padding="8dp"
             android:layout_marginStart="8dp"
-            android:background="?android:attr/selectableItemBackground" />
+            android:background="@drawable/selector_title_button" />
     </LinearLayout>
 
     <!-- 二维码显示区域 -->
