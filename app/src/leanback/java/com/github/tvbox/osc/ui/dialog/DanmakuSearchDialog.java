@@ -35,8 +35,6 @@ import com.github.tvbox.osc.utils.ResUtil;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
-import java.net.URLEncoder;
-
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -165,12 +163,9 @@ public class DanmakuSearchDialog extends BaseDialog {
      */
     private void showQRCode() {
         try {
-            String name = URLEncoder.encode(cleanTitle(videoTitle), "UTF-8");
-            // 使用当前播放的集名，如果没有则使用视频标题
-            String episode = URLEncoder.encode(TextUtils.isEmpty(episodeName) ? videoTitle : episodeName, "UTF-8");
             // 使用局域网IP而非127.0.0.1
             String baseUrl = Server.get().getAddress(false);
-            String url = baseUrl + "/danmaku?name=" + name + "&episode=" + episode;
+            String url = baseUrl + "/danmaku";
 
             binding.qrcode.setImageBitmap(QRCode.getBitmap(url, 200, 0));
             binding.qrcodeInfo.setText("扫码进入弹幕投送页面\n" + baseUrl);

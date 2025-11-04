@@ -251,10 +251,6 @@ public class DanmakuPage implements Process {
      * 返回弹幕投送页面 HTML
      */
     private NanoHTTPD.Response getDanmakuPage(NanoHTTPD.IHTTPSession session) {
-        Map<String, String> params = session.getParms();
-        String name = params.get("name");
-        String episode = params.get("episode");
-
         String html = "<!DOCTYPE html>\n" +
             "<html lang=\"zh-CN\">\n" +
             "<head>\n" +
@@ -397,18 +393,56 @@ public class DanmakuPage implements Process {
             "        .toast.show {\n" +
             "            display: block;\n" +
             "        }\n" +
+            "        .fab-container {\n" +
+            "            position: fixed;\n" +
+            "            right: 20px;\n" +
+            "            bottom: 20px;\n" +
+            "            display: none;\n" +
+            "            flex-direction: column;\n" +
+            "            gap: 10px;\n" +
+            "            z-index: 1000;\n" +
+            "        }\n" +
+            "        .fab-container.show {\n" +
+            "            display: flex;\n" +
+            "        }\n" +
+            "        .fab-btn {\n" +
+            "            width: 56px;\n" +
+            "            height: 56px;\n" +
+            "            border-radius: 50%;\n" +
+            "            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n" +
+            "            color: white;\n" +
+            "            border: none;\n" +
+            "            box-shadow: 0 4px 12px rgba(0,0,0,0.3);\n" +
+            "            cursor: pointer;\n" +
+            "            font-size: 24px;\n" +
+            "            display: flex;\n" +
+            "            align-items: center;\n" +
+            "            justify-content: center;\n" +
+            "            transition: transform 0.2s, box-shadow 0.2s;\n" +
+            "        }\n" +
+            "        .fab-btn:active {\n" +
+            "            transform: scale(0.9);\n" +
+            "            box-shadow: 0 2px 8px rgba(0,0,0,0.3);\n" +
+            "        }\n" +
+            "        .fab-btn.secondary {\n" +
+            "            width: 48px;\n" +
+            "            height: 48px;\n" +
+            "            font-size: 20px;\n" +
+            "            background: rgba(255,255,255,0.9);\n" +
+            "            color: #667eea;\n" +
+            "        }\n" +
             "    </style>\n" +
             "</head>\n" +
             "<body>\n" +
             "    <div class=\"container\">\n" +
             "        <div class=\"header\">\n" +
             "            <h1>🎬 弹幕投送</h1>\n" +
-            "            <p>搜索并投送弹幕到电视</p>\n" +
+            "            <p id=\"headerSubtitle\">搜索并投送弹幕到电视</p>\n" +
             "        </div>\n" +
             "        \n" +
             "        <div class=\"search-box\">\n" +
             "            <div class=\"search-input-group\">\n" +
-            "                <input type=\"text\" class=\"search-input\" id=\"searchInput\" placeholder=\"输入剧名搜索...\" value=\"" + (name != null ? name : "") + "\">\n" +
+            "                <input type=\"text\" class=\"search-input\" id=\"searchInput\" placeholder=\"输入剧名搜索...\">\n" +
             "                <button class=\"search-btn\" id=\"searchBtn\">搜索</button>\n" +
             "            </div>\n" +
             "        </div>\n" +
@@ -420,26 +454,52 @@ public class DanmakuPage implements Process {
             "    \n" +
             "    <div class=\"toast\" id=\"toast\"></div>\n" +
             "    \n" +
+            "    <!-- 悬浮按钮 -->\n" +
+            "    <div class=\"fab-container\" id=\"fabContainer\">\n" +
+            "        <button class=\"fab-btn secondary\" id=\"topBtn\" title=\"回到顶部\">↑</button>\n" +
+            "        <button class=\"fab-btn secondary\" id=\"bottomBtn\" title=\"跳到底部\">↓</button>\n" +
+            "        <button class=\"fab-btn\" id=\"reverseBtn\" title=\"反转列表\">⇅</button>\n" +
+            "    </div>\n" +
+            "    \n" +
             "    <script>\n" +
             "        let currentAnimeId = null;\n" +
             "        let currentAnimeName = '';\n" +
             "        let targetEpisodeNumber = null;\n" +
+            "        let currentEpisodes = null;\n" +
+            "        let isReversed = false;\n" +
             "        \n" +
             "        // 初始化\n" +
             "        window.onload = function() {\n" +
-            "            const urlParams = new URLSearchParams(window.location.search);\n" +
-            "            const name = urlParams.get('name');\n" +
-            "            const episode = urlParams.get('episode');\n" +
-            "            \n" +
-            "            if (episode) {\n" +
-            "                targetEpisodeNumber = parseEpisodeNumber(episode);\n" +
-            "            }\n" +
-            "            \n" +
-            "            if (name) {\n" +
-            "                const cleanName = cleanTitle(name);\n" +
-            "                document.getElementById('searchInput').value = cleanName;\n" +
-            "                performSearch();\n" +
-            "            }\n" +
+            "            // 从服务器获取当前播放信息\n" +
+            "            fetch('/media')\n" +
+            "                .then(res => res.json())\n" +
+            "                .then(data => {\n" +
+            "                    if (data && data.title) {\n" +
+            "                        const name = data.title;\n" +
+            "                        const episode = data.artist || '';\n" +
+            "                        \n" +
+            "                        // 显示当前剧名和集名\n" +
+            "                        if (name || episode) {\n" +
+            "                            let subtitle = '当前: ';\n" +
+            "                            if (name) subtitle += name;\n" +
+            "                            if (episode) subtitle += ' - ' + episode;\n" +
+            "                            document.getElementById('headerSubtitle').textContent = subtitle;\n" +
+            "                        }\n" +
+            "                        \n" +
+            "                        if (episode) {\n" +
+            "                            targetEpisodeNumber = parseEpisodeNumber(episode);\n" +
+            "                        }\n" +
+            "                        \n" +
+            "                        if (name) {\n" +
+            "                            const cleanName = cleanTitle(name);\n" +
+            "                            document.getElementById('searchInput').value = cleanName;\n" +
+            "                            performSearch();\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                })\n" +
+            "                .catch(err => {\n" +
+            "                    console.log('获取播放信息失败:', err);\n" +
+            "                });\n" +
             "        };\n" +
             "        \n" +
             "        // 清理标题\n" +
@@ -453,13 +513,51 @@ public class DanmakuPage implements Process {
             "                /第(\\d+)集/,\n" +
             "                /(\\d+)集/,\n" +
             "                /EP?(\\d+)/i,\n" +
-            "                /S\\d+E(\\d+)/i\n" +
+            "                /S\\d+E(\\d+)/i,\n" +
+            "                /^\\[(\\d+)\\]/  // 序号前缀格式：[1]、[2]等\n" +
             "            ];\n" +
             "            for (let pattern of patterns) {\n" +
             "                const match = episode.match(pattern);\n" +
             "                if (match) return parseInt(match[1]);\n" +
             "            }\n" +
             "            return null;\n" +
+            "        }\n" +
+            "        \n" +
+            "        // 自动匹配剧集（参考播放器的多级匹配策略）\n" +
+            "        function autoMatchEpisode(episodes, episodeName, episodeNumber) {\n" +
+            "            if (!episodes || episodes.length === 0) return -1;\n" +
+            "            \n" +
+            "            // 规则1: 精准匹配剧集名\n" +
+            "            if (episodeName) {\n" +
+            "                for (let i = 0; i < episodes.length; i++) {\n" +
+            "                    const ep = episodes[i];\n" +
+            "                    const epTitle = ep.episodeTitle || '';\n" +
+            "                    if (episodeName === epTitle) {\n" +
+            "                        return i;\n" +
+            "                    }\n" +
+            "                }\n" +
+            "            }\n" +
+            "            \n" +
+            "            // 规则2: 使用集数匹配\n" +
+            "            if (episodeNumber) {\n" +
+            "                for (let i = 0; i < episodes.length; i++) {\n" +
+            "                    const ep = episodes[i];\n" +
+            "                    \n" +
+            "                    // 先尝试使用接口返回的episodeNumber\n" +
+            "                    if (ep.episodeNumber && parseInt(ep.episodeNumber) === episodeNumber) {\n" +
+            "                        return i;\n" +
+            "                    }\n" +
+            "                    \n" +
+            "                    // 再尝试从标题中解析集数\n" +
+            "                    const title = ep.episodeTitle || '';\n" +
+            "                    const parsedNumber = parseEpisodeNumber(title);\n" +
+            "                    if (parsedNumber === episodeNumber) {\n" +
+            "                        return i;\n" +
+            "                    }\n" +
+            "                }\n" +
+            "            }\n" +
+            "            \n" +
+            "            return -1; // 未匹配到\n" +
             "        }\n" +
             "        \n" +
             "        // 搜索按钮点击\n" +
@@ -519,6 +617,9 @@ public class DanmakuPage implements Process {
             "            \n" +
             "            document.getElementById('resultsContent').innerHTML = html;\n" +
             "            document.getElementById('results').classList.add('show');\n" +
+            "            \n" +
+            "            // 隐藏悬浮按钮\n" +
+            "            document.getElementById('fabContainer').classList.remove('show');\n" +
             "        }\n" +
             "        \n" +
             "        // 选择番剧\n" +
@@ -546,14 +647,21 @@ public class DanmakuPage implements Process {
             "        function showEpisodeList(episodes) {\n" +
             "            if (!episodes || episodes.length === 0) {\n" +
             "                showEmpty('该番剧暂无剧集');\n" +
+            "                document.getElementById('fabContainer').classList.remove('show');\n" +
             "                return;\n" +
             "            }\n" +
             "            \n" +
+            "            // 保存当前剧集列表（如果不是反转操作，则保存原始列表）\n" +
+            "            if (!currentEpisodes || currentEpisodes.length !== episodes.length) {\n" +
+            "                currentEpisodes = episodes;\n" +
+            "                isReversed = false;\n" +
+            "            }\n" +
+            "            \n" +
             "            let html = '<div class=\"back-btn\" onclick=\"performSearch()\">← 返回搜索结果</div>';\n" +
-            "            episodes.forEach(episode => {\n" +
+            "            episodes.forEach((episode, index) => {\n" +
             "                const title = episode.episodeTitle || '第' + episode.episodeNumber + '集';\n" +
             "                html += `\n" +
-            "                    <div class=\"result-item\" onclick=\"castEpisode(${episode.episodeId}, '${escapeHtml(title)}')\">\n" +
+            "                    <div class=\"result-item\" data-index=\"${index}\" onclick=\"castEpisode(${episode.episodeId}, '${escapeHtml(title)}')\">\n" +
             "                        <div class=\"result-title\">${escapeHtml(title)}</div>\n" +
             "                    </div>\n" +
             "                `;\n" +
@@ -562,18 +670,27 @@ public class DanmakuPage implements Process {
             "            document.getElementById('resultsContent').innerHTML = html;\n" +
             "            document.getElementById('results').classList.add('show');\n" +
             "            \n" +
-            "            // 自动滚动到目标集数\n" +
-            "            if (targetEpisodeNumber) {\n" +
-            "                setTimeout(() => {\n" +
-            "                    const items = document.querySelectorAll('.result-item');\n" +
-            "                    items.forEach(item => {\n" +
-            "                        const text = item.textContent;\n" +
-            "                        if (text.includes('第' + targetEpisodeNumber + '集')) {\n" +
-            "                            item.scrollIntoView({ behavior: 'smooth', block: 'center' });\n" +
-            "                            item.style.background = '#fff3cd';\n" +
+            "            // 显示悬浮按钮\n" +
+            "            document.getElementById('fabContainer').classList.add('show');\n" +
+            "            \n" +
+            "            // 使用改进的自动匹配功能（仅在首次加载时）\n" +
+            "            if (!isReversed) {\n" +
+            "                const urlParams = new URLSearchParams(window.location.search);\n" +
+            "                const episodeName = urlParams.get('episode');\n" +
+            "                const matchedIndex = autoMatchEpisode(episodes, episodeName, targetEpisodeNumber);\n" +
+            "                \n" +
+            "                if (matchedIndex >= 0) {\n" +
+            "                    setTimeout(() => {\n" +
+            "                        const items = document.querySelectorAll('.result-item');\n" +
+            "                        const matchedItem = items[matchedIndex];\n" +
+            "                        if (matchedItem) {\n" +
+            "                            matchedItem.scrollIntoView({ behavior: 'smooth', block: 'center' });\n" +
+            "                            matchedItem.style.background = '#fff3cd';\n" +
+            "                            const epTitle = episodes[matchedIndex].episodeTitle || '第' + episodes[matchedIndex].episodeNumber + '集';\n" +
+            "                            showToast('已自动定位到: ' + epTitle);\n" +
             "                        }\n" +
-            "                    });\n" +
-            "                }, 100);\n" +
+            "                    }, 200);\n" +
+            "                }\n" +
             "            }\n" +
             "        }\n" +
             "        \n" +
@@ -623,6 +740,27 @@ public class DanmakuPage implements Process {
             "            div.textContent = text;\n" +
             "            return div.innerHTML;\n" +
             "        }\n" +
+            "        \n" +
+            "        // 悬浮按钮功能\n" +
+            "        document.getElementById('topBtn').addEventListener('click', function() {\n" +
+            "            window.scrollTo({ top: 0, behavior: 'smooth' });\n" +
+            "        });\n" +
+            "        \n" +
+            "        document.getElementById('bottomBtn').addEventListener('click', function() {\n" +
+            "            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });\n" +
+            "        });\n" +
+            "        \n" +
+            "        document.getElementById('reverseBtn').addEventListener('click', function() {\n" +
+            "            if (!currentEpisodes || currentEpisodes.length === 0) {\n" +
+            "                showToast('没有可反转的列表');\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            isReversed = !isReversed;\n" +
+            "            const reversedEpisodes = [...currentEpisodes].reverse();\n" +
+            "            showEpisodeList(reversedEpisodes);\n" +
+            "            showToast(isReversed ? '已反转列表' : '已恢复顺序');\n" +
+            "        });\n" +
             "    </script>\n" +
             "</body>\n" +
             "</html>";

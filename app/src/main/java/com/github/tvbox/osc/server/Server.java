@@ -10,6 +10,10 @@ public class Server {
     private Nano nano;
     private int port;
 
+    // 当前播放信息
+    private volatile String currentTitle = "";
+    private volatile String currentEpisode = "";
+
     private static class Loader {
         static volatile Server INSTANCE = new Server();
     }
@@ -69,5 +73,27 @@ public class Server {
     public void stop() {
         if (nano != null) nano.stop();
         nano = null;
+    }
+
+    /**
+     * 设置当前播放信息
+     */
+    public void setCurrentMedia(String title, String episode) {
+        this.currentTitle = title != null ? title : "";
+        this.currentEpisode = episode != null ? episode : "";
+    }
+
+    /**
+     * 获取当前播放的剧名
+     */
+    public String getCurrentTitle() {
+        return currentTitle;
+    }
+
+    /**
+     * 获取当前播放的集名
+     */
+    public String getCurrentEpisode() {
+        return currentEpisode;
     }
 }
