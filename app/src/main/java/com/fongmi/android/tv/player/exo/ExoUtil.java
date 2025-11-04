@@ -37,7 +37,8 @@ import java.util.Map;
 public class ExoUtil {
 
     public static LoadControl buildLoadControl() {
-        return new DefaultLoadControl(Setting.getBuffer());
+        int minBufferMs = Math.max(Setting.getBuffer() * 1000, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+        return new DefaultLoadControl.Builder().setBufferDurationsMs(minBufferMs, DefaultLoadControl.DEFAULT_MAX_BUFFER_MS, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS).build();
     }
 
     public static TrackSelector buildTrackSelector() {
@@ -108,12 +109,10 @@ public class ExoUtil {
 
     public static MediaItem getMediaItem(Map<String, String> headers, Uri uri, String mimeType, Drm drm, List<Sub> subs, int decode) {
         MediaItem.Builder builder = new MediaItem.Builder().setUri(uri);
-        builder.setAllowChunklessPreparation(decode == Players.HARD);
         builder.setRequestMetadata(getRequestMetadata(headers, uri));
         builder.setSubtitleConfigurations(getSubtitleConfigs(subs));
         if (drm != null) builder.setDrmConfiguration(drm.get());
         if (mimeType != null) builder.setMimeType(mimeType);
-        builder.setForceUseRtpTcp(Setting.getRtsp() == 1);
         builder.setAds(Sniffer.getRegex(uri));
         builder.setMediaId(uri.toString());
         return builder.build();

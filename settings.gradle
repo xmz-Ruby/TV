@@ -24,6 +24,10 @@ dependencyResolutionManagement {
         }
     }
 }
+
+// Set properties required by media3 modules
+gradle.ext.androidxMediaSettingsDir = file('../media').canonicalPath
+
 include ':app'
 include ':hook'
 include ':tvbus'
@@ -36,4 +40,49 @@ include ':youtube'
 include ':jianpian'
 include ':forcetech'
 include ':ijkplayer'
+
+// Include media3 modules
+include ':lib-common'
+project(':lib-common').projectDir = new File('../media/libraries/common')
+include ':lib-container'
+project(':lib-container').projectDir = new File('../media/libraries/container')
+include ':lib-database'
+project(':lib-database').projectDir = new File('../media/libraries/database')
+include ':lib-datasource'
+project(':lib-datasource').projectDir = new File('../media/libraries/datasource')
+include ':lib-datasource-okhttp'
+project(':lib-datasource-okhttp').projectDir = new File('../media/libraries/datasource_okhttp')
+include ':lib-datasource-rtmp'
+project(':lib-datasource-rtmp').projectDir = new File('../media/libraries/datasource_rtmp')
+include ':lib-decoder'
+project(':lib-decoder').projectDir = new File('../media/libraries/decoder')
+include ':lib-decoder-av1'
+project(':lib-decoder-av1').projectDir = new File('../media/libraries/decoder_av1')
+include ':lib-exoplayer'
+project(':lib-exoplayer').projectDir = new File('../media/libraries/exoplayer')
+include ':lib-exoplayer-dash'
+project(':lib-exoplayer-dash').projectDir = new File('../media/libraries/exoplayer_dash')
+include ':lib-exoplayer-hls'
+project(':lib-exoplayer-hls').projectDir = new File('../media/libraries/exoplayer_hls')
+include ':lib-exoplayer-rtsp'
+project(':lib-exoplayer-rtsp').projectDir = new File('../media/libraries/exoplayer_rtsp')
+include ':lib-exoplayer-smoothstreaming'
+project(':lib-exoplayer-smoothstreaming').projectDir = new File('../media/libraries/exoplayer_smoothstreaming')
+include ':lib-extractor'
+project(':lib-extractor').projectDir = new File('../media/libraries/extractor')
+include ':lib-ui'
+project(':lib-ui').projectDir = new File('../media/libraries/ui')
+include ':test-utils'
+project(':test-utils').projectDir = new File('../media/libraries/test_utils')
+include ':test-data'
+project(':test-data').projectDir = new File('../media/libraries/test_data')
+include ':test-utils-robolectric'
+project(':test-utils-robolectric').projectDir = new File('../media/libraries/test_utils_robolectric')
+include ':lib-transformer'
+project(':lib-transformer').projectDir = new File('../media/libraries/transformer')
+include ':lib-effect'
+project(':lib-effect').projectDir = new File('../media/libraries/effect')
+include ':lib-muxer'
+project(':lib-muxer').projectDir = new File('../media/libraries/muxer')
+
 rootProject.name = "TV"

@@ -89,6 +89,7 @@ android {
         resolutionStrategy {
             force 'com.squareup.okhttp3:okhttp:' + okhttpVersion
         }
+        exclude group: 'com.github.mcxinyu', module: 'LibRtmp-Client-for-Android'
     }
 
     lint {
@@ -127,7 +128,7 @@ dependencies {
     implementation 'com.guolindev.permissionx:permissionx:1.8.0'
     implementation 'com.hierynomus:smbj:0.13.0'
     implementation 'com.tencent.tbs:tbssdk:44286'
-    implementation 'io.antmedia:rtmp-client:3.2.0'
+    implementation('io.antmedia:rtmp-client:3.2.0') { exclude group: 'com.github.mcxinyu', module: 'LibRtmp-Client-for-Android' }
     implementation 'javax.servlet:javax.servlet-api:3.1.0'
     implementation 'org.chromium.net:cronet-embedded:76.3809.111'
     implementation 'org.eclipse.jetty:jetty-client:8.1.22.v20160922'
@@ -142,21 +143,21 @@ dependencies {
     implementation(ext: 'aar', name: 'dlna-core-release', group: 'fongmi', version: 'release')
     implementation(ext: 'aar', name: 'dlna-dmc-release', group: 'fongmi', version: 'release')
     implementation(ext: 'aar', name: 'dlna-dmr-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-common-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-container-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-database-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-datasource-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-datasource-okhttp-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-datasource-rtmp-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-decoder-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-decoder-av1-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-exoplayer-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-exoplayer-dash-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-exoplayer-hls-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-exoplayer-rtsp-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-exoplayer-smoothstreaming-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-extractor-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'lib-ui-release', group: 'fongmi', version: 'release')
+    implementation project(':lib-common')
+    implementation project(':lib-container')
+    implementation project(':lib-database')
+    implementation project(':lib-datasource')
+    implementation project(':lib-datasource-okhttp')
+    implementation project(':lib-datasource-rtmp')
+    implementation project(':lib-decoder')
+    implementation project(':lib-decoder-av1')
+    implementation project(':lib-exoplayer')
+    implementation project(':lib-exoplayer-dash')
+    implementation project(':lib-exoplayer-hls')
+    implementation project(':lib-exoplayer-rtsp')
+    implementation project(':lib-exoplayer-smoothstreaming')
+    implementation project(':lib-extractor')
+    implementation project(':lib-ui')
     leanbackImplementation 'androidx.leanback:leanback:1.2.0-alpha04'
     leanbackImplementation 'com.github.hedzr:android-file-chooser:v1.2.0-final'
     leanbackImplementation 'com.github.JessYanCoding:AndroidAutoSize:1.2.1'
