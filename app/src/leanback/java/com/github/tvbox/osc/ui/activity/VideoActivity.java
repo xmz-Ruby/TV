@@ -122,7 +122,7 @@ import okhttp3.Call;
 import okhttp3.Response;
 import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 
-public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback {
+public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback, com.github.tvbox.osc.impl.DanmuSettingCallback {
 
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
@@ -374,6 +374,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mBinding.control.danmu.setUpListener(this::onDanmuAdd);
         mBinding.control.danmu.setDownListener(this::onDanmuSub);
         mBinding.control.danmuSearch.setOnClickListener(view -> onDanmuSearch());
+        mBinding.control.danmuSetting.setOnClickListener(view -> onDanmuSetting());
         mBinding.control.next.setOnClickListener(view -> checkNext());
         mBinding.control.prev.setOnClickListener(view -> checkPrev());
         mBinding.control.episodes.setOnClickListener(view -> onEpisodes());
@@ -961,6 +962,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                 .episodeName(episodeName)
                 .episodeIndex(episodeIndex)
                 .show(this);
+        hideControl();
+    }
+
+    private void onDanmuSetting() {
+        com.github.tvbox.osc.ui.dialog.DanmuSettingDialog.create(this).show();
         hideControl();
     }
 
@@ -1881,6 +1887,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             stopSearch();
             super.onBackPressed();
         }
+    }
+
+    @Override
+    public void onDanmuSettingChanged() {
+        setDanmuViewSettings();
     }
 
     @Override

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="600dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="center"
+        android:text="弹幕设置"
+        android:textColor="@color/white"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- 弹幕速度 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/speedLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="速度"
+            android:textColor="@color/white"
+            android:textSize="16sp" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/speedSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/selector_item"
+            android:padding="8dp"
+            android:stepSize="1"
+            android:valueFrom="0"
+            android:valueTo="3"
+            app:thumbColor="@color/blue_500"
+            app:trackColorActive="@color/blue_500"
+            app:trackColorInactive="@color/blue_50" />
+
+    </LinearLayout>
+
+    <!-- 弹幕大小 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/sizeLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="大小"
+            android:textColor="@color/white"
+            android:textSize="16sp" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sizeSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/selector_item"
+            android:padding="8dp"
+            android:stepSize="0.1"
+            android:valueFrom="0.6"
+            android:valueTo="2"
+            app:thumbColor="@color/blue_500"
+            app:trackColorActive="@color/blue_500"
+            app:trackColorInactive="@color/blue_50" />
+
+    </LinearLayout>
+
+    <!-- 弹幕行数 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/lineLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="行数"
+            android:textColor="@color/white"
+            android:textSize="16sp" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/lineSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/selector_item"
+            android:padding="8dp"
+            android:stepSize="1"
+            android:valueFrom="1"
+            android:valueTo="15"
+            app:thumbColor="@color/blue_500"
+            app:trackColorActive="@color/blue_500"
+            app:trackColorInactive="@color/blue_50" />
+
+    </LinearLayout>
+
+    <!-- 弹幕透明度 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/alphaLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="透明度"
+            android:textColor="@color/white"
+            android:textSize="16sp" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/alphaSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/selector_item"
+            android:padding="8dp"
+            android:stepSize="5"
+            android:valueFrom="10"
+            android:valueTo="100"
+            app:thumbColor="@color/blue_500"
+            app:trackColorActive="@color/blue_500"
+            app:trackColorInactive="@color/blue_50" />
+
+    </LinearLayout>
+
+    <!-- 关闭按钮 -->
+    <TextView
+        android:id="@+id/closeButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/selector_text"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:gravity="center"
+        android:padding="12dp"
+        android:text="关闭"
+        android:textColor="@color/white"
+        android:textSize="16sp" />
+
+</LinearLayout>
