@@ -112,7 +112,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
         mBinding.restore.setOnClickListener(this::onRestore);
         mBinding.player.setOnClickListener(this::onPlayer);
         mBinding.danmu.setOnClickListener(this::onDanmu);
-        mBinding.version.setOnClickListener(this::onVersion);
         mBinding.vod.setOnLongClickListener(this::onVodEdit);
         mBinding.vodHome.setOnClickListener(this::onVodHome);
         mBinding.live.setOnLongClickListener(this::onLiveEdit);
@@ -120,7 +119,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
         mBinding.wall.setOnLongClickListener(this::onWallEdit);
         mBinding.backup.setOnLongClickListener(this::onBackupMode);
         mBinding.vodHistory.setOnClickListener(this::onVodHistory);
-        mBinding.version.setOnLongClickListener(this::onVersionDev);
         mBinding.liveHistory.setOnClickListener(this::onLiveHistory);
         mBinding.wallDefault.setOnClickListener(this::setWallDefault);
         mBinding.wallRefresh.setOnClickListener(this::setWallRefresh);
@@ -261,15 +259,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
 
     private void onDanmu(View view) {
         SettingDanmuActivity.start(this);
-    }
-
-    private void onVersion(View view) {
-        Updater.get().force().release().start(this);
-    }
-
-    private boolean onVersionDev(View view) {
-        Updater.get().force().dev().start(this);
-        return true;
     }
 
     private void setWallDefault(View view) {
