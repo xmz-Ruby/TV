@@ -161,6 +161,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private View mFocus1;
     private View mFocus2;
     private boolean hasKeyEvent;
+    private String mCurrentDanmaku;
 
     public static void push(FragmentActivity activity, String text) {
         if (FileChooser.isValid(activity, Uri.parse(text))) file(activity, FileChooser.getPathFromUri(activity, Uri.parse(text)));
@@ -577,10 +578,34 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void checkDanmu(String danmu) {
+        mCurrentDanmaku = danmu;
         mBinding.danmaku.release();
+        updateDanmuControlsVisibility();
         if (!Setting.isDanmuLoad()) return;
         mBinding.danmaku.setVisibility(danmu.isEmpty() ? View.GONE : View.VISIBLE);
         if (danmu.length() > 0) App.execute(() -> mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext));
+    }
+
+    private void updateDanmuControlsVisibility() {
+        boolean danmuLoad = Setting.isDanmuLoad();
+        // 弹幕开关关闭时，隐藏弹幕显示和搜索按钮，只保留设置按钮
+        mBinding.control.danmu.setVisibility(danmuLoad ? View.VISIBLE : View.GONE);
+        mBinding.control.danmuSearch.setVisibility(danmuLoad ? View.VISIBLE : View.GONE);
+        // 弹幕设置按钮始终显示，用户可以在设置中开启弹幕
+
+        // 弹幕开关关闭时，隐藏弹幕视图
+        if (!danmuLoad) {
+            mBinding.danmaku.setVisibility(View.GONE);
+            mBinding.danmaku.hide();
+        } else {
+            // 弹幕开关开启时，重新加载弹幕
+            if (mCurrentDanmaku != null && !mCurrentDanmaku.isEmpty()) {
+                mBinding.danmaku.setVisibility(View.VISIBLE);
+                if (Setting.isDanmu()) {
+                    mBinding.danmaku.show();
+                }
+            }
+        }
     }
 
     private void setEmpty(boolean finish) {
@@ -1397,7 +1422,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (event.getType() == RefreshEvent.Type.DETAIL) getDetail();
         else if (event.getType() == RefreshEvent.Type.PLAYER) onRefresh();
         else if (event.getType() == RefreshEvent.Type.DANMAKU) checkDanmu(event.getPath());
-        else if (event.getType() == RefreshEvent.Type.DANMAKU_SETTING) setDanmuViewSettings();
+        else if (event.getType() == RefreshEvent.Type.DANMAKU_SETTING) {
+            setDanmuViewSettings();
+            updateDanmuControlsVisibility();
+            showDanmu();
+        }
         else if (event.getType() == RefreshEvent.Type.SUBTITLE) mPlayers.setSub(Sub.from(event.getPath()));
     }
 
@@ -1893,6 +1922,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     @Override
     public void onDanmuSettingChanged() {
         setDanmuViewSettings();
+        updateDanmuControlsVisibility();
+        showDanmu();
     }
 
     @Override

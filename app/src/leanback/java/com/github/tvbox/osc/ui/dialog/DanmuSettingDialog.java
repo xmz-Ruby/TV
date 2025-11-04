@@ -41,6 +41,9 @@ public class DanmuSettingDialog {
     }
 
     private void initView() {
+        // 设置弹幕开关状态
+        updateDanmuLoadText();
+
         // 设置当前值
         binding.speedSlider.setValue(Setting.getDanmuSpeed());
         binding.sizeSlider.setValue(Setting.getDanmuSize());
@@ -87,6 +90,14 @@ public class DanmuSettingDialog {
             callback.onDanmuSettingChanged();
         });
 
+        // 弹幕开关按钮
+        binding.danmuLoadButton.setOnClickListener(v -> toggleDanmuLoad());
+        binding.danmuLoadButton.setOnKeyListener((view, keyCode, event) -> {
+            boolean enter = KeyUtil.isEnterKey(event);
+            if (enter) toggleDanmuLoad();
+            return enter;
+        });
+
         // 关闭按钮
         binding.closeButton.setOnClickListener(v -> dialog.dismiss());
         binding.closeButton.setOnKeyListener((view, keyCode, event) -> {
@@ -94,6 +105,16 @@ public class DanmuSettingDialog {
             if (enter) dialog.dismiss();
             return enter;
         });
+    }
+
+    private void toggleDanmuLoad() {
+        Setting.putDanmuLoad(!Setting.isDanmuLoad());
+        updateDanmuLoadText();
+        callback.onDanmuSettingChanged();
+    }
+
+    private void updateDanmuLoadText() {
+        binding.danmuLoadText.setText(Setting.isDanmuLoad() ? "开" : "关");
     }
 
     private void updateSpeedLabel(int speed) {

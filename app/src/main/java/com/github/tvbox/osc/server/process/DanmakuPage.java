@@ -230,6 +230,10 @@ public class DanmakuPage implements Process {
         if (key != null && value != null) {
             try {
                 switch (key) {
+                    case "load":
+                        boolean load = Integer.parseInt(value) != 0;
+                        com.github.tvbox.osc.Setting.putDanmuLoad(load);
+                        break;
                     case "speed":
                         int speed = Integer.parseInt(value);
                         com.github.tvbox.osc.Setting.putDanmuSpeed(speed);
@@ -265,6 +269,7 @@ public class DanmakuPage implements Process {
 
         // 否则返回当前设置
         Map<String, Object> settings = new HashMap<>();
+        settings.put("load", com.github.tvbox.osc.Setting.isDanmuLoad());
         settings.put("speed", com.github.tvbox.osc.Setting.getDanmuSpeed());
         settings.put("size", com.github.tvbox.osc.Setting.getDanmuSize());
         settings.put("line", com.github.tvbox.osc.Setting.getDanmuLine(3));
@@ -585,15 +590,27 @@ public class DanmakuPage implements Process {
             "            <p id=\"headerSubtitle\">搜索并投送弹幕到电视</p>\n" +
             "        </div>\n" +
             "        \n" +
-            "        <div class=\"search-box\">\n" +
-            "            <div class=\"search-input-group\">\n" +
-            "                <input type=\"text\" class=\"search-input\" id=\"searchInput\" placeholder=\"输入剧名搜索...\">\n" +
-            "                <button class=\"search-btn\" id=\"searchBtn\">搜索</button>\n" +
+            "        <!-- 弹幕关闭提示 -->\n" +
+            "        <div id=\"danmuOffContainer\" style=\"display: none; text-align: center; padding: 40px;\">\n" +
+            "            <div style=\"background: white; border-radius: 12px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);\">\n" +
+            "                <h2 style=\"color: #333; margin-bottom: 20px;\">弹幕功能已关闭</h2>\n" +
+            "                <p style=\"color: #666; margin-bottom: 30px;\">请先开启弹幕功能</p>\n" +
+            "                <button class=\"search-btn\" id=\"enableDanmuBtn\" style=\"padding: 15px 40px; font-size: 18px;\">开启弹幕</button>\n" +
             "            </div>\n" +
             "        </div>\n" +
             "        \n" +
-            "        <div class=\"results\" id=\"results\">\n" +
-            "            <div id=\"resultsContent\"></div>\n" +
+            "        <!-- 搜索和结果区域 -->\n" +
+            "        <div id=\"danmuOnContainer\">\n" +
+            "            <div class=\"search-box\">\n" +
+            "                <div class=\"search-input-group\">\n" +
+            "                    <input type=\"text\" class=\"search-input\" id=\"searchInput\" placeholder=\"输入剧名搜索...\">\n" +
+            "                    <button class=\"search-btn\" id=\"searchBtn\">搜索</button>\n" +
+            "                </div>\n" +
+            "            </div>\n" +
+            "            \n" +
+            "            <div class=\"results\" id=\"results\">\n" +
+            "                <div id=\"resultsContent\"></div>\n" +
+            "            </div>\n" +
             "        </div>\n" +
             "    </div>\n" +
             "    \n" +
@@ -616,6 +633,14 @@ public class DanmakuPage implements Process {
             "    <div class=\"settings-modal\" id=\"settingsModal\">\n" +
             "        <div class=\"settings-content\">\n" +
             "            <div class=\"settings-header\">弹幕设置</div>\n" +
+            "            \n" +
+            "            <div class=\"setting-item\">\n" +
+            "                <div class=\"setting-label\">\n" +
+            "                    <span>弹幕开关</span>\n" +
+            "                    <span class=\"setting-value\" id=\"loadValue\">开</span>\n" +
+            "                </div>\n" +
+            "                <button class=\"close-btn\" id=\"loadToggleBtn\" style=\"background: #667eea; margin-top: 10px;\">切换</button>\n" +
+            "            </div>\n" +
             "            \n" +
             "            <div class=\"setting-item\">\n" +
             "                <div class=\"setting-label\">\n" +
@@ -673,38 +698,57 @@ public class DanmakuPage implements Process {
             "        let isReversed = false;\n" +
             "        let highlightedEpisodeId = null;\n" +
             "        \n" +
+            "        // 更新页面显示状态\n" +
+            "        function updatePageDisplay() {\n" +
+            "            if (danmakuSettings.load) {\n" +
+            "                document.getElementById('danmuOffContainer').style.display = 'none';\n" +
+            "                document.getElementById('danmuOnContainer').style.display = 'block';\n" +
+            "            } else {\n" +
+            "                document.getElementById('danmuOffContainer').style.display = 'block';\n" +
+            "                document.getElementById('danmuOnContainer').style.display = 'none';\n" +
+            "            }\n" +
+            "        }\n" +
+            "        \n" +
             "        // 初始化\n" +
             "        window.onload = function() {\n" +
-            "            // 从服务器获取当前播放信息\n" +
-            "            fetch('/media')\n" +
-            "                .then(res => res.json())\n" +
-            "                .then(data => {\n" +
-            "                    if (data && data.title) {\n" +
-            "                        const name = data.title;\n" +
-            "                        const episode = data.artist || '';\n" +
-            "                        \n" +
-            "                        // 显示当前剧名和集名\n" +
-            "                        if (name || episode) {\n" +
-            "                            let subtitle = '当前: ';\n" +
-            "                            if (name) subtitle += name;\n" +
-            "                            if (episode) subtitle += ' - ' + episode;\n" +
-            "                            document.getElementById('headerSubtitle').textContent = subtitle;\n" +
-            "                        }\n" +
-            "                        \n" +
-            "                        if (episode) {\n" +
-            "                            targetEpisodeNumber = parseEpisodeNumber(episode);\n" +
-            "                        }\n" +
-            "                        \n" +
-            "                        if (name) {\n" +
-            "                            const cleanName = cleanTitle(name);\n" +
-            "                            document.getElementById('searchInput').value = cleanName;\n" +
-            "                            performSearch();\n" +
-            "                        }\n" +
-            "                    }\n" +
-            "                })\n" +
-            "                .catch(err => {\n" +
-            "                    console.log('获取播放信息失败:', err);\n" +
-            "                });\n" +
+            "            // 先加载设置，然后根据设置决定是否自动搜索\n" +
+            "            loadSettings().then(() => {\n" +
+            "                updatePageDisplay();\n" +
+            "                \n" +
+            "                // 只有在弹幕开启时才自动搜索\n" +
+            "                if (danmakuSettings.load) {\n" +
+            "                    // 从服务器获取当前播放信息\n" +
+            "                    fetch('/media')\n" +
+            "                        .then(res => res.json())\n" +
+            "                        .then(data => {\n" +
+            "                            if (data && data.title) {\n" +
+            "                                const name = data.title;\n" +
+            "                                const episode = data.artist || '';\n" +
+            "                                \n" +
+            "                                // 显示当前剧名和集名\n" +
+            "                                if (name || episode) {\n" +
+            "                                    let subtitle = '当前: ';\n" +
+            "                                    if (name) subtitle += name;\n" +
+            "                                    if (episode) subtitle += ' - ' + episode;\n" +
+            "                                    document.getElementById('headerSubtitle').textContent = subtitle;\n" +
+            "                                }\n" +
+            "                                \n" +
+            "                                if (episode) {\n" +
+            "                                    targetEpisodeNumber = parseEpisodeNumber(episode);\n" +
+            "                                }\n" +
+            "                                \n" +
+            "                                if (name) {\n" +
+            "                                    const cleanName = cleanTitle(name);\n" +
+            "                                    document.getElementById('searchInput').value = cleanName;\n" +
+            "                                    performSearch();\n" +
+            "                                }\n" +
+            "                            }\n" +
+            "                        })\n" +
+            "                        .catch(err => {\n" +
+            "                            console.log('获取播放信息失败:', err);\n" +
+            "                        });\n" +
+            "                }\n" +
+            "            });\n" +
             "        };\n" +
             "        \n" +
             "        // 清理标题\n" +
@@ -1071,6 +1115,7 @@ public class DanmakuPage implements Process {
             "        // 弹幕设置功能\n" +
             "        const speedTexts = ['慢', '正常', '快', '最快'];\n" +
             "        let danmakuSettings = {\n" +
+            "            load: true,\n" +
             "            speed: 2,\n" +
             "            size: 1.0,\n" +
             "            line: 3,\n" +
@@ -1079,7 +1124,7 @@ public class DanmakuPage implements Process {
             "        \n" +
             "        // 加载设置\n" +
             "        function loadSettings() {\n" +
-            "            fetch('/danmaku/api/settings')\n" +
+            "            return fetch('/danmaku/api/settings')\n" +
             "                .then(res => res.json())\n" +
             "                .then(data => {\n" +
             "                    if (data.success) {\n" +
@@ -1097,6 +1142,7 @@ public class DanmakuPage implements Process {
             "            document.getElementById('lineSlider').value = danmakuSettings.line;\n" +
             "            document.getElementById('alphaSlider').value = danmakuSettings.alpha;\n" +
             "            \n" +
+            "            document.getElementById('loadValue').textContent = danmakuSettings.load ? '开' : '关';\n" +
             "            document.getElementById('speedValue').textContent = speedTexts[danmakuSettings.speed];\n" +
             "            document.getElementById('sizeValue').textContent = danmakuSettings.size.toFixed(1) + '倍';\n" +
             "            document.getElementById('lineValue').textContent = danmakuSettings.line + '行';\n" +
@@ -1158,6 +1204,36 @@ public class DanmakuPage implements Process {
             "            const value = parseInt(this.value);\n" +
             "            document.getElementById('alphaValue').textContent = value + '%';\n" +
             "            saveSetting('alpha', value);\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 弹幕开关按钮\n" +
+            "        document.getElementById('loadToggleBtn').addEventListener('click', function() {\n" +
+            "            const wasOff = !danmakuSettings.load;\n" +
+            "            danmakuSettings.load = !danmakuSettings.load;\n" +
+            "            document.getElementById('loadValue').textContent = danmakuSettings.load ? '开' : '关';\n" +
+            "            saveSetting('load', danmakuSettings.load ? 1 : 0);\n" +
+            "            // 关闭设置弹窗，让用户看到页面变化\n" +
+            "            document.getElementById('settingsModal').classList.remove('show');\n" +
+            "            updatePageDisplay();\n" +
+            "            showToast(danmakuSettings.load ? '弹幕已开启' : '弹幕已关闭');\n" +
+            "            \n" +
+            "            // 如果从关闭切换到开启，且有搜索内容，自动执行搜索\n" +
+            "            if (wasOff && danmakuSettings.load) {\n" +
+            "                const searchInput = document.getElementById('searchInput').value.trim();\n" +
+            "                if (searchInput) {\n" +
+            "                    setTimeout(() => performSearch(), 300);\n" +
+            "                }\n" +
+            "            }\n" +
+            "        });\n" +
+            "        \n" +
+            "        // 开启弹幕按钮\n" +
+            "        document.getElementById('enableDanmuBtn').addEventListener('click', function() {\n" +
+            "            danmakuSettings.load = true;\n" +
+            "            saveSetting('load', 1);\n" +
+            "            updatePageDisplay();\n" +
+            "            showToast('弹幕已开启');\n" +
+            "            // 刷新页面以加载搜索功能\n" +
+            "            setTimeout(() => location.reload(), 500);\n" +
             "        });\n" +
             "        \n" +
             "        // 页面加载时加载设置\n" +
