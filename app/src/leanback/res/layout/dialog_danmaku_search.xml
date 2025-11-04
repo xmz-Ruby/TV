@@ -111,6 +111,47 @@
             android:background="@drawable/selector_text" />
     </LinearLayout>
 
+    <!-- 快速操作栏 -->
+    <LinearLayout
+        android:id="@+id/quickActionLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/reverseButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="反转"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:focusable="true"
+            android:clickable="true"
+            android:padding="8dp"
+            android:layout_marginEnd="8dp"
+            android:nextFocusRight="@id/jumpButton"
+            android:nextFocusDown="@id/episodeList"
+            android:nextFocusUp="@id/search"
+            android:background="@drawable/selector_text" />
+
+        <TextView
+            android:id="@+id/jumpButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="快速跳转"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:focusable="true"
+            android:clickable="true"
+            android:padding="8dp"
+            android:nextFocusLeft="@id/reverseButton"
+            android:nextFocusDown="@id/episodeList"
+            android:nextFocusUp="@id/search"
+            android:background="@drawable/selector_text" />
+    </LinearLayout>
+
     <!-- 加载提示 -->
     <TextView
         android:id="@+id/loading"

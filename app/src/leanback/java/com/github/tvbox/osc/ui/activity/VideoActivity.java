@@ -678,20 +678,42 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void setEpisodeAdapter(List<Episode> items) {
         getEpisodeView().setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
+
+        // 给所有剧集添加序号前缀
+        addEpisodePrefix(items);
+
         if (isVisible(mBinding.episodeVert)) setEpisodeView(items);
         mEpisodeAdapter.setItems(items, null);
         setArrayAdapter(items.size());
         setR2Callback(50);
     }
 
+    /**
+     * 给剧集列表添加序号前缀
+     */
+    private void addEpisodePrefix(List<Episode> items) {
+        for (int i = 0; i < items.size(); i++) {
+            items.get(i).setIndex(i);
+
+            // 给每一集的名称添加序号前缀，格式：[序号]原名称
+            String originalName = items.get(i).getName();
+            if (originalName != null && !originalName.startsWith("[" + (i + 1) + "]")) {
+                String nameWithPrefix = "[" + (i + 1) + "]" + originalName;
+                items.get(i).setName(nameWithPrefix);
+            }
+        }
+    }
+
     private void setEpisodeView(List<Episode> items) {
         int size = items.size();
         int episodeNameLength = items.isEmpty() ? 0 : items.get(0).getName().length();
+
+        // 计算最长的剧集名称长度
         for (int i = 0; i < size; i++) {
-            items.get(i).setIndex(i);
             int length = items.get(i).getName() == null ? 0 : items.get(i).getName().length();
             if (length > episodeNameLength) episodeNameLength = length;
         }
+
         int numColumns = 10;
         if (episodeNameLength > 40) numColumns = 1;
         if (episodeNameLength > 30) numColumns = 2;
@@ -735,6 +757,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         for (int i = 0; i < mFlagAdapter.size(); i++) ((Flag) mFlagAdapter.get(i)).toggle(flagPosition == i, item);
         setEpisodeSelectedPosition(getEpisodePosition());
         notifyItemChanged(getEpisodeView(), mEpisodeAdapter);
+        // 切换集数时清空弹幕，避免串集
+        mBinding.danmaku.release();
         onRefresh();
     }
 
@@ -928,10 +952,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void onDanmuSearch() {
-        String episodeName = getEpisode() != null ? getEpisode().getName() : "";
+        Episode episode = getEpisode();
+        // episodeName已经包含序号前缀，格式：[序号]原名称
+        String episodeName = episode != null ? episode.getName() : "";
+        int episodeIndex = episode != null ? episode.getIndex() : -1;
         DanmakuSearchDialog.create()
                 .videoTitle(mBinding.name.getText().toString())
                 .episodeName(episodeName)
+                .episodeIndex(episodeIndex)
                 .show(this);
         hideControl();
     }
