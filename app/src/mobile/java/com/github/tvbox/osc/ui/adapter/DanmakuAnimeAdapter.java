@@ -18,6 +18,7 @@ public class DanmakuAnimeAdapter extends RecyclerView.Adapter<DanmakuAnimeAdapte
 
     private List<DanmakuAnime> data = new ArrayList<>();
     private OnItemClickListener listener;
+    private int selectedPosition = -1;
 
     public interface OnItemClickListener {
         void onItemClick(DanmakuAnime anime);
@@ -29,6 +30,7 @@ public class DanmakuAnimeAdapter extends RecyclerView.Adapter<DanmakuAnimeAdapte
 
     public void setData(List<DanmakuAnime> data) {
         this.data = data != null ? data : new ArrayList<>();
+        selectedPosition = -1;
         notifyDataSetChanged();
     }
 
@@ -38,6 +40,7 @@ public class DanmakuAnimeAdapter extends RecyclerView.Adapter<DanmakuAnimeAdapte
 
     public void clear() {
         data.clear();
+        selectedPosition = -1;
         notifyDataSetChanged();
     }
 
@@ -52,7 +55,21 @@ public class DanmakuAnimeAdapter extends RecyclerView.Adapter<DanmakuAnimeAdapte
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         DanmakuAnime anime = data.get(position);
         holder.text.setText(anime.getAnimeTitle());
-        holder.itemView.setOnClickListener(v -> {
+
+        // 设置选中状态
+        holder.text.setSelected(position == selectedPosition);
+
+        // 点击事件
+        holder.text.setOnClickListener(v -> {
+            int oldPosition = selectedPosition;
+            selectedPosition = position;
+
+            // 刷新旧的和新的选中项
+            if (oldPosition != -1) {
+                notifyItemChanged(oldPosition);
+            }
+            notifyItemChanged(selectedPosition);
+
             if (listener != null) {
                 listener.onItemClick(anime);
             }

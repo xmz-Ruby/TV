@@ -45,6 +45,7 @@ public class DanmakuSearchDialog extends BaseDialog {
     private DanmakuAnime selectedAnime;
     private List<DanmakuEpisode> currentEpisodes;
     private boolean isReversed = false;
+    private boolean isFirstSearch = true; // 是否首次搜索
 
     // 集数标识的正则表达式
     private static final Pattern EPISODE_PATTERN = Pattern.compile("第\\d+集|\\d+集|EP?\\d+|S\\d+E\\d+|\\d{8}|\\d{4}-\\d{2}-\\d{2}", Pattern.CASE_INSENSITIVE);
@@ -89,9 +90,9 @@ public class DanmakuSearchDialog extends BaseDialog {
 
     @Override
     protected void initView() {
-        // 设置标题
+        // 设置搜索输入框默认值
         if (!TextUtils.isEmpty(videoTitle)) {
-            binding.title.setText(cleanTitle(videoTitle));
+            binding.searchInput.setText(cleanTitle(videoTitle));
         }
 
         // 初始化弹幕源列表
@@ -104,12 +105,6 @@ public class DanmakuSearchDialog extends BaseDialog {
         episodeAdapter = new DanmakuEpisodeAdapter(this::onEpisodeClick);
         binding.episodeList.setAdapter(episodeAdapter);
 
-        // 设置搜索输入框的初始值
-        if (!TextUtils.isEmpty(videoTitle)) {
-            binding.searchInput.setText(cleanTitle(videoTitle));
-            binding.searchInput.setSelection(binding.searchInput.getText().length());
-        }
-
         // 自动搜索
         if (!TextUtils.isEmpty(videoTitle)) {
             searchAnime(cleanTitle(videoTitle));
@@ -118,10 +113,13 @@ public class DanmakuSearchDialog extends BaseDialog {
 
     @Override
     protected void initEvent() {
+        // 搜索按钮点击 - 直接执行搜索
+        binding.search.setOnClickListener(v -> performSearch());
+
         // 关闭按钮点击
         binding.close.setOnClickListener(v -> dismiss());
 
-        // 搜索输入框
+        // 搜索输入框 - 回车执行搜索
         binding.searchInput.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 performSearch();
@@ -129,9 +127,6 @@ public class DanmakuSearchDialog extends BaseDialog {
             }
             return false;
         });
-
-        // 搜索按钮
-        binding.searchButton.setOnClickListener(v -> performSearch());
 
         // 反转按钮
         binding.reverseButton.setOnClickListener(v -> reverseEpisodes());
@@ -157,6 +152,14 @@ public class DanmakuSearchDialog extends BaseDialog {
             Notify.show("请输入搜索关键词");
             return;
         }
+
+        // 隐藏软键盘
+        android.view.inputmethod.InputMethodManager imm =
+            (android.view.inputmethod.InputMethodManager) getActivity().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(binding.searchInput.getWindowToken(), 0);
+        }
+
         searchAnime(keyword);
     }
 
@@ -174,9 +177,20 @@ public class DanmakuSearchDialog extends BaseDialog {
                     hideLoading();
                     if (data == null || data.isEmpty()) {
                         Notify.show("未找到相关番剧");
+                        isFirstSearch = false;
                         return;
                     }
-                    showAnimeList(data);
+
+                    // 如果是首次搜索，自动选择第一个弹幕源
+                    if (isFirstSearch && !data.isEmpty()) {
+                        isFirstSearch = false;
+                        DanmakuAnime firstAnime = data.get(0);
+                        android.util.Log.d("DanmakuSearch", "首次搜索完成，自动选择第一个弹幕源: " + firstAnime.getAnimeTitle());
+                        Notify.show("已自动选择: " + firstAnime.getAnimeTitle());
+                        onAnimeClick(firstAnime);
+                    } else {
+                        showAnimeList(data);
+                    }
                 });
             }
 
@@ -185,6 +199,7 @@ public class DanmakuSearchDialog extends BaseDialog {
                 App.post(() -> {
                     hideLoading();
                     Notify.show("搜索失败: " + error);
+                    isFirstSearch = false;
                 });
             }
         });
@@ -252,6 +267,9 @@ public class DanmakuSearchDialog extends BaseDialog {
         final int matchedPosition = autoMatchEpisode(episodes);
 
         if (matchedPosition >= 0) {
+            // 设置选中状态
+            episodeAdapter.setSelectedPosition(matchedPosition);
+
             binding.episodeList.postDelayed(() -> {
                 binding.episodeList.scrollToPosition(matchedPosition);
                 Notify.show("已自动定位到: " + episodes.get(matchedPosition).getDisplayName());

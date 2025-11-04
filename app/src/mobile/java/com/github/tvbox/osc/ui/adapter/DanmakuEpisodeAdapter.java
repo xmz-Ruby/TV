@@ -18,6 +18,7 @@ public class DanmakuEpisodeAdapter extends RecyclerView.Adapter<DanmakuEpisodeAd
 
     private List<DanmakuEpisode> data = new ArrayList<>();
     private OnItemClickListener listener;
+    private int selectedPosition = -1;
 
     public interface OnItemClickListener {
         void onItemClick(DanmakuEpisode episode);
@@ -29,7 +30,19 @@ public class DanmakuEpisodeAdapter extends RecyclerView.Adapter<DanmakuEpisodeAd
 
     public void setData(List<DanmakuEpisode> data) {
         this.data = data != null ? data : new ArrayList<>();
+        selectedPosition = -1;
         notifyDataSetChanged();
+    }
+
+    public void setSelectedPosition(int position) {
+        int oldPosition = selectedPosition;
+        selectedPosition = position;
+        if (oldPosition != -1) {
+            notifyItemChanged(oldPosition);
+        }
+        if (selectedPosition != -1) {
+            notifyItemChanged(selectedPosition);
+        }
     }
 
     public List<DanmakuEpisode> getData() {
@@ -38,6 +51,7 @@ public class DanmakuEpisodeAdapter extends RecyclerView.Adapter<DanmakuEpisodeAd
 
     public void clear() {
         data.clear();
+        selectedPosition = -1;
         notifyDataSetChanged();
     }
 
@@ -52,7 +66,21 @@ public class DanmakuEpisodeAdapter extends RecyclerView.Adapter<DanmakuEpisodeAd
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         DanmakuEpisode episode = data.get(position);
         holder.text.setText(episode.getDisplayName());
-        holder.itemView.setOnClickListener(v -> {
+
+        // 设置选中状态
+        holder.text.setSelected(position == selectedPosition);
+
+        // 点击事件
+        holder.text.setOnClickListener(v -> {
+            int oldPosition = selectedPosition;
+            selectedPosition = position;
+
+            // 刷新旧的和新的选中项
+            if (oldPosition != -1) {
+                notifyItemChanged(oldPosition);
+            }
+            notifyItemChanged(selectedPosition);
+
             if (listener != null) {
                 listener.onItemClick(episode);
             }
