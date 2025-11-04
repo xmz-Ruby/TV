@@ -5,6 +5,7 @@ import android.content.Context;
 import com.github.tvbox.osc.App;
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderNull;
+import com.github.catvod.utils.Logger;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -17,8 +18,20 @@ public class PyLoader {
     private String recent;
 
     public PyLoader() {
-        spiders = new ConcurrentHashMap<>();
+        this.spiders = new ConcurrentHashMap<>();
         init();
+    }
+
+    private void init() {
+        try {
+            Class<?> loaderClass = Class.forName("com.undcover.freedom.pyramid.Loader");
+            loader = loaderClass.newInstance();
+            Logger.i("PyLoader: Pyramid loader initialized successfully");
+        } catch (ClassNotFoundException e) {
+            Logger.e("PyLoader: Loader class not found - pyramid module not included?", e);
+        } catch (Throwable e) {
+            Logger.e("PyLoader: Failed to initialize pyramid loader", e);
+        }
     }
 
     public void clear() {
@@ -30,23 +43,22 @@ public class PyLoader {
         this.recent = recent;
     }
 
-    private void init() {
-        try {
-            loader = Class.forName("com.undcover.freedom.pyramid.Loader").newInstance();
-        } catch (Throwable ignored) {
-        }
-    }
-
     public Spider getSpider(String key, String api, String ext) {
         try {
+            if (loader == null) {
+                Logger.e("PyLoader: Loader not initialized");
+                return new SpiderNull();
+            }
             if (spiders.containsKey(key)) return spiders.get(key);
+            Logger.i("PyLoader: Loading Python spider - key=" + key + ", api=" + api);
             Method method = loader.getClass().getMethod("spider", Context.class, String.class);
             Spider spider = (Spider) method.invoke(loader, App.get(), api);
             spider.init(App.get(), ext);
             spiders.put(key, spider);
+            Logger.i("PyLoader: Python spider loaded successfully - " + key);
             return spider;
         } catch (Throwable e) {
-            e.printStackTrace();
+            Logger.e("PyLoader: Failed to load Python spider - " + key, e);
             return new SpiderNull();
         }
     }
@@ -56,7 +68,7 @@ public class PyLoader {
             if (!params.containsKey("siteKey")) return spiders.get(recent).proxyLocal(params);
             return BaseLoader.get().getSpider(params).proxyLocal(params);
         } catch (Throwable e) {
-            e.printStackTrace();
+            Logger.e("PyLoader: proxyInvoke failed", e);
             return null;
         }
     }

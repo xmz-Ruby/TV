@@ -46,7 +46,7 @@ def getName(ru):
     return result
 
 
-def init(ru, extend):
+def init(ru, extend=""):
     ru.init(extend)
 
 
@@ -86,8 +86,8 @@ def playerContent(ru, flag, id, vipFlags):
     return formatJo
 
 
-def liveContent(ru):
-    result = ru.liveContent()
+def liveContent(ru, url):
+    result = ru.liveContent(url)
     return result
 
 
@@ -104,6 +104,16 @@ def action(ru, action):
     result = ru.action(action)
     formatJo = json.dumps(result, ensure_ascii=False)
     return formatJo
+
+
+def manualVideoCheck(ru):
+    result = ru.manualVideoCheck()
+    return result
+
+
+def isVideoFormat(ru, url):
+    result = ru.isVideoFormat(url)
+    return result
 
 
 def run():
