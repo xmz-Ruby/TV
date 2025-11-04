@@ -53,6 +53,7 @@ public class Action implements Process {
         else if ("setting".equals(param)) onSetting(params);
         else if ("refresh".equals(param)) onRefresh(params);
         else if ("transmit".equals(param)) onTransmit(params, files);
+        else if ("danmaku".equals(param)) onDanmaku(params);
         return Nano.success();
     }
 
@@ -93,6 +94,12 @@ public class Action implements Process {
         else if ("player".equals(type)) RefreshEvent.player();
         else if ("danmaku".equals(type)) RefreshEvent.danmaku(path);
         else if ("subtitle".equals(type)) RefreshEvent.subtitle(path);
+    }
+
+    private void onDanmaku(Map<String, String> params) {
+        String url = params.get("url");
+        if (TextUtils.isEmpty(url)) return;
+        RefreshEvent.danmaku(url);
     }
 
     private void onCast(Map<String, String> params) {

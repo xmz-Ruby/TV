@@ -26,12 +26,16 @@ import com.github.tvbox.osc.bean.DanmakuAnime;
 import com.github.tvbox.osc.bean.DanmakuEpisode;
 import com.github.tvbox.osc.databinding.DialogDanmakuSearchBinding;
 import com.github.tvbox.osc.event.RefreshEvent;
+import com.github.tvbox.osc.server.Server;
 import com.github.tvbox.osc.ui.presenter.DanmakuAnimePresenter;
 import com.github.tvbox.osc.ui.presenter.DanmakuEpisodePresenter;
 import com.github.tvbox.osc.utils.Notify;
+import com.github.tvbox.osc.utils.QRCode;
 import com.github.tvbox.osc.utils.ResUtil;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
+
+import java.net.URLEncoder;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -93,6 +97,9 @@ public class DanmakuSearchDialog extends BaseDialog {
 
     @Override
     protected void initEvent() {
+        // 标题点击显示二维码
+        binding.title.setOnClickListener(v -> toggleQRCode());
+
         // 搜索按钮点击
         binding.search.setOnClickListener(v -> showSearchInput());
 
@@ -110,6 +117,38 @@ public class DanmakuSearchDialog extends BaseDialog {
 
         // 搜索按钮
         binding.searchButton.setOnClickListener(v -> performSearch());
+    }
+
+    /**
+     * 切换二维码显示
+     */
+    private void toggleQRCode() {
+        if (binding.qrcodeLayout.getVisibility() == View.VISIBLE) {
+            binding.qrcodeLayout.setVisibility(View.GONE);
+        } else {
+            showQRCode();
+        }
+    }
+
+    /**
+     * 显示二维码
+     */
+    private void showQRCode() {
+        try {
+            String name = URLEncoder.encode(videoTitle, "UTF-8");
+            String episode = URLEncoder.encode(videoTitle, "UTF-8"); // 可以传递当前集数
+            String url = Server.get().getAddress("/danmaku?name=" + name + "&episode=" + episode);
+
+            binding.qrcode.setImageBitmap(QRCode.getBitmap(url, 200, 0));
+            binding.qrcodeInfo.setText("扫码进入弹幕投送页面\n" + Server.get().getAddress());
+            binding.qrcodeLayout.setVisibility(View.VISIBLE);
+
+            // 隐藏列表
+            binding.animeList.setVisibility(View.GONE);
+            binding.episodeList.setVisibility(View.GONE);
+        } catch (Exception e) {
+            Notify.show("生成二维码失败");
+        }
     }
 
     /**
@@ -179,6 +218,7 @@ public class DanmakuSearchDialog extends BaseDialog {
      */
     private void showAnimeList(List<DanmakuAnime> animes) {
         animeAdapter.setItems(animes, null);
+        binding.qrcodeLayout.setVisibility(View.GONE);
         binding.animeList.setVisibility(View.VISIBLE);
         binding.animeList.postDelayed(() -> {
             View firstItem = binding.animeList.getLayoutManager().findViewByPosition(0);
@@ -231,6 +271,7 @@ public class DanmakuSearchDialog extends BaseDialog {
      */
     private void showEpisodeList(List<DanmakuEpisode> episodes) {
         episodeAdapter.setItems(episodes, null);
+        binding.qrcodeLayout.setVisibility(View.GONE);
         binding.episodeList.setVisibility(View.VISIBLE);
         binding.episodeList.postDelayed(() -> {
             View firstItem = binding.episodeList.getLayoutManager().findViewByPosition(0);
@@ -283,6 +324,7 @@ public class DanmakuSearchDialog extends BaseDialog {
      * 显示番剧列表（从Adapter恢复）
      */
     private void showAnimeList(ArrayObjectAdapter adapter) {
+        binding.qrcodeLayout.setVisibility(View.GONE);
         binding.animeList.setVisibility(View.VISIBLE);
         binding.animeList.postDelayed(() -> {
             View firstItem = binding.animeList.getLayoutManager().findViewByPosition(0);

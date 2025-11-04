@@ -22,7 +22,10 @@
             android:text="弹幕检索"
             android:textColor="@color/white"
             android:textSize="20sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="?android:attr/selectableItemBackground" />
 
         <TextView
             android:id="@+id/search"
@@ -46,6 +49,32 @@
             android:padding="8dp"
             android:layout_marginStart="8dp"
             android:background="?android:attr/selectableItemBackground" />
+    </LinearLayout>
+
+    <!-- 二维码显示区域 -->
+    <LinearLayout
+        android:id="@+id/qrcodeLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        android:paddingBottom="16dp">
+
+        <ImageView
+            android:id="@+id/qrcode"
+            android:layout_width="200dp"
+            android:layout_height="200dp"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:id="@+id/qrcodeInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/white_60"
+            android:textSize="12sp"
+            android:gravity="center" />
     </LinearLayout>
 
     <!-- 搜索输入框（隐藏，通过代码控制显示） -->

@@ -4,6 +4,7 @@ import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.bean.Device;
 import com.github.tvbox.osc.server.process.Action;
 import com.github.tvbox.osc.server.process.Cache;
+import com.github.tvbox.osc.server.process.DanmakuPage;
 import com.github.tvbox.osc.server.process.Local;
 import com.github.tvbox.osc.server.process.Media;
 import com.github.tvbox.osc.server.process.Parse;
@@ -28,7 +29,7 @@ public class Nano extends NanoHTTPD {
     private List<Process> process;
 
     public Nano(int port) {
-        super(port);
+        super("0.0.0.0", port);
         addProcess();
     }
 
@@ -36,6 +37,7 @@ public class Nano extends NanoHTTPD {
         process = new ArrayList<>();
         process.add(new Action());
         process.add(new Cache());
+        process.add(new DanmakuPage());
         process.add(new Local());
         process.add(new Media());
         process.add(new Parse());
