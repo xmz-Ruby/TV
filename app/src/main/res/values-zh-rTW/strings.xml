@@ -206,10 +206,10 @@
     </string-array>
 
     <string-array name="select_danmu_speed">
-        <item>超慢</item>
         <item>慢</item>
-        <item>適中</item>
+        <item>正常</item>
         <item>快</item>
+        <item>最快</item>
     </string-array>
 
     <string-array name="select_quality">

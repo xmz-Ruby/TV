@@ -206,10 +206,10 @@
     </string-array>
 
     <string-array name="select_danmu_speed">
-        <item>Super slow</item>
         <item>Slow</item>
-        <item>Moderate</item>
+        <item>Normal</item>
         <item>Fast</item>
+        <item>Fastest</item>
     </string-array>
 
     <string-array name="select_render">

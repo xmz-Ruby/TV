@@ -97,7 +97,7 @@ public class DanmuSettingDialog {
     }
 
     private void updateSpeedLabel(int speed) {
-        String[] speedTexts = {"最快", "快", "正常", "慢"};
+        String[] speedTexts = {"慢", "正常", "快", "最快"};
         binding.speedLabel.setText("速度: " + speedTexts[speed]);
     }
 

@@ -1069,7 +1069,7 @@ public class DanmakuPage implements Process {
             "        });\n" +
             "        \n" +
             "        // 弹幕设置功能\n" +
-            "        const speedTexts = ['最快', '快', '正常', '慢'];\n" +
+            "        const speedTexts = ['慢', '正常', '快', '最快'];\n" +
             "        let danmakuSettings = {\n" +
             "            speed: 2,\n" +
             "            size: 1.0,\n" +

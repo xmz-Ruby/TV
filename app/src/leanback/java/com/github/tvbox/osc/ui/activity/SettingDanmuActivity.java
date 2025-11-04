@@ -86,7 +86,7 @@ public class SettingDanmuActivity extends BaseActivity {
     }
 
     private void updateSpeedLabel(int speed) {
-        String[] speedTexts = {"最快", "快", "正常", "慢"};
+        String[] speedTexts = {"慢", "正常", "快", "最快"};
         mBinding.danmuSpeedLabel.setText(getString(R.string.player_danmu_speed) + ": " + speedTexts[speed]);
     }
 
