@@ -51,6 +51,7 @@ public class DanmakuSearchDialog extends BaseDialog {
     private DanmakuAnime selectedAnime;
     private List<DanmakuEpisode> currentEpisodes; // 当前弹幕剧集列表
     private boolean isReversed = false; // 是否已反转
+    private boolean isFirstSearch = true; // 是否首次搜索
 
     // 集数标识的正则表达式
     private static final Pattern EPISODE_PATTERN = Pattern.compile("第\\d+集|\\d+集|EP?\\d+|S\\d+E\\d+|\\d{8}|\\d{4}-\\d{2}-\\d{2}", Pattern.CASE_INSENSITIVE);
@@ -122,8 +123,8 @@ public class DanmakuSearchDialog extends BaseDialog {
         // 标题点击显示二维码
         binding.title.setOnClickListener(v -> toggleQRCode());
 
-        // 搜索按钮点击
-        binding.search.setOnClickListener(v -> showSearchInput());
+        // 搜索按钮点击 - 直接执行搜索
+        binding.search.setOnClickListener(v -> performDirectSearch());
 
         // 关闭按钮点击
         binding.close.setOnClickListener(v -> dismiss());
@@ -199,6 +200,18 @@ public class DanmakuSearchDialog extends BaseDialog {
     }
 
     /**
+     * 直接执行搜索（不显示输入框）
+     */
+    private void performDirectSearch() {
+        String keyword = cleanTitle(videoTitle);
+        if (TextUtils.isEmpty(keyword)) {
+            Notify.show("无法获取搜索关键词");
+            return;
+        }
+        searchAnime(keyword);
+    }
+
+    /**
      * 执行搜索
      */
     private void performSearch() {
@@ -225,9 +238,20 @@ public class DanmakuSearchDialog extends BaseDialog {
                     hideLoading();
                     if (data == null || data.isEmpty()) {
                         Notify.show("未找到相关番剧");
+                        isFirstSearch = false;
                         return;
                     }
-                    showAnimeList(data);
+
+                    // 如果是首次搜索，自动选择第一个弹幕源
+                    if (isFirstSearch && !data.isEmpty()) {
+                        isFirstSearch = false;
+                        DanmakuAnime firstAnime = data.get(0);
+                        android.util.Log.d("DanmakuSearch", "首次搜索完成，自动选择第一个弹幕源: " + firstAnime.getAnimeTitle());
+                        Notify.show("已自动选择: " + firstAnime.getAnimeTitle());
+                        onAnimeClick(firstAnime);
+                    } else {
+                        showAnimeList(data);
+                    }
                 });
             }
 
@@ -236,6 +260,7 @@ public class DanmakuSearchDialog extends BaseDialog {
                 App.post(() -> {
                     hideLoading();
                     Notify.show("搜索失败: " + error);
+                    isFirstSearch = false;
                 });
             }
         });
