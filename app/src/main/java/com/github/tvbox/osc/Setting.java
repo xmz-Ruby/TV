@@ -11,7 +11,7 @@ import com.github.catvod.utils.Prefers;
 public class Setting {
 
     public static String getDoh() {
-        return Prefers.getString("doh");
+        return Prefers.getString("doh", "{\"name\":\"Tencent\",\"url\":\"https://doh.pub/dns-query\"}");
     }
 
     public static void putDoh(String doh) {
