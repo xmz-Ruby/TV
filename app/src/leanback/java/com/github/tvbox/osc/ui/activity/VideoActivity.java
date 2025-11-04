@@ -70,6 +70,7 @@ import com.github.tvbox.osc.ui.adapter.QualityAdapter;
 import com.github.tvbox.osc.ui.base.BaseActivity;
 import com.github.tvbox.osc.ui.custom.CustomKeyDownVod;
 import com.github.tvbox.osc.ui.custom.CustomMovement;
+import com.github.tvbox.osc.ui.dialog.DanmakuSearchDialog;
 import com.github.tvbox.osc.ui.dialog.DescDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeDialog;
 import com.github.tvbox.osc.ui.dialog.FileChooserDialog;
@@ -372,6 +373,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mBinding.control.danmu.setOnClickListener(view -> onDanmu());
         mBinding.control.danmu.setUpListener(this::onDanmuAdd);
         mBinding.control.danmu.setDownListener(this::onDanmuSub);
+        mBinding.control.danmuSearch.setOnClickListener(view -> onDanmuSearch());
         mBinding.control.next.setOnClickListener(view -> checkNext());
         mBinding.control.prev.setOnClickListener(view -> checkPrev());
         mBinding.control.episodes.setOnClickListener(view -> onEpisodes());
@@ -923,6 +925,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         Setting.putDanmuLine(line);
         mBinding.control.danmu.setText(line + ResUtil.getString(R.string.lines));
         setDanmuViewSettings();
+    }
+
+    private void onDanmuSearch() {
+        DanmakuSearchDialog.create().videoTitle(mBinding.name.getText().toString()).show(this);
+        hideControl();
     }
 
     private void onEpisodes() {
