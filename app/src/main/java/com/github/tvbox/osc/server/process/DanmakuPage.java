@@ -759,11 +759,10 @@ public class DanmakuPage implements Process {
             "        // 解析集数\n" +
             "        function parseEpisodeNumber(episode) {\n" +
             "            const patterns = [\n" +
-            "                /第(\\d+)集/,\n" +
-            "                /(\\d+)集/,\n" +
-            "                /EP?(\\d+)/i,\n" +
             "                /S\\d+E(\\d+)/i,\n" +
-            "                /^\\[(\\d+)\\]/  // 序号前缀格式：[1]、[2]等\n" +
+            "                /EP?(\\d+)/i,\n" +
+            "                /第(\\d+)[话集]/,\n" +
+            "                /\\[(\\d+)\\]/\n" +
             "            ];\n" +
             "            for (let pattern of patterns) {\n" +
             "                const match = episode.match(pattern);\n" +
@@ -775,6 +774,24 @@ public class DanmakuPage implements Process {
             "        // 自动匹配剧集（参考播放器的多级匹配策略）\n" +
             "        function autoMatchEpisode(episodes, episodeName, episodeNumber) {\n" +
             "            if (!episodes || episodes.length === 0) return -1;\n" +
+            "            \n" +
+            "            // 规则0: 标准格式解析（最高优先级）\n" +
+            "            if (episodeName) {\n" +
+            "                const parsedFromName = parseEpisodeNumber(episodeName);\n" +
+            "                if (parsedFromName) {\n" +
+            "                    for (let i = 0; i < episodes.length; i++) {\n" +
+            "                        const ep = episodes[i];\n" +
+            "                        if (ep.episodeNumber && parseInt(ep.episodeNumber) === parsedFromName) {\n" +
+            "                            return i;\n" +
+            "                        }\n" +
+            "                        const title = ep.episodeTitle || '';\n" +
+            "                        const parsedFromTitle = parseEpisodeNumber(title);\n" +
+            "                        if (parsedFromTitle === parsedFromName) {\n" +
+            "                            return i;\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                }\n" +
+            "            }\n" +
             "            \n" +
             "            // 规则1: 精准匹配剧集名\n" +
             "            if (episodeName) {\n" +
@@ -791,13 +808,9 @@ public class DanmakuPage implements Process {
             "            if (episodeNumber) {\n" +
             "                for (let i = 0; i < episodes.length; i++) {\n" +
             "                    const ep = episodes[i];\n" +
-            "                    \n" +
-            "                    // 先尝试使用接口返回的episodeNumber\n" +
             "                    if (ep.episodeNumber && parseInt(ep.episodeNumber) === episodeNumber) {\n" +
             "                        return i;\n" +
             "                    }\n" +
-            "                    \n" +
-            "                    // 再尝试从标题中解析集数\n" +
             "                    const title = ep.episodeTitle || '';\n" +
             "                    const parsedNumber = parseEpisodeNumber(title);\n" +
             "                    if (parsedNumber === episodeNumber) {\n" +
@@ -806,7 +819,7 @@ public class DanmakuPage implements Process {
             "                }\n" +
             "            }\n" +
             "            \n" +
-            "            return -1; // 未匹配到\n" +
+            "            return -1;\n" +
             "        }\n" +
             "        \n" +
             "        // 搜索按钮点击\n" +
