@@ -698,6 +698,7 @@ public class DanmakuPage implements Process {
             "        let isReversed = false;\n" +
             "        let highlightedEpisodeId = null;\n" +
             "        let shouldAutoMatch = false;\n" +
+            "        let shouldAutoSelect = false;\n" +
             "        \n" +
             "        // 更新页面显示状态\n" +
             "        function updatePageDisplay() {\n" +
@@ -741,7 +742,7 @@ public class DanmakuPage implements Process {
             "                                if (name) {\n" +
             "                                    const cleanName = cleanTitle(name);\n" +
             "                                    document.getElementById('searchInput').value = cleanName;\n" +
-            "                                    shouldAutoMatch = true;\n" +
+            "                                    shouldAutoSelect = true;\n" +
             "                                    performSearch();\n" +
             "                                }\n" +
             "                            }\n" +
@@ -849,7 +850,8 @@ public class DanmakuPage implements Process {
             "                .then(data => {\n" +
             "                    if (data.success) {\n" +
             "                        showAnimeList(data.data);\n" +
-            "                        if (data.data && data.data.length > 0 && shouldAutoMatch) {\n" +
+            "                        if (data.data && data.data.length > 0 && shouldAutoSelect) {\n" +
+            "                            shouldAutoSelect = false;\n" +
             "                            selectAnime(data.data[0].animeId, data.data[0].animeTitle);\n" +
             "                        }\n" +
             "                    } else {\n" +
@@ -889,6 +891,7 @@ public class DanmakuPage implements Process {
             "        function selectAnime(animeId, animeName) {\n" +
             "            currentAnimeId = animeId;\n" +
             "            currentAnimeName = animeName;\n" +
+            "            shouldAutoMatch = true;\n" +
             "            \n" +
             "            showLoading();\n" +
             "            \n" +
