@@ -697,6 +697,7 @@ public class DanmakuPage implements Process {
             "        let currentEpisodes = null;\n" +
             "        let isReversed = false;\n" +
             "        let highlightedEpisodeId = null;\n" +
+            "        let shouldAutoMatch = false;\n" +
             "        \n" +
             "        // 更新页面显示状态\n" +
             "        function updatePageDisplay() {\n" +
@@ -740,6 +741,7 @@ public class DanmakuPage implements Process {
             "                                if (name) {\n" +
             "                                    const cleanName = cleanTitle(name);\n" +
             "                                    document.getElementById('searchInput').value = cleanName;\n" +
+            "                                    shouldAutoMatch = true;\n" +
             "                                    performSearch();\n" +
             "                                }\n" +
             "                            }\n" +
@@ -847,8 +849,7 @@ public class DanmakuPage implements Process {
             "                .then(data => {\n" +
             "                    if (data.success) {\n" +
             "                        showAnimeList(data.data);\n" +
-            "                        // 自动选择第一个\n" +
-            "                        if (data.data && data.data.length > 0) {\n" +
+            "                        if (data.data && data.data.length > 0 && shouldAutoMatch) {\n" +
             "                            selectAnime(data.data[0].animeId, data.data[0].animeTitle);\n" +
             "                        }\n" +
             "                    } else {\n" +
@@ -935,8 +936,7 @@ public class DanmakuPage implements Process {
             "            // 显示悬浮按钮\n" +
             "            document.getElementById('fabContainer').classList.add('show');\n" +
             "            \n" +
-            "            // 使用改进的自动匹配功能（仅在首次加载时）\n" +
-            "            if (!isReversed) {\n" +
+            "            if (!isReversed && shouldAutoMatch) {\n" +
             "                const urlParams = new URLSearchParams(window.location.search);\n" +
             "                const episodeName = urlParams.get('episode');\n" +
             "                const matchedIndex = autoMatchEpisode(episodes, episodeName, targetEpisodeNumber);\n" +
@@ -954,6 +954,7 @@ public class DanmakuPage implements Process {
             "                        }\n" +
             "                    }, 200);\n" +
             "                }\n" +
+            "                shouldAutoMatch = false;\n" +
             "            }\n" +
             "        }\n" +
             "        \n" +
