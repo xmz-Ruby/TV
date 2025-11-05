@@ -13,9 +13,16 @@ public class UrlAdapter implements JsonDeserializer<Url> {
 
     @Override
     public Url deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-        if (json.isJsonArray()) return convert(json.getAsJsonArray());
-        if (json.isJsonObject()) return Url.objectFrom(json);
-        return Url.create().add(json.getAsString());
+        Url url;
+        if (json.isJsonArray()) {
+            url = convert(json.getAsJsonArray());
+        } else if (json.isJsonObject()) {
+            url = Url.objectFrom(json);
+        } else {
+            url = Url.create().add(json.getAsString());
+        }
+        // 对画质列表进行排序和过滤
+        return url.sortAndFilterQualities();
     }
 
     private Url convert(JsonArray array) {

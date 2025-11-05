@@ -3,6 +3,7 @@ package com.github.tvbox.osc.bean;
 import android.text.TextUtils;
 
 import com.github.tvbox.osc.App;
+import com.github.tvbox.osc.utils.QualitySorter;
 import com.google.gson.JsonElement;
 import com.google.gson.annotations.SerializedName;
 
@@ -18,7 +19,9 @@ public class Url {
 
     public static Url objectFrom(JsonElement element) {
         try {
-            return App.gson().fromJson(element, Url.class);
+            Url url = App.gson().fromJson(element, Url.class);
+            // 对画质列表进行排序和过滤
+            return url.sortAndFilterQualities();
         } catch (Exception e) {
             return create();
         }
@@ -29,7 +32,28 @@ public class Url {
     }
 
     public List<Value> getValues() {
-        return values = values == null ? new ArrayList<>() : values;
+        if (values == null) {
+            values = new ArrayList<>();
+        }
+        return values;
+    }
+
+    /**
+     * 对画质列表进行排序和过滤
+     * 应该在解析完成后调用此方法
+     */
+    public Url sortAndFilterQualities() {
+        if (values != null && !values.isEmpty()) {
+            List<Value> sorted = QualitySorter.sortAndFilter(values);
+            if (sorted != null && !sorted.isEmpty()) {
+                values = sorted;
+                // 重置position，确保不越界
+                if (position >= values.size()) {
+                    position = 0;
+                }
+            }
+        }
+        return this;
     }
 
     public int getPosition() {
