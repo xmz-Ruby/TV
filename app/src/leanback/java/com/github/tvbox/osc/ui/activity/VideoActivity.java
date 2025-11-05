@@ -48,6 +48,7 @@ import com.github.tvbox.osc.bean.History;
 import com.github.tvbox.osc.bean.Keep;
 import com.github.tvbox.osc.bean.Parse;
 import com.github.tvbox.osc.bean.Part;
+import com.github.tvbox.osc.bean.PlayStatus;
 import com.github.tvbox.osc.bean.Result;
 import com.github.tvbox.osc.bean.Site;
 import com.github.tvbox.osc.bean.Sub;
@@ -695,12 +696,15 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private void setFlagActivated(Flag item) {
         if (mFlagAdapter.size() == 0 || item.isActivated()) return;
         if (mFlagAdapter.indexOf(item) == -1) item.setFlag(((Flag) mFlagAdapter.get(0)).getFlag());
+
+        android.util.Log.d("VideoActivity.setFlagActivated", "手动切换线路: " + item.getFlag());
+
         for (int i = 0; i < mFlagAdapter.size(); i++) ((Flag) mFlagAdapter.get(i)).setActivated(item);
         mBinding.flag.setSelectedPosition(mFlagAdapter.indexOf(item));
         notifyItemChanged(mBinding.flag, mFlagAdapter);
         setEpisodeAdapter(item.getEpisodes());
         setQualityVisible(false);
-        seamless(item);
+        seamless(item); // 自动匹配集数+恢复进度
     }
 
     private void setEpisodeAdapter(List<Episode> items) {
@@ -762,32 +766,36 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void seamless(Flag flag) {
-        int currentEpisodeIndex = getEpisodePosition();
-        Episode currentEpisode = getEpisode();
-        String currentRemarks = mHistory.getVodRemarks();
+        // 从PlayStatus表恢复播放状态
+        String vodName = mBinding.name.getText().toString();
+        android.util.Log.d("VideoActivity.seamless", "====== 换源/换线路 ======");
+        android.util.Log.d("VideoActivity.seamless", "查询条件剧名: " + vodName);
+        android.util.Log.d("VideoActivity.seamless", "目标线路: " + flag.getFlag());
 
-        android.util.Log.d("VideoActivity.seamless", "====== 开始换源剧集匹配 ======");
-        android.util.Log.d("VideoActivity.seamless", "当前播放位置索引: " + currentEpisodeIndex);
-        android.util.Log.d("VideoActivity.seamless", "当前剧集名称: " + (currentEpisode != null ? currentEpisode.getName() : "null"));
-        android.util.Log.d("VideoActivity.seamless", "历史记录remarks: " + currentRemarks);
-        android.util.Log.d("VideoActivity.seamless", "新站源Flag: " + flag.getFlag());
+        // 打印所有PlayStatus记录
+        java.util.List<PlayStatus> allStatus = AppDatabase.get().getPlayStatusDao().getAll();
+        android.util.Log.d("VideoActivity.seamless", "PlayStatus表总记录数: " + allStatus.size());
+        for (PlayStatus s : allStatus) {
+            android.util.Log.d("VideoActivity.seamless", "  记录: 剧名=" + s.getVodName() + ", vodId=" + s.getVodId() + ", 源=" + s.getSourceKey() + ", 集=" + s.getEpisodeName());
+        }
 
-        Episode episode = flag.find(currentRemarks, currentEpisodeIndex, getMark().isEmpty());
+        PlayStatus status = PlayStatus.find(vodName);
+        android.util.Log.d("VideoActivity.seamless", "PlayStatus查询结果: " + (status != null ? "存在" : "不存在"));
 
-        android.util.Log.d("VideoActivity.seamless", "匹配结果: " + (episode != null ? episode.getName() : "null"));
+        if (status != null) {
+            android.util.Log.d("VideoActivity.seamless", "PlayStatus详情: vodId=" + status.getVodId() + ", 源=" + status.getSourceKey() + ", 线路=" + status.getFlagName() + ", 集=" + status.getEpisodeName() + ", 进度=" + status.getPosition() + "ms");
+            Episode episode = flag.find(status.getEpisodeName(), -1, true);
+            android.util.Log.d("VideoActivity.seamless", "匹配结果: " + (episode != null ? episode.getName() : "未匹配到"));
 
-        setQualityVisible(episode != null && episode.isActivated() && mQualityAdapter.getItemCount() > 1);
-        if (episode == null || episode.isActivated()) return;
-        if (Setting.getFlag() == 1) {
-            episode.setActivated(true);
-            if (!isFullscreen()) getEpisodeView().requestFocus();
-            setEpisodeSelectedPosition(getEpisodePosition());
-            episode.setActivated(false);
+            if (episode != null && !episode.isActivated()) {
+                mHistory.setVodRemarks(episode.getName());
+                mHistory.setPosition(status.getPosition());
+                setEpisodeActivated(episode);
+                hidePreview();
+                Notify.show(getString(R.string.play_auto_match_episode, 0, episode.getName()));
+            }
         } else {
-            mHistory.setVodRemarks(episode.getName());
-            setEpisodeActivated(episode);
-            hidePreview();
-            Notify.show(getString(R.string.play_auto_match_episode, currentEpisodeIndex + 1, episode.getName()));
+            android.util.Log.d("VideoActivity.seamless", "PlayStatus表中没有找到记录，剧名=" + vodName);
         }
     }
 
@@ -1368,7 +1376,23 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mHistory.setVodRemarks(item.getName());
         mHistory.setVodFlag(getFlag().getFlag());
         mHistory.setCreateTime(System.currentTimeMillis());
-        mPlayers.setPosition(Math.max(mHistory.getOpening(), mHistory.getPosition()));
+
+        // 立即保存PlayStatus，确保换源/换线路时能找到
+        App.execute(() -> {
+            String vodName = mBinding.name.getText().toString();
+            PlayStatus status = PlayStatus.find(vodName);
+            if (status == null) status = PlayStatus.create(vodName);
+            status.setVodId(getId());
+            status.setSourceKey(getSite().getKey());
+            status.setFlagName(getFlag().getFlag());
+            status.setQualityIndex(mQualityAdapter.getPosition());
+            status.setEpisodeName(item.getName());
+            status.setEpisodeUrl(item.getUrl());
+            status.setPosition(position);
+            status.setUpdateTime(System.currentTimeMillis());
+            status.save();
+            android.util.Log.d("VideoActivity.updateHistory", "保存PlayStatus: 剧名=" + vodName + ", vodId=" + getId() + ", 源=" + getSite().getKey() + ", 线路=" + getFlag().getFlag() + ", 集=" + item.getName() + ", 进度=" + position + "ms");
+        });
     }
 
     private void checkKeep() {
@@ -1410,7 +1434,24 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         long position, duration;
         mHistory.setPosition(position = mPlayers.getPosition());
         mHistory.setDuration(duration = mPlayers.getDuration());
-        if (position >= 0 && duration > 0 && !Setting.isIncognito()) App.execute(() -> mHistory.update());
+        if (position >= 0 && duration > 0 && !Setting.isIncognito()) {
+            App.execute(() -> {
+                mHistory.update();
+                // 同时更新PlayStatus表
+                String vodName = mBinding.name.getText().toString();
+                PlayStatus status = PlayStatus.find(vodName);
+                if (status == null) status = PlayStatus.create(vodName);
+                status.setVodId(getId());
+                status.setSourceKey(getSite().getKey());
+                status.setFlagName(getFlag().getFlag());
+                status.setQualityIndex(mQualityAdapter.getPosition());
+                status.setEpisodeName(mHistory.getVodRemarks());
+                status.setEpisodeUrl(mHistory.getEpisodeUrl());
+                status.setPosition(position);
+                status.setUpdateTime(System.currentTimeMillis());
+                status.save();
+            });
+        }
         if (mHistory.getEnding() > 0 && duration > 0 && mHistory.getEnding() + position >= duration) {
             mClock.setCallback(null);
             checkNext();
@@ -1471,6 +1512,15 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                 mHistory.setPlayer(mPlayers.getPlayer());
                 mBinding.widget.size.setText(mPlayers.getSizeText());
                 mBinding.display.size.setText(mPlayers.getSizeText());
+                // 恢复播放进度
+                long position = mHistory.getPosition();
+                if (position > mHistory.getOpening()) {
+                    mPlayers.setPosition(position);
+                    android.util.Log.d("VideoActivity.onPlayerEvent", "STATE_READY: 恢复进度 " + position + "ms");
+                } else if (mHistory.getOpening() > 0) {
+                    mPlayers.setPosition(mHistory.getOpening());
+                    android.util.Log.d("VideoActivity.onPlayerEvent", "STATE_READY: 跳过片头 " + mHistory.getOpening() + "ms");
+                }
                 break;
             case Player.STATE_ENDED:
                 checkEnded();

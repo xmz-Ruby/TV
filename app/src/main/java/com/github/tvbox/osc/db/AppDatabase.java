@@ -17,6 +17,7 @@ import com.github.tvbox.osc.bean.Download;
 import com.github.tvbox.osc.bean.History;
 import com.github.tvbox.osc.bean.Keep;
 import com.github.tvbox.osc.bean.Live;
+import com.github.tvbox.osc.bean.PlayStatus;
 import com.github.tvbox.osc.bean.Site;
 import com.github.tvbox.osc.bean.Track;
 import com.github.tvbox.osc.db.dao.ConfigDao;
@@ -25,6 +26,7 @@ import com.github.tvbox.osc.db.dao.DownloadDao;
 import com.github.tvbox.osc.db.dao.HistoryDao;
 import com.github.tvbox.osc.db.dao.KeepDao;
 import com.github.tvbox.osc.db.dao.LiveDao;
+import com.github.tvbox.osc.db.dao.PlayStatusDao;
 import com.github.tvbox.osc.db.dao.SiteDao;
 import com.github.tvbox.osc.db.dao.TrackDao;
 import com.github.tvbox.osc.utils.FileUtil;
@@ -36,10 +38,10 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
-@Database(entities = {Keep.class, Site.class, Live.class, Track.class, Config.class, Device.class, History.class, Download.class}, version = AppDatabase.VERSION)
+@Database(entities = {Keep.class, Site.class, Live.class, Track.class, Config.class, Device.class, History.class, Download.class, PlayStatus.class}, version = AppDatabase.VERSION)
 public abstract class AppDatabase extends RoomDatabase {
 
-    public static final int VERSION = 31;
+    public static final int VERSION = 33;
     public static final String NAME = "tv";
     public static final String SYMBOL = "@@@";
     public static final String BACKUP_SUFFIX = "tv.backup";
@@ -116,6 +118,8 @@ public abstract class AppDatabase extends RoomDatabase {
                 .addMigrations(MIGRATION_28_29)
                 .addMigrations(MIGRATION_29_30)
                 .addMigrations(MIGRATION_30_31)
+                .addMigrations(MIGRATION_31_32)
+                .addMigrations(MIGRATION_32_33)
                 .allowMainThreadQueries().fallbackToDestructiveMigration().build();
     }
 
@@ -134,6 +138,8 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract HistoryDao getHistoryDao();
 
     public abstract DownloadDao getDownloadDao();
+
+    public abstract PlayStatusDao getPlayStatusDao();
 
     static final Migration MIGRATION_11_12 = new Migration(11, 12) {
         @Override
@@ -285,6 +291,21 @@ public abstract class AppDatabase extends RoomDatabase {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase database) {
             database.execSQL("CREATE TABLE Download (`id` TEXT NOT NULL, vodPic TEXT, vodName TEXT, url TEXT, header TEXT, createTime INTEGER NOT NULL, PRIMARY KEY (`id`))");
+        }
+    };
+
+    static final Migration MIGRATION_31_32 = new Migration(31, 32) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE TABLE PlayStatus (vodId TEXT NOT NULL, sourceKey TEXT, flagName TEXT, qualityIndex INTEGER NOT NULL, episodeName TEXT, episodeUrl TEXT, position INTEGER NOT NULL, updateTime INTEGER NOT NULL, PRIMARY KEY (vodId))");
+        }
+    };
+
+    static final Migration MIGRATION_32_33 = new Migration(32, 33) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("DROP TABLE IF EXISTS PlayStatus");
+            database.execSQL("CREATE TABLE PlayStatus (vodName TEXT NOT NULL, vodId TEXT, sourceKey TEXT, flagName TEXT, qualityIndex INTEGER NOT NULL, episodeName TEXT, episodeUrl TEXT, position INTEGER NOT NULL, updateTime INTEGER NOT NULL, PRIMARY KEY (vodName))");
         }
     };
 }
