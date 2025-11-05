@@ -227,6 +227,12 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void setPosition(long position) {
+        android.util.Log.d("Players.setPosition", "========================================");
+        android.util.Log.d("Players.setPosition", "设置position变量");
+        android.util.Log.d("Players.setPosition", "旧值: " + this.position + "ms");
+        android.util.Log.d("Players.setPosition", "新值: " + position + "ms");
+        android.util.Log.d("Players.setPosition", "调用堆栈: " + android.util.Log.getStackTraceString(new Throwable()));
+        android.util.Log.d("Players.setPosition", "========================================");
         this.position = position;
     }
 
@@ -412,9 +418,25 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void seekTo(long time) {
+        android.util.Log.d("Players.seekTo", "========================================");
+        android.util.Log.d("Players.seekTo", "执行跳转");
+        android.util.Log.d("Players.seekTo", "目标位置: " + time + "ms");
+        android.util.Log.d("Players.seekTo", "当前位置: " + getPosition() + "ms");
+        android.util.Log.d("Players.seekTo", "播放器类型: " + (isExo() ? "EXO" : isIjk() ? "IJK" : "UNKNOWN"));
+        android.util.Log.d("Players.seekTo", "调用堆栈: " + android.util.Log.getStackTraceString(new Throwable()));
+        android.util.Log.d("Players.seekTo", "========================================");
+
         if (haveDanmu()) danmuView.seekTo(time);
-        if (isExo() && exoPlayer != null) exoPlayer.seekTo(time);
-        if (isIjk() && ijkPlayer != null) ijkPlayer.seekTo(time);
+        if (isExo() && exoPlayer != null) {
+            android.util.Log.d("Players.seekTo", "EXO播放器执行seekTo: " + time + "ms");
+            exoPlayer.seekTo(time);
+        }
+        if (isIjk() && ijkPlayer != null) {
+            android.util.Log.d("Players.seekTo", "IJK播放器执行seekTo: " + time + "ms");
+            ijkPlayer.seekTo(time);
+        }
+
+        android.util.Log.d("Players.seekTo", "跳转完成，当前位置: " + getPosition() + "ms");
     }
 
     public void play() {
@@ -551,9 +573,25 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     private void setMediaSource(Map<String, String> headers, String url, String format, Drm drm, List<Sub> subs, int timeout) {
-        if (isIjk() && ijkPlayer != null) ijkPlayer.setMediaSource(IjkUtil.getSource(this.headers = checkUa(headers), this.url = url), position);
-        if (isExo() && exoPlayer != null) exoPlayer.setMediaItem(ExoUtil.getMediaItem(this.headers = checkUa(headers), UrlUtil.uri(this.url = url), this.format = format, this.drm = drm, checkSub(this.subs = subs), decode), position);
-        if (isExo() && exoPlayer != null) exoPlayer.prepare();
+        android.util.Log.d("Players.setMediaSource", "========================================");
+        android.util.Log.d("Players.setMediaSource", "设置媒体源");
+        android.util.Log.d("Players.setMediaSource", "URL: " + url);
+        android.util.Log.d("Players.setMediaSource", "当前position变量值: " + position + "ms");
+        android.util.Log.d("Players.setMediaSource", "播放器类型: " + (isExo() ? "EXO" : isIjk() ? "IJK" : "UNKNOWN"));
+        android.util.Log.d("Players.setMediaSource", "========================================");
+
+        if (isIjk() && ijkPlayer != null) {
+            android.util.Log.d("Players.setMediaSource", "IJK播放器设置媒体源，起始位置: " + position + "ms");
+            ijkPlayer.setMediaSource(IjkUtil.getSource(this.headers = checkUa(headers), this.url = url), position);
+        }
+        if (isExo() && exoPlayer != null) {
+            android.util.Log.d("Players.setMediaSource", "EXO播放器设置媒体项，起始位置: " + position + "ms");
+            exoPlayer.setMediaItem(ExoUtil.getMediaItem(this.headers = checkUa(headers), UrlUtil.uri(this.url = url), this.format = format, this.drm = drm, checkSub(this.subs = subs), decode), position);
+        }
+        if (isExo() && exoPlayer != null) {
+            android.util.Log.d("Players.setMediaSource", "EXO播放器开始准备");
+            exoPlayer.prepare();
+        }
         App.post(runnable, timeout);
         PlayerEvent.prepare();
         Logger.t(TAG).d(url);
