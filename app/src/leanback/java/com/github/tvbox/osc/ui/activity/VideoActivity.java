@@ -762,7 +762,20 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void seamless(Flag flag) {
-        Episode episode = flag.find(mHistory.getVodRemarks(), getMark().isEmpty());
+        int currentEpisodeIndex = getEpisodePosition();
+        Episode currentEpisode = getEpisode();
+        String currentRemarks = mHistory.getVodRemarks();
+
+        android.util.Log.d("VideoActivity.seamless", "====== 开始换源剧集匹配 ======");
+        android.util.Log.d("VideoActivity.seamless", "当前播放位置索引: " + currentEpisodeIndex);
+        android.util.Log.d("VideoActivity.seamless", "当前剧集名称: " + (currentEpisode != null ? currentEpisode.getName() : "null"));
+        android.util.Log.d("VideoActivity.seamless", "历史记录remarks: " + currentRemarks);
+        android.util.Log.d("VideoActivity.seamless", "新站源Flag: " + flag.getFlag());
+
+        Episode episode = flag.find(currentRemarks, currentEpisodeIndex, getMark().isEmpty());
+
+        android.util.Log.d("VideoActivity.seamless", "匹配结果: " + (episode != null ? episode.getName() : "null"));
+
         setQualityVisible(episode != null && episode.isActivated() && mQualityAdapter.getItemCount() > 1);
         if (episode == null || episode.isActivated()) return;
         if (Setting.getFlag() == 1) {
@@ -774,6 +787,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             mHistory.setVodRemarks(episode.getName());
             setEpisodeActivated(episode);
             hidePreview();
+            Notify.show(getString(R.string.play_auto_match_episode, currentEpisodeIndex + 1, episode.getName()));
         }
     }
 

@@ -120,6 +120,123 @@ public class Flag implements Parcelable {
         return strict ? null : getEpisodes().get(0);
     }
 
+    public Episode find(String remarks, int episodeIndex, boolean strict) {
+        if (getEpisodes().size() == 0) return null;
+        if (getEpisodes().size() == 1) return getEpisodes().get(0);
+
+        android.util.Log.d("Flag.find", "====== 开始匹配剧集 ======");
+        android.util.Log.d("Flag.find", "remarks: " + remarks);
+        android.util.Log.d("Flag.find", "episodeIndex: " + episodeIndex);
+        android.util.Log.d("Flag.find", "剧集总数: " + getEpisodes().size());
+
+        // 规则0: 优先从remarks中解析标准集数格式（最重要！）
+        int parsedFromRemarks = -1;
+        if (!TextUtils.isEmpty(remarks)) {
+            parsedFromRemarks = parseEpisodeNumber(remarks);
+            android.util.Log.d("Flag.find", "从remarks解析到集数: " + parsedFromRemarks);
+
+            if (parsedFromRemarks > 0) {
+                // 遍历所有episode，从名称中解析集数进行匹配
+                for (int i = 0; i < getEpisodes().size(); i++) {
+                    Episode ep = getEpisodes().get(i);
+                    String epName = ep.getName();
+                    int epParsedNumber = parseEpisodeNumber(epName);
+
+                    android.util.Log.d("Flag.find", "检查episode[" + i + "]: name=" + epName +
+                                     ", parsedNumber=" + epParsedNumber);
+
+                    if (epParsedNumber == parsedFromRemarks) {
+                        android.util.Log.d("Flag.find", "✓ 通过remarks解析匹配成功 - 位置: " + i);
+                        return ep;
+                    }
+                }
+                android.util.Log.d("Flag.find", "remarks解析匹配失败");
+            }
+        }
+
+        // 规则1: 精准匹配剧集名
+        if (!TextUtils.isEmpty(remarks)) {
+            for (int i = 0; i < getEpisodes().size(); i++) {
+                Episode item = getEpisodes().get(i);
+                if (item.rule1(remarks)) {
+                    android.util.Log.d("Flag.find", "✓ 精准名称匹配成功 - 位置: " + i + ", name: " + item.getName());
+                    return item;
+                }
+            }
+            android.util.Log.d("Flag.find", "精准名称匹配失败");
+        }
+
+        // 规则2: 使用数字匹配（原有的Util.getDigit）
+        int number = Util.getDigit(remarks);
+        android.util.Log.d("Flag.find", "Util.getDigit从remarks提取数字: " + number);
+        if (number != -1) {
+            for (int i = 0; i < getEpisodes().size(); i++) {
+                Episode item = getEpisodes().get(i);
+                if (item.rule2(number)) {
+                    android.util.Log.d("Flag.find", "✓ 数字匹配成功 - 位置: " + i);
+                    return item;
+                }
+            }
+            android.util.Log.d("Flag.find", "数字匹配失败");
+        }
+
+        // 规则3: 模糊匹配
+        if (number == -1 && !TextUtils.isEmpty(remarks)) {
+            for (int i = 0; i < getEpisodes().size(); i++) {
+                Episode item = getEpisodes().get(i);
+                if (item.rule3(remarks)) {
+                    android.util.Log.d("Flag.find", "✓ 模糊匹配1成功 - 位置: " + i);
+                    return item;
+                }
+            }
+            for (int i = 0; i < getEpisodes().size(); i++) {
+                Episode item = getEpisodes().get(i);
+                if (item.rule4(remarks)) {
+                    android.util.Log.d("Flag.find", "✓ 模糊匹配2成功 - 位置: " + i);
+                    return item;
+                }
+            }
+            android.util.Log.d("Flag.find", "模糊匹配失败");
+        }
+
+        // 使用上次位置
+        if (getPosition() != -1 && getPosition() < getEpisodes().size()) {
+            android.util.Log.d("Flag.find", "✓ 使用上次位置: " + getPosition());
+            return getEpisodes().get(getPosition());
+        }
+
+        android.util.Log.d("Flag.find", "所有匹配失败，返回" + (strict ? "null" : "第一集"));
+        return strict ? null : getEpisodes().get(0);
+    }
+
+    /**
+     * 从剧集名称中解析集数（参考弹幕搜索的parseEpisodeNumber）
+     */
+    private int parseEpisodeNumber(String title) {
+        if (TextUtils.isEmpty(title)) return -1;
+
+        // 按优先级顺序尝试匹配
+        String[] patterns = {
+            "S\\d+E(\\d+)",      // S01E16 - 最高优先级
+            "EP?(\\d+)",         // EP16 或 E16
+            "第(\\d+)[话集]",    // 第16集
+            "\\[(\\d+)\\]"       // [16] - 最低优先级
+        };
+
+        for (String patternStr : patterns) {
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(patternStr, java.util.regex.Pattern.CASE_INSENSITIVE);
+            java.util.regex.Matcher matcher = pattern.matcher(title);
+            if (matcher.find()) {
+                try {
+                    return Integer.parseInt(matcher.group(1));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+
+        return -1;
+    }
+
     public static List<Flag> create(String flag, String name, String url) {
         Flag item = Flag.create(flag);
         item.getEpisodes().add(Episode.create(name, url));
