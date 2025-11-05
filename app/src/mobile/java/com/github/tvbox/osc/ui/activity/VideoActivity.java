@@ -1459,7 +1459,12 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private void autoSwitchToNextFlag() {
         int position = mFlagAdapter.getPosition();
         if (position < mFlagAdapter.getItemCount() - 1) {
-            mFlagAdapter.setActivated(mFlagAdapter.get(position + 1));
+            Flag nextFlag = mFlagAdapter.get(position + 1);
+            mFlagAdapter.setActivated(nextFlag);
+            mBinding.flag.scrollToPosition(position + 1);
+            setEpisodeAdapter(nextFlag.getEpisodes());
+            setQualityVisible(false);
+            seamless(nextFlag);
         }
     }
 
@@ -1914,7 +1919,12 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     @Override
     public void onPlayErrorRetry() {
         if (mFlagAdapter != null && mFlagAdapter.getItemCount() > 0) {
-            mFlagAdapter.setActivated(mFlagAdapter.get(0));
+            Flag firstFlag = mFlagAdapter.get(0);
+            mFlagAdapter.setActivated(firstFlag);
+            mBinding.flag.scrollToPosition(0);
+            setEpisodeAdapter(firstFlag.getEpisodes());
+            setQualityVisible(false);
+            seamless(firstFlag);
         } else {
             onRefresh();
         }
