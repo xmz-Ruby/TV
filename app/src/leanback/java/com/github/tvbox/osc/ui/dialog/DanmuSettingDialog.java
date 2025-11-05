@@ -112,9 +112,16 @@ public class DanmuSettingDialog {
     }
 
     private void toggleDanmuLoad() {
+        boolean wasDisabled = !Setting.isDanmuLoad();
         Setting.putDanmuLoad(!Setting.isDanmuLoad());
         updateDanmuLoadText();
         callback.onDanmuSettingChanged();
+
+        // 如果从关到开，关闭弹层并打开弹幕搜索框
+        if (wasDisabled && Setting.isDanmuLoad()) {
+            dialog.dismiss();
+            callback.onDanmuLoadEnabled();
+        }
     }
 
     private void updateDanmuLoadText() {

@@ -1927,6 +1927,12 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     @Override
+    public void onDanmuLoadEnabled() {
+        // 弹幕开关从关到开时，自动打开弹幕搜索框
+        onDanmuSearch();
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         stopSearch();
