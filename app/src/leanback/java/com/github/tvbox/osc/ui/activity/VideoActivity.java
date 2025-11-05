@@ -1445,9 +1445,13 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void updateHistory(Episode item, boolean replay) {
-        // 换源/换线路时，如果剧集名称相同，不应该重置进度
+        // 判断是否是同一集：只比较剧集名称
         boolean isSameEpisode = item.getName() != null && item.getName().equals(mHistory.getVodRemarks());
-        replay = replay || (!item.equals(mHistory.getEpisode()) && !isSameEpisode);
+
+        // 如果切换到不同的集数，需要重播（清空进度）
+        if (!isSameEpisode) {
+            replay = true;
+        }
 
         // 如果需要重播（切换集数），清空待恢复进度
         if (replay) {
