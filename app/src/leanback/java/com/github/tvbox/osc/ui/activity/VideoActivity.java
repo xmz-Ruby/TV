@@ -1644,7 +1644,25 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void onError(ErrorEvent event) {
         onErrorPlayer(event);
-        showPlayErrorDialog(event);
+        // 先尝试自动切换线路，如果所有线路都尝试完了，才显示对话框
+        if (shouldAutoSwitchFlag()) {
+            autoSwitchToNextFlag();
+        } else {
+            showPlayErrorDialog(event);
+        }
+    }
+
+    private boolean shouldAutoSwitchFlag() {
+        // 检查是否还有未尝试的线路
+        int currentPosition = isGone(mBinding.flag) ? -1 : getFlagPosition();
+        return currentPosition >= 0 && currentPosition < mFlagAdapter.size() - 1;
+    }
+
+    private void autoSwitchToNextFlag() {
+        int position = getFlagPosition();
+        if (position < mFlagAdapter.size() - 1) {
+            nextFlag(position);
+        }
     }
 
     private void showPlayErrorDialog(ErrorEvent event) {
@@ -2050,7 +2068,13 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     @Override
     public void onPlayErrorRetry() {
-        onRefresh();
+        // 重试：从第一个线路开始重新尝试
+        if (mFlagAdapter != null && mFlagAdapter.size() > 0) {
+            Flag firstFlag = (Flag) mFlagAdapter.get(0);
+            setFlagActivated(firstFlag);
+        } else {
+            onRefresh();
+        }
     }
 
     @Override

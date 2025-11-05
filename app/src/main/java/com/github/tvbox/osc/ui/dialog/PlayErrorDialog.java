@@ -1,5 +1,7 @@
 package com.github.tvbox.osc.ui.dialog;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +22,9 @@ public class PlayErrorDialog extends BaseDialog {
     private Listener listener;
     private String errorMsg;
     private boolean hasMultiQuality;
+    private Handler countdownHandler;
+    private Runnable countdownRunnable;
+    private int countdown = 5;
 
     public static PlayErrorDialog create() {
         return new PlayErrorDialog();
@@ -59,6 +64,40 @@ public class PlayErrorDialog extends BaseDialog {
             binding.message.setText(errorMsg);
         }
         binding.btnQuality.setVisibility(hasMultiQuality ? View.VISIBLE : View.GONE);
+
+        // 初始化倒计时
+        countdownHandler = new Handler(Looper.getMainLooper());
+        updateCountdownText();
+        startCountdown();
+    }
+
+    private void startCountdown() {
+        countdownRunnable = new Runnable() {
+            @Override
+            public void run() {
+                countdown--;
+                if (countdown > 0) {
+                    updateCountdownText();
+                    countdownHandler.postDelayed(this, 1000);
+                } else {
+                    // 倒计时结束，自动换源
+                    onAutoSwitch();
+                }
+            }
+        };
+        countdownHandler.postDelayed(countdownRunnable, 1000);
+    }
+
+    private void stopCountdown() {
+        if (countdownHandler != null && countdownRunnable != null) {
+            countdownHandler.removeCallbacks(countdownRunnable);
+        }
+    }
+
+    private void updateCountdownText() {
+        if (binding != null && binding.countdown != null) {
+            binding.countdown.setText(countdown + "秒后自动换源...");
+        }
     }
 
     @Override
@@ -69,16 +108,19 @@ public class PlayErrorDialog extends BaseDialog {
     }
 
     private void onRetry() {
+        stopCountdown();
         listener.onPlayErrorRetry();
         dismiss();
     }
 
     private void onQuality() {
+        stopCountdown();
         listener.onPlayErrorSwitchQuality();
         dismiss();
     }
 
     private void onAutoSwitch() {
+        stopCountdown();
         listener.onPlayErrorAutoSwitch();
         dismiss();
     }
@@ -93,5 +135,11 @@ public class PlayErrorDialog extends BaseDialog {
     public void onResume() {
         super.onResume();
         getDialog().getWindow().setLayout(ResUtil.dp2px(400), -1);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        stopCountdown();
     }
 }
