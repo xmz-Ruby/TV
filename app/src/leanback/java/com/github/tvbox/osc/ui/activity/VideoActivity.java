@@ -791,9 +791,10 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         PlayStatus status = PlayStatus.find(vodName);
         android.util.Log.d("VideoActivity.seamless", "PlayStatus查询结果: " + (status != null ? "存在" : "不存在"));
 
+        Episode episode = null;
         if (status != null) {
-            android.util.Log.d("VideoActivity.seamless", "PlayStatus详情: vodId=" + status.getVodId() + ", 源=" + status.getSourceKey() + ", 线路=" + status.getFlagName() + ", 集=" + status.getEpisodeName() + ", 进度=" + status.getPosition() + "ms");
-            Episode episode = flag.find(status.getEpisodeName(), -1, true);
+            android.util.Log.d("VideoActivity.seamless", "PlayStatus详情: vodId=" + status.getVodId() + ", 源=" + status.getSourceKey() + ", 线路=" + status.getFlagName() + ", 集=" + status.getEpisodeName() + ", 画质索引=" + status.getQualityIndex() + ", 进度=" + status.getPosition() + "ms");
+            episode = flag.find(status.getEpisodeName(), -1, true);
             android.util.Log.d("VideoActivity.seamless", "匹配结果: " + (episode != null ? episode.getName() : "未匹配到"));
 
             if (episode != null && !episode.isActivated()) {
@@ -801,12 +802,35 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                 mHistory.setEpisodeUrl(episode.getUrl());
                 mHistory.setPosition(status.getPosition());
                 mPendingResumePosition = Math.max(mPendingResumePosition, status.getPosition());
+
+                // 恢复画质索引
+                if (status.getQualityIndex() >= 0) {
+                    mQualityAdapter.setPosition(status.getQualityIndex());
+                    android.util.Log.d("VideoActivity.seamless", "恢复画质索引: " + status.getQualityIndex());
+                }
+
                 setEpisodeActivated(episode);
                 hidePreview();
                 Notify.show(getString(R.string.play_auto_match_episode, 0, episode.getName()));
             }
-        } else {
-            android.util.Log.d("VideoActivity.seamless", "PlayStatus表中没有找到记录，剧名=" + vodName);
+        }
+
+        // 如果PlayStatus不存在或者没有匹配到集数，默认选第一集
+        if (episode == null && flag.getEpisodes().size() > 0) {
+            android.util.Log.d("VideoActivity.seamless", "PlayStatus表中没有记录或匹配失败，默认选第一集");
+            Episode firstEpisode = flag.getEpisodes().get(0);
+            if (!firstEpisode.isActivated()) {
+                mHistory.setVodRemarks(firstEpisode.getName());
+                mHistory.setEpisodeUrl(firstEpisode.getUrl());
+                mHistory.setPosition(0);
+                mPendingResumePosition = 0;
+
+                // 画质索引重置为0
+                mQualityAdapter.setPosition(0);
+
+                setEpisodeActivated(firstEpisode);
+                hidePreview();
+            }
         }
     }
 
@@ -832,8 +856,35 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         try {
             long currentPosition = mPlayers.getPosition();
             if (currentPosition < 0) currentPosition = mHistory.getPosition();
+            final long finalPosition = currentPosition;
             mPendingResumePosition = currentPosition;
             mHistory.setPosition(currentPosition);
+
+            android.util.Log.d("VideoActivity.setQualityActivated", "切换画质: 当前进度=" + currentPosition + "ms, 准备恢复到此位置");
+
+            // 切换画质时也要更新PlayStatus表，确保画质索引被保存
+            App.execute(() -> {
+                String vodName = mBinding.name.getText().toString();
+                PlayStatus status = PlayStatus.find(vodName);
+                if (status == null) status = PlayStatus.create(vodName);
+                status.setVodId(getId());
+                status.setSourceKey(getSite().getKey());
+                status.setFlagName(getFlag().getFlag());
+                status.setQualityIndex(mQualityAdapter.getPosition());
+                status.setEpisodeName(mHistory.getVodRemarks());
+                status.setEpisodeUrl(mHistory.getEpisodeUrl());
+                status.setPosition(finalPosition);
+                status.setUpdateTime(System.currentTimeMillis());
+                status.save();
+                android.util.Log.d("VideoActivity.setQualityActivated", "切换画质并保存PlayStatus: 剧名=" + vodName + ", 画质索引=" + mQualityAdapter.getPosition() + ", 进度=" + finalPosition + "ms");
+            });
+
+            // 在启动播放器之前设置position，确保播放器从正确的位置开始（关键！）
+            if (mPendingResumePosition > 0) {
+                mPlayers.setPosition(mPendingResumePosition);
+                android.util.Log.d("VideoActivity.setQualityActivated", "已设置播放器位置: " + mPendingResumePosition + "ms");
+            }
+
             mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
             mBinding.danmaku.hide();
         } catch (Exception e) {

@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -63,7 +64,7 @@ public class FlagSorter {
         }
 
         // 按优先级排序
-        flagItems.sort((item1, item2) -> {
+        Collections.sort(flagItems, (item1, item2) -> {
             int priority1 = getFlagPriority(item1.name);
             int priority2 = getFlagPriority(item2.name);
 
