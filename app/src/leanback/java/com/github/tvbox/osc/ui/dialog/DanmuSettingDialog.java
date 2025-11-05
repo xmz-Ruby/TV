@@ -93,17 +93,21 @@ public class DanmuSettingDialog {
         // 弹幕开关按钮
         binding.danmuLoadButton.setOnClickListener(v -> toggleDanmuLoad());
         binding.danmuLoadButton.setOnKeyListener((view, keyCode, event) -> {
-            boolean enter = KeyUtil.isEnterKey(event);
-            if (enter) toggleDanmuLoad();
-            return enter;
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN && KeyUtil.isEnterKey(event)) {
+                toggleDanmuLoad();
+                return true;
+            }
+            return false;
         });
 
         // 关闭按钮
         binding.closeButton.setOnClickListener(v -> dialog.dismiss());
         binding.closeButton.setOnKeyListener((view, keyCode, event) -> {
-            boolean enter = KeyUtil.isEnterKey(event);
-            if (enter) dialog.dismiss();
-            return enter;
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN && KeyUtil.isEnterKey(event)) {
+                dialog.dismiss();
+                return true;
+            }
+            return false;
         });
     }
 
