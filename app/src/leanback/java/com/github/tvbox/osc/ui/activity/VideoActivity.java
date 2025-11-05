@@ -74,6 +74,7 @@ import com.github.tvbox.osc.ui.dialog.DanmakuSearchDialog;
 import com.github.tvbox.osc.ui.dialog.DescDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeDialog;
 import com.github.tvbox.osc.ui.dialog.FileChooserDialog;
+import com.github.tvbox.osc.ui.dialog.PlayErrorDialog;
 import com.github.tvbox.osc.ui.dialog.PlayerDialog;
 import com.github.tvbox.osc.ui.dialog.SubtitleDialog;
 import com.github.tvbox.osc.ui.dialog.TrackDialog;
@@ -122,7 +123,7 @@ import okhttp3.Call;
 import okhttp3.Response;
 import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 
-public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback, com.github.tvbox.osc.impl.DanmuSettingCallback {
+public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback, com.github.tvbox.osc.impl.DanmuSettingCallback, PlayErrorDialog.Listener {
 
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
@@ -1540,7 +1541,19 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void onError(ErrorEvent event) {
         onErrorPlayer(event);
-        startFlow();
+        showPlayErrorDialog(event);
+    }
+
+    private void showPlayErrorDialog(ErrorEvent event) {
+        if (!getSite().isChangeable()) {
+            startFlow();
+            return;
+        }
+        boolean hasMultiQuality = mQualityAdapter != null && mQualityAdapter.getItemCount() > 1;
+        PlayErrorDialog.create()
+                .message(event.getMsg())
+                .hasMultiQuality(hasMultiQuality)
+                .show(this);
     }
 
     private void startFlow() {
@@ -1930,6 +1943,30 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     public void onDanmuLoadEnabled() {
         // 弹幕开关从关到开时，自动打开弹幕搜索框
         onDanmuSearch();
+    }
+
+    @Override
+    public void onPlayErrorRetry() {
+        onRefresh();
+    }
+
+    @Override
+    public void onPlayErrorSwitchQuality() {
+        if (mQualityAdapter != null && mQualityAdapter.getItemCount() > 1) {
+            int oldPos = mQualityAdapter.getPosition();
+            mQualityAdapter.switchToNext();
+            int newPos = mQualityAdapter.getPosition();
+            Result result = mQualityAdapter.getResult();
+            if (result != null && !result.getUrl().isEmpty()) {
+                String qualityName = result.getUrl().n(newPos);
+                Notify.show(getString(R.string.play_switch_quality, qualityName));
+            }
+        }
+    }
+
+    @Override
+    public void onPlayErrorAutoSwitch() {
+        startFlow();
     }
 
     @Override
