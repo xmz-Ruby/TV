@@ -272,6 +272,16 @@ public class Vod implements Parcelable {
     }
 
     public void setVodFlags() {
+        // 先对线路进行过滤和排序
+        com.github.tvbox.osc.utils.FlagSorter.FilterResult filterResult =
+            com.github.tvbox.osc.utils.FlagSorter.filterAndSort(getVodPlayFrom(), getVodPlayUrl());
+
+        // 如果过滤后有结果，更新vodPlayFrom和vodPlayUrl
+        if (!filterResult.playFromList.isEmpty()) {
+            this.vodPlayFrom = String.join("$$$", filterResult.playFromList);
+            this.vodPlayUrl = String.join("$$$", filterResult.playUrlList);
+        }
+
         String[] playFlags = getVodPlayFrom().split("\\$\\$\\$");
         String[] playUrls = getVodPlayUrl().split("\\$\\$\\$");
         for (int i = 0; i < playFlags.length; i++) {
