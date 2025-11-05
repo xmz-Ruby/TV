@@ -715,7 +715,9 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setEpisodeAdapter(List<Episode> items) {
-        getEpisodeView().setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
+        boolean empty = items.isEmpty();
+        mBinding.episodeLabel.setVisibility(empty ? View.GONE : View.VISIBLE);
+        getEpisodeView().setVisibility(empty ? View.GONE : View.VISIBLE);
 
         // 给所有剧集添加序号前缀
         addEpisodePrefix(items);
@@ -821,6 +823,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setQualityVisible(boolean visible) {
+        mBinding.qualityLabel.setVisibility(visible ? View.VISIBLE : View.GONE);
         mBinding.quality.setVisibility(visible ? View.VISIBLE : View.GONE);
         setR2Callback(100);
     }
@@ -1355,6 +1358,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void checkFlag(Vod item) {
         boolean empty = item.getVodFlags().isEmpty();
+        mBinding.flagLabel.setVisibility(empty ? View.GONE : View.VISIBLE);
         mBinding.flag.setVisibility(empty ? View.GONE : View.VISIBLE);
         if (empty) {
             ErrorEvent.flag();

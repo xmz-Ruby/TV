@@ -248,11 +248,25 @@
 
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/flagLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/video"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:text="@string/video_flag"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <com.github.tvbox.osc.ui.custom.CustomHorizontalGridView
         android:id="@+id/flag"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/video"
+        android:layout_below="@+id/flagLabel"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:layout_marginBottom="12dp"
@@ -272,6 +286,19 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
+            <TextView
+                android:id="@+id/qualityLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="6dp"
+                android:text="@string/video_quality"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <com.github.tvbox.osc.ui.custom.CustomHorizontalGridView
                 android:id="@+id/quality"
                 android:layout_width="match_parent"
@@ -281,6 +308,19 @@
                 android:layout_marginBottom="12dp"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/episodeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="6dp"
+                android:text="@string/video_episode"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
                 android:visibility="gone" />
 
             <com.github.tvbox.osc.ui.custom.CustomHorizontalGridView

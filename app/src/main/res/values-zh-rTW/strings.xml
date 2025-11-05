@@ -34,6 +34,11 @@
     <string name="play_next">下集</string>
     <string name="play_prev">上集</string>
     <string name="play_episodes">選集</string>
+
+    <!-- Video -->
+    <string name="video_flag">線路</string>
+    <string name="video_quality">畫質</string>
+    <string name="video_episode">劇集</string>
     <string name="play_loop">循環</string>
     <string name="play_timer">定時</string>
     <string name="play_time">時間</string>
