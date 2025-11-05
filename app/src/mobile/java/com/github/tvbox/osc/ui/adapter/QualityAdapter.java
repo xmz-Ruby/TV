@@ -34,6 +34,10 @@ public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHold
         return position;
     }
 
+    public Result getResult() {
+        return mResult;
+    }
+
     @Override
     public int getItemCount() {
         return mResult.getUrl().getValues().size();
