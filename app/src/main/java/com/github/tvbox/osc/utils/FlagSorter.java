@@ -12,7 +12,8 @@ public class FlagSorter {
 
     // 需要过滤掉的线路关键字
     private static final String[] FILTER_KEYWORDS = {
-        "百度", "度盘", "天翼", "123", "迅雷", "采集"
+        "百度", "度盘", "天翼", "123", "迅雷", "采集",
+        "错误", "无效", "失效", "error", "invalid", "expired", "unavailable"
     };
 
     // 线路排序规则：包含"预览" > 包含"原画" > 其他
@@ -37,12 +38,15 @@ public class FlagSorter {
      * @return 过滤并排序后的结果
      */
     public static FilterResult filterAndSort(String playFrom, String playUrl) {
+        android.util.Log.d("FlagSorter", "开始过滤和排序线路");
         if (playFrom == null || playFrom.isEmpty() || playUrl == null || playUrl.isEmpty()) {
+            android.util.Log.d("FlagSorter", "线路数据为空");
             return new FilterResult(new ArrayList<>(), new ArrayList<>());
         }
 
         String[] playFromArray = playFrom.split("\\$\\$\\$");
         String[] playUrlArray = playUrl.split("\\$\\$\\$");
+        android.util.Log.d("FlagSorter", "原始线路数量: " + playFromArray.length);
 
         // 创建线路列表（保持playFrom和playUrl的对应关系）
         List<FlagItem> flagItems = new ArrayList<>();
@@ -52,14 +56,19 @@ public class FlagSorter {
             String flagName = playFromArray[i].trim();
             String flagUrl = playUrlArray[i];
 
+            android.util.Log.d("FlagSorter", "检查线路[" + i + "]: " + flagName);
             // 过滤掉包含关键字的线路
             if (!shouldFilter(flagName)) {
+                android.util.Log.d("FlagSorter", "保留线路: " + flagName);
                 flagItems.add(new FlagItem(flagName, flagUrl, i));
             }
         }
 
+        android.util.Log.d("FlagSorter", "过滤后线路数量: " + flagItems.size());
+
         // 如果过滤后为空，返回空列表
         if (flagItems.isEmpty()) {
+            android.util.Log.d("FlagSorter", "过滤后没有有效线路");
             return new FilterResult(new ArrayList<>(), new ArrayList<>());
         }
 
@@ -98,6 +107,7 @@ public class FlagSorter {
 
         for (String keyword : FILTER_KEYWORDS) {
             if (flagName.contains(keyword)) {
+                android.util.Log.d("FlagSorter", "过滤线路 [" + flagName + "]，匹配关键字: " + keyword);
                 return true;
             }
         }
