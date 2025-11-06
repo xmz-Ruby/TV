@@ -63,6 +63,20 @@ public class Flag implements Parcelable {
         this.flag = flag;
     }
 
+    public boolean isInvalid() {
+        String flagName = getFlag().toLowerCase();
+        android.util.Log.d("Flag.isInvalid", "检查线路: " + getFlag() + " (小写: " + flagName + ")");
+        String[] invalidKeywords = {"错误", "无效", "失效", "error", "invalid", "expired", "unavailable"};
+        for (String keyword : invalidKeywords) {
+            if (flagName.contains(keyword)) {
+                android.util.Log.d("Flag.isInvalid", "线路 [" + getFlag() + "] 包含无效关键字: " + keyword);
+                return true;
+            }
+        }
+        android.util.Log.d("Flag.isInvalid", "线路 [" + getFlag() + "] 是有效线路");
+        return false;
+    }
+
     public String getUrls() {
         return urls;
     }

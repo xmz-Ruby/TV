@@ -703,6 +703,18 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (mFlagAdapter.size() == 0 || item.isActivated()) return;
         if (mFlagAdapter.indexOf(item) == -1) item.setFlag(((Flag) mFlagAdapter.get(0)).getFlag());
 
+        // 如果当前线路无效，尝试找到第一个有效线路
+        if (item.isInvalid()) {
+            android.util.Log.d("VideoActivity.setFlagActivated", "检测到无效线路: " + item.getFlag() + "，尝试切换到有效线路");
+            Flag validFlag = findFirstValidFlag();
+            if (validFlag != null) {
+                item = validFlag;
+                android.util.Log.d("VideoActivity.setFlagActivated", "切换到有效线路: " + item.getFlag());
+            } else {
+                android.util.Log.d("VideoActivity.setFlagActivated", "没有找到有效线路，使用当前线路");
+            }
+        }
+
         android.util.Log.d("VideoActivity.setFlagActivated", "手动切换线路: " + item.getFlag());
 
         for (int i = 0; i < mFlagAdapter.size(); i++) ((Flag) mFlagAdapter.get(i)).setActivated(item);
@@ -711,6 +723,16 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         setEpisodeAdapter(item.getEpisodes());
         setQualityVisible(false);
         seamless(item); // 自动匹配集数+恢复进度
+    }
+
+    private Flag findFirstValidFlag() {
+        for (int i = 0; i < mFlagAdapter.size(); i++) {
+            Flag flag = (Flag) mFlagAdapter.get(i);
+            if (!flag.isInvalid()) {
+                return flag;
+            }
+        }
+        return null;
     }
 
     private void setEpisodeAdapter(List<Episode> items) {
@@ -1724,16 +1746,56 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void checkFlag() {
         int position = isGone(mBinding.flag) ? -1 : getFlagPosition();
-        if (position == mFlagAdapter.size() - 1) checkSearch(false);
-        else nextFlag(position);
+        android.util.Log.d("VideoActivity.checkFlag", "当前线路位置: " + position + ", 总线路数: " + mFlagAdapter.size());
+
+        // 打印当前线路信息
+        if (position >= 0 && position < mFlagAdapter.size()) {
+            Flag currentFlag = (Flag) mFlagAdapter.get(position);
+            android.util.Log.d("VideoActivity.checkFlag", "当前线路名称: " + currentFlag.getFlag() + ", 是否无效: " + currentFlag.isInvalid());
+        }
+
+        // 查找下一个有效的线路
+        int nextValidPosition = findNextValidFlag(position);
+        android.util.Log.d("VideoActivity.checkFlag", "下一个有效线路位置: " + nextValidPosition);
+
+        if (nextValidPosition == -1) {
+            // 没有找到有效线路，直接切换源
+            android.util.Log.d("VideoActivity.checkFlag", "没有找到有效线路，开始切换源");
+            checkSearch(false);
+        } else {
+            android.util.Log.d("VideoActivity.checkFlag", "找到有效线路，切换到位置: " + nextValidPosition);
+            nextFlag(nextValidPosition - 1);
+        }
+    }
+
+    private int findNextValidFlag(int currentPosition) {
+        android.util.Log.d("VideoActivity.findNextValidFlag", "开始查找有效线路，当前位置: " + currentPosition);
+        // 从当前位置的下一个开始查找有效线路
+        for (int i = currentPosition + 1; i < mFlagAdapter.size(); i++) {
+            Flag flag = (Flag) mFlagAdapter.get(i);
+            android.util.Log.d("VideoActivity.findNextValidFlag", "检查线路[" + i + "]: " + flag.getFlag() + ", 是否无效: " + flag.isInvalid());
+            if (!flag.isInvalid()) {
+                android.util.Log.d("VideoActivity.findNextValidFlag", "找到有效线路: " + flag.getFlag());
+                return i;
+            }
+        }
+        android.util.Log.d("VideoActivity.findNextValidFlag", "没有找到有效线路");
+        return -1; // 没有找到有效线路
     }
 
     private void checkSearch(boolean force) {
-        if (mQuickAdapter.size() == 0) initSearch(mBinding.name.getText().toString(), true);
-        else if (isAutoMode() || force) nextSite();
+        android.util.Log.d("VideoActivity.checkSearch", "开始检查搜索，force=" + force + ", mQuickAdapter.size=" + mQuickAdapter.size());
+        if (mQuickAdapter.size() == 0) {
+            android.util.Log.d("VideoActivity.checkSearch", "没有搜索结果，开始搜索");
+            initSearch(mBinding.name.getText().toString(), true);
+        } else if (isAutoMode() || force) {
+            android.util.Log.d("VideoActivity.checkSearch", "已有搜索结果，直接切换到下一个源");
+            nextSite();
+        }
     }
 
     private void initSearch(String keyword, boolean auto) {
+        android.util.Log.d("VideoActivity.initSearch", "初始化搜索，关键词: " + keyword + ", auto=" + auto);
         stopSearch();
         setAutoMode(auto);
         setInitAuto(auto);
@@ -1751,7 +1813,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         List<Site> sites = new ArrayList<>();
         mExecutor = Executors.newFixedThreadPool(Constant.THREAD_POOL);
         for (Site site : VodConfig.get().getSites()) if (isPass(site)) sites.add(site);
-        for (Site site : sites) mExecutor.execute(() -> search(site, keyword));
+        android.util.Log.d("VideoActivity.startSearch", "开始搜索，关键词: " + keyword + ", 可搜索源数量: " + sites.size());
+        for (Site site : sites) {
+            android.util.Log.d("VideoActivity.startSearch", "提交搜索任务: " + site.getName());
+            mExecutor.execute(() -> search(site, keyword));
+        }
     }
 
     private void stopSearch() {
@@ -1768,12 +1834,19 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setSearch(Result result) {
+        android.util.Log.d("VideoActivity.setSearch", "收到搜索结果，结果数量: " + result.getList().size());
         List<Vod> items = result.getList();
         Iterator<Vod> iterator = items.iterator();
         while (iterator.hasNext()) if (mismatch(iterator.next())) iterator.remove();
+        android.util.Log.d("VideoActivity.setSearch", "过滤后结果数量: " + items.size() + ", isInitAuto=" + isInitAuto());
         mQuickAdapter.addAll(mQuickAdapter.size(), items);
         mBinding.quick.setVisibility(View.VISIBLE);
-        if (isInitAuto()) nextSite();
+        if (isInitAuto()) {
+            android.util.Log.d("VideoActivity.setSearch", "自动模式，立即切换到第一个源");
+            nextSite();
+        } else {
+            android.util.Log.d("VideoActivity.setSearch", "非自动模式，不自动切换");
+        }
         if (items.isEmpty()) return;
         App.removeCallbacks(mR4);
     }
@@ -1804,8 +1877,13 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void nextSite() {
-        if (mQuickAdapter.size() == 0) return;
+        android.util.Log.d("VideoActivity.nextSite", "准备切换到下一个源，当前搜索结果数: " + mQuickAdapter.size());
+        if (mQuickAdapter.size() == 0) {
+            android.util.Log.d("VideoActivity.nextSite", "没有搜索结果，无法切换");
+            return;
+        }
         Vod item = (Vod) mQuickAdapter.get(0);
+        android.util.Log.d("VideoActivity.nextSite", "切换到源: " + item.getSiteName() + ", 视频: " + item.getVodName());
         Notify.show(getString(R.string.play_switch_site, item.getSiteName()));
         mQuickAdapter.removeItems(0, 1);
         mBroken.add(getId());
