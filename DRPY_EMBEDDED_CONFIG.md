@@ -4,9 +4,13 @@
 
 ## 内置文件位置
 
-内置在 `quickjs/src/main/assets/js/lib/` 目录：
+内置文件分布在两个目录：
+
+**`quickjs/src/main/assets/js/lib/` 目录：**
 - `drpy2.js` - drpy2 核心库（73KB）
 - `drpy2.min.js` - drpy2 核心库（同上，向后兼容）
+
+**`quickjs/src/main/assets/js/dist/` 目录：**
 - `drpy-core-lite.min.js` - drpy-core-lite 库（692KB）
 
 ## 使用方法
@@ -141,6 +145,44 @@ drpy 规则可以通过**两种方式**加载内置核心库，都能正常工�
 - **Nano.java**：内置 HTTP 服务器，将 URL 路径映射到 assets 文件
 - **缓存机制**：文件内容会被缓存，避免重复读取
 - **混合使用**：可以部分规则用内置，部分规则用远程
+
+## 故障排除
+
+### 错误：Could not find export 'cheerio' in module
+
+如果看到类似这样的错误：
+```
+QuickJSException: Could not find export 'cheerio' in module 'http://127.0.0.1:9978/js/dist/drpy-core-lite.min.js'
+```
+
+**原因**：某些 drpy 源文件尝试从 drpy-core-lite.min.js 导入 cheerio，但该库的打包方式可能不支持这种导入。
+
+**解决方法**：
+1. 换用不依赖 cheerio 的 drpy 规则源
+2. 使用 drpy2.js 而不是 drpy-core-lite（大多数规则支持）
+3. 如果规则是你自己编写的，检查 import 语句是否正确
+
+### 错误：Failed to load JS spider from
+
+如果看到：
+```
+Failed to load JS spider from: http://127.0.0.1:9978/js/lib/drpy2.js
+```
+
+**原因**：内置服务器未启动或文件路径不正确。
+
+**解决方法**：
+1. 检查配置路径是否正确：应该是 `/js/lib/drpy2.js` 或 `/js/dist/drpy-core-lite.min.js`
+2. 或改用 `assets://` 协议直接加载
+3. 重启应用
+
+### JavaScript 兼容性问题
+
+QuickJS 引擎不完全支持所有 ES6+ 特性，某些规则可能会报错：
+- ❌ 顶层 `await`（top-level await）
+- ❌ 某些高级语法
+
+**解决方法**：选择兼容 QuickJS 的 drpy 规则。
 
 ## 参考 drpy-node 配置
 
