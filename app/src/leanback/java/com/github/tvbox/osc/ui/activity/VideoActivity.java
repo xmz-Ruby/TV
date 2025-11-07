@@ -657,6 +657,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (item.getVodFlags().isEmpty()) {
             android.util.Log.d("VideoActivity.setDetail", "该源没有有效线路，自动跳过: 源=" + item.getSiteName());
             mBroken.add(item.getVodId()); // 记录为不可用源
+
+            // 如果当前剧名为空（首次进入），先设置剧名，确保界面有内容
+            if (currentName.isEmpty() && !newName.isEmpty()) {
+                mBinding.progressLayout.showContent();
+                mBinding.name.setText(newName);
+                android.util.Log.d("VideoActivity.setDetail", "设置剧名: " + newName);
+            }
+
             Notify.show("该源没有有效线路，自动尝试下一个源...");
 
             // 启动自动换源（如果还没有启动）
@@ -737,8 +745,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             if (keyword != null && !keyword.isEmpty()) {
                 initSearch(keyword, true); // 直接启动搜索，使用正确的关键词
             } else {
-                // 连剧名都没有，无法搜索，显示错误
+                // 连剧名都没有，无法搜索，显示错误并保持在播放界面
                 Notify.show("无法获取剧名，无法自动换源");
+                hideProgress();
+                // 确保界面显示为内容状态，而不是空白或其他状态
+                mBinding.progressLayout.showContent();
                 showError("该源无法播放，且无法自动换源");
             }
         }
@@ -1964,6 +1975,12 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             android.util.Log.d("VideoActivity.nextSite", "没有更多可用源，停止自动换源");
             Notify.show("已尝试所有可用源，均无法播放");
             setAutoMode(false); // 退出自动模式
+
+            // 显示错误信息，保持在播放界面
+            hideProgress();
+            // 确保界面显示为内容状态
+            mBinding.progressLayout.showContent();
+            showError("所有源均无法播放，请稍后再试或手动选择其他源");
             return;
         }
         Vod item = (Vod) mQuickAdapter.get(0);
