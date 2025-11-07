@@ -634,6 +634,73 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setDetail(Vod item) {
+        String currentName = mBinding.name.getText().toString();
+        String newName = item.getVodName(getName());
+
+        // 1. 剧名精准匹配检查（无论自动还是手动模式都检查并自动跳过）
+        if (!currentName.isEmpty() && !currentName.equals(newName)) {
+            android.util.Log.d("VideoActivity.setDetail", "剧名不匹配，自动跳过该源: 当前=" + currentName + ", 新=" + newName);
+            mBroken.add(item.getVodId()); // 记录为不可用源，避免重复尝试
+            Notify.show("剧名不匹配，自动跳过：《" + newName + "》");
+
+            // 启动自动换源（如果还没有启动）
+            if (!isAutoMode()) {
+                setAutoMode(true);
+                android.util.Log.d("VideoActivity.setDetail", "手动换源检测到不匹配，启动自动模式");
+            }
+
+            tryNextSource(currentName); // 尝试下一个源
+            return;
+        }
+
+        // 2. 线路为空检查：所有线路都被过滤掉了（例如都是"加载错误"）
+        if (item.getVodFlags().isEmpty()) {
+            android.util.Log.d("VideoActivity.setDetail", "该源没有有效线路，自动跳过: 源=" + item.getSiteName());
+            mBroken.add(item.getVodId()); // 记录为不可用源
+            Notify.show("该源没有有效线路，自动尝试下一个源...");
+
+            // 启动自动换源（如果还没有启动）
+            if (!isAutoMode()) {
+                setAutoMode(true);
+            }
+
+            // 使用新源的剧名作为搜索关键词（当前名称可能为空）
+            String searchKeyword = currentName.isEmpty() ? newName : currentName;
+            tryNextSource(searchKeyword); // 尝试下一个源
+            return;
+        }
+
+        // 3. 集数合理性检查（无论手动还是自动都检查）
+        PlayStatus status = PlayStatus.find(currentName);
+        if (status != null && !item.getVodFlags().isEmpty()) {
+            // 获取PlayStatus中记录的集数名称，提取集数编号
+            String recordedEpisodeName = status.getEpisodeName();
+            int recordedEpisodeNumber = extractEpisodeNumber(recordedEpisodeName);
+
+            // 计算新源的总集数
+            int totalEpisodes = 0;
+            for (Flag flag : item.getVodFlags()) {
+                totalEpisodes = Math.max(totalEpisodes, flag.getEpisodes().size());
+            }
+
+            // 如果记录的集数大于新源的总集数，说明新源集数不足（可能是同名电影）
+            if (recordedEpisodeNumber > 0 && totalEpisodes > 0 && recordedEpisodeNumber > totalEpisodes) {
+                android.util.Log.d("VideoActivity.setDetail", "集数不足，自动跳过该源: 记录集数=" + recordedEpisodeNumber + ", 新源总集数=" + totalEpisodes + ", 源=" + item.getSiteName());
+                mBroken.add(item.getVodId()); // 记录为不可用源
+                Notify.show("该源集数不足(总共" + totalEpisodes + "集)，自动跳过...");
+
+                // 启动自动换源（如果还没有启动）
+                if (!isAutoMode()) {
+                    setAutoMode(true);
+                }
+
+                tryNextSource(currentName); // 尝试下一个源
+                return;
+            }
+
+            android.util.Log.d("VideoActivity.setDetail", "集数检查通过: 记录集数=" + recordedEpisodeNumber + ", 新源总集数=" + totalEpisodes + ", 源=" + item.getSiteName());
+        }
+
         mBinding.progressLayout.showContent();
         mBinding.video.setTag(item.getVodPic(getPic()));
         mBinding.name.setText(item.getVodName(getName()));
@@ -654,6 +721,55 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         checkHistory(item);
         checkFlag(item);
         checkKeep();
+    }
+
+    /**
+     * 尝试下一个源：如果已有搜索结果则使用，否则启动搜索
+     */
+    private void tryNextSource(String keyword) {
+        if (mQuickAdapter.size() > 0) {
+            // 已有搜索结果，直接尝试下一个
+            android.util.Log.d("VideoActivity.tryNextSource", "使用已有搜索结果，尝试下一个源");
+            nextSite();
+        } else {
+            // 没有搜索结果，启动搜索
+            android.util.Log.d("VideoActivity.tryNextSource", "没有搜索结果，启动搜索: " + keyword);
+            if (keyword != null && !keyword.isEmpty()) {
+                initSearch(keyword, true); // 直接启动搜索，使用正确的关键词
+            } else {
+                // 连剧名都没有，无法搜索，显示错误
+                Notify.show("无法获取剧名，无法自动换源");
+                showError("该源无法播放，且无法自动换源");
+            }
+        }
+    }
+
+    /**
+     * 从集数名称中提取集数编号
+     * 例如：[30]第30集 -> 30, 第10集 -> 10
+     */
+    private int extractEpisodeNumber(String episodeName) {
+        if (episodeName == null || episodeName.isEmpty()) {
+            return 0;
+        }
+
+        try {
+            // 匹配模式：[数字] 或 第数字集 或 纯数字
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\[(\\d+)\\]|第(\\d+)集|(^\\d+$)");
+            java.util.regex.Matcher matcher = pattern.matcher(episodeName);
+            if (matcher.find()) {
+                for (int i = 1; i <= matcher.groupCount(); i++) {
+                    String group = matcher.group(i);
+                    if (group != null && !group.isEmpty()) {
+                        return Integer.parseInt(group);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.d("VideoActivity.extractEpisodeNumber", "提取集数失败: " + episodeName + ", error=" + e.getMessage());
+        }
+
+        return 0;
     }
 
     private int getMaxLines() {
@@ -780,6 +896,13 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         android.util.Log.d("VideoActivity.seamless", "查询条件剧名: " + vodName);
         android.util.Log.d("VideoActivity.seamless", "目标线路: " + flag.getFlag());
 
+        // 检查目标线路是否有效
+        if (isInvalidFlag(flag.getFlag())) {
+            android.util.Log.d("VideoActivity.seamless", "目标线路无效，跳过: " + flag.getFlag());
+            // 不选择任何集数，让用户手动换源
+            return;
+        }
+
         // 打印所有PlayStatus记录
         java.util.List<PlayStatus> allStatus = AppDatabase.get().getPlayStatusDao().getAll();
         android.util.Log.d("VideoActivity.seamless", "PlayStatus表总记录数: " + allStatus.size());
@@ -793,24 +916,31 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         Episode episode = null;
         if (status != null) {
             android.util.Log.d("VideoActivity.seamless", "PlayStatus详情: vodId=" + status.getVodId() + ", 源=" + status.getSourceKey() + ", 线路=" + status.getFlagName() + ", 集=" + status.getEpisodeName() + ", 画质索引=" + status.getQualityIndex() + ", 进度=" + status.getPosition() + "ms");
-            episode = flag.find(status.getEpisodeName(), -1, true);
-            android.util.Log.d("VideoActivity.seamless", "匹配结果: " + (episode != null ? episode.getName() : "未匹配到"));
 
-            if (episode != null && !episode.isActivated()) {
-                mHistory.setVodRemarks(episode.getName());
-                mHistory.setEpisodeUrl(episode.getUrl());
-                mHistory.setPosition(status.getPosition());
-                mPendingResumePosition = Math.max(mPendingResumePosition, status.getPosition());
+            // 检查PlayStatus中的线路是否有效
+            if (isInvalidFlag(status.getFlagName())) {
+                android.util.Log.d("VideoActivity.seamless", "PlayStatus中的线路无效，忽略: " + status.getFlagName());
+                status = null; // 清空status，后续会选择第一集
+            } else {
+                episode = flag.find(status.getEpisodeName(), -1, true);
+                android.util.Log.d("VideoActivity.seamless", "匹配结果: " + (episode != null ? episode.getName() : "未匹配到"));
 
-                // 恢复画质索引
-                if (status.getQualityIndex() >= 0) {
-                    mQualityAdapter.setPosition(status.getQualityIndex());
-                    android.util.Log.d("VideoActivity.seamless", "恢复画质索引: " + status.getQualityIndex());
+                if (episode != null && !episode.isActivated()) {
+                    mHistory.setVodRemarks(episode.getName());
+                    mHistory.setEpisodeUrl(episode.getUrl());
+                    mHistory.setPosition(status.getPosition());
+                    mPendingResumePosition = Math.max(mPendingResumePosition, status.getPosition());
+
+                    // 恢复画质索引
+                    if (status.getQualityIndex() >= 0) {
+                        mQualityAdapter.setPosition(status.getQualityIndex());
+                        android.util.Log.d("VideoActivity.seamless", "恢复画质索引: " + status.getQualityIndex());
+                    }
+
+                    setEpisodeActivated(episode);
+                    hidePreview();
+                    Notify.show(getString(R.string.play_auto_match_episode, 0, episode.getName()));
                 }
-
-                setEpisodeActivated(episode);
-                hidePreview();
-                Notify.show(getString(R.string.play_auto_match_episode, 0, episode.getName()));
             }
         }
 
@@ -862,21 +992,27 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             android.util.Log.d("VideoActivity.setQualityActivated", "切换画质: 当前进度=" + currentPosition + "ms, 准备恢复到此位置");
 
             // 切换画质时也要更新PlayStatus表，确保画质索引被保存
-            App.execute(() -> {
-                String vodName = mBinding.name.getText().toString();
-                PlayStatus status = PlayStatus.find(vodName);
-                if (status == null) status = PlayStatus.create(vodName);
-                status.setVodId(getId());
-                status.setSourceKey(getSite().getKey());
-                status.setFlagName(getFlag().getFlag());
-                status.setQualityIndex(mQualityAdapter.getPosition());
-                status.setEpisodeName(mHistory.getVodRemarks());
-                status.setEpisodeUrl(mHistory.getEpisodeUrl());
-                status.setPosition(finalPosition);
-                status.setUpdateTime(System.currentTimeMillis());
-                status.save();
-                android.util.Log.d("VideoActivity.setQualityActivated", "切换画质并保存PlayStatus: 剧名=" + vodName + ", 画质索引=" + mQualityAdapter.getPosition() + ", 进度=" + finalPosition + "ms");
-            });
+            // 但要检查线路是否有效
+            String flagName = getFlag().getFlag();
+            if (!isInvalidFlag(flagName)) {
+                App.execute(() -> {
+                    String vodName = mBinding.name.getText().toString();
+                    PlayStatus status = PlayStatus.find(vodName);
+                    if (status == null) status = PlayStatus.create(vodName);
+                    status.setVodId(getId());
+                    status.setSourceKey(getSite().getKey());
+                    status.setFlagName(getFlag().getFlag());
+                    status.setQualityIndex(mQualityAdapter.getPosition());
+                    status.setEpisodeName(mHistory.getVodRemarks());
+                    status.setEpisodeUrl(mHistory.getEpisodeUrl());
+                    status.setPosition(finalPosition);
+                    status.setUpdateTime(System.currentTimeMillis());
+                    status.save();
+                    android.util.Log.d("VideoActivity.setQualityActivated", "切换画质并保存PlayStatus: 剧名=" + vodName + ", 画质索引=" + mQualityAdapter.getPosition() + ", 进度=" + finalPosition + "ms");
+                });
+            } else {
+                android.util.Log.d("VideoActivity.setQualityActivated", "跳过保存无效线路到PlayStatus: " + flagName);
+            }
 
             // 在启动播放器之前设置position，确保播放器从正确的位置开始（关键！）
             if (mPendingResumePosition > 0) {
@@ -1467,23 +1603,28 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mHistory.setVodFlag(getFlag().getFlag());
         mHistory.setCreateTime(System.currentTimeMillis());
 
-        // 立即保存PlayStatus，确保换源/换线路时能找到
-        final long positionForStatus = targetPosition;
-        App.execute(() -> {
-            String vodName = mBinding.name.getText().toString();
-            PlayStatus status = PlayStatus.find(vodName);
-            if (status == null) status = PlayStatus.create(vodName);
-            status.setVodId(getId());
-            status.setSourceKey(getSite().getKey());
-            status.setFlagName(getFlag().getFlag());
-            status.setQualityIndex(mQualityAdapter.getPosition());
-            status.setEpisodeName(item.getName());
-            status.setEpisodeUrl(item.getUrl());
-            status.setPosition(positionForStatus);
-            status.setUpdateTime(System.currentTimeMillis());
-            status.save();
-            android.util.Log.d("VideoActivity.updateHistory", "保存PlayStatus: 剧名=" + vodName + ", vodId=" + getId() + ", 源=" + getSite().getKey() + ", 线路=" + getFlag().getFlag() + ", 集=" + item.getName() + ", 进度=" + positionForStatus + "ms");
-        });
+        // PlayStatus的更新策略优化：
+        // 不在这里立即保存PlayStatus（避免保存进度=0ms的无效记录）
+        // 依赖onTimeChanged()中的自动保存机制，确保播放器成功加载后才保存
+        // 这样可以避免快速换源时频繁保存无效的PlayStatus记录
+        android.util.Log.d("VideoActivity.updateHistory", "准备播放: 剧名=" + mBinding.name.getText().toString() + ", vodId=" + getId() + ", 源=" + getSite().getKey() + ", 线路=" + getFlag().getFlag() + ", 集=" + item.getName() + ", 目标进度=" + targetPosition + "ms (PlayStatus将在播放稳定后自动保存)");
+    }
+
+    /**
+     * 检查线路名是否无效（包含错误关键字）
+     */
+    private boolean isInvalidFlag(String flagName) {
+        if (flagName == null || flagName.isEmpty()) {
+            return true;
+        }
+
+        String[] invalidKeywords = {"错误", "加载错误", "无效", "失效", "error", "invalid", "expired", "unavailable", "所有链接无效"};
+        for (String keyword : invalidKeywords) {
+            if (flagName.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void checkKeep() {
@@ -1539,6 +1680,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (position >= 0 && duration > 0 && !Setting.isIncognito()) {
             App.execute(() -> {
                 mHistory.update();
+
+                // 检查线路是否有效，避免保存错误线路到PlayStatus
+                String flagName = getFlag().getFlag();
+                if (isInvalidFlag(flagName)) {
+                    android.util.Log.d("VideoActivity.onTimeChanged", "跳过保存无效线路到PlayStatus: " + flagName);
+                    return;
+                }
+
                 // 同时更新PlayStatus表
                 String vodName = mBinding.name.getText().toString();
                 PlayStatus status = PlayStatus.find(vodName);
@@ -1724,31 +1873,21 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void checkFlag() {
         int position = isGone(mBinding.flag) ? -1 : getFlagPosition();
-        android.util.Log.d("VideoActivity.checkFlag", "当前线路位置: " + position + ", 总线路数: " + mFlagAdapter.size());
-
-        // 如果是最后一个线路，切换源；否则切换到下一个线路
         if (position == mFlagAdapter.size() - 1) {
-            android.util.Log.d("VideoActivity.checkFlag", "已是最后一个线路，开始切换源");
-            checkSearch(false);
+            // 已经是最后一个线路，强制启动自动换源
+            android.util.Log.d("VideoActivity.checkFlag", "最后一个线路播放失败，强制启动自动换源");
+            checkSearch(true); // 传入true强制换源
         } else {
-            android.util.Log.d("VideoActivity.checkFlag", "切换到下一个线路");
             nextFlag(position);
         }
     }
 
     private void checkSearch(boolean force) {
-        android.util.Log.d("VideoActivity.checkSearch", "开始检查搜索，force=" + force + ", mQuickAdapter.size=" + mQuickAdapter.size());
-        if (mQuickAdapter.size() == 0) {
-            android.util.Log.d("VideoActivity.checkSearch", "没有搜索结果，开始搜索");
-            initSearch(mBinding.name.getText().toString(), true);
-        } else if (isAutoMode() || force) {
-            android.util.Log.d("VideoActivity.checkSearch", "已有搜索结果，直接切换到下一个源");
-            nextSite();
-        }
+        if (mQuickAdapter.size() == 0) initSearch(mBinding.name.getText().toString(), true);
+        else if (isAutoMode() || force) nextSite();
     }
 
     private void initSearch(String keyword, boolean auto) {
-        android.util.Log.d("VideoActivity.initSearch", "初始化搜索，关键词: " + keyword + ", auto=" + auto);
         stopSearch();
         setAutoMode(auto);
         setInitAuto(auto);
@@ -1766,11 +1905,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         List<Site> sites = new ArrayList<>();
         mExecutor = Executors.newFixedThreadPool(Constant.THREAD_POOL);
         for (Site site : VodConfig.get().getSites()) if (isPass(site)) sites.add(site);
-        android.util.Log.d("VideoActivity.startSearch", "开始搜索，关键词: " + keyword + ", 可搜索源数量: " + sites.size());
-        for (Site site : sites) {
-            android.util.Log.d("VideoActivity.startSearch", "提交搜索任务: " + site.getName());
-            mExecutor.execute(() -> search(site, keyword));
-        }
+        for (Site site : sites) mExecutor.execute(() -> search(site, keyword));
     }
 
     private void stopSearch() {
@@ -1787,19 +1922,12 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setSearch(Result result) {
-        android.util.Log.d("VideoActivity.setSearch", "收到搜索结果，结果数量: " + result.getList().size());
         List<Vod> items = result.getList();
         Iterator<Vod> iterator = items.iterator();
         while (iterator.hasNext()) if (mismatch(iterator.next())) iterator.remove();
-        android.util.Log.d("VideoActivity.setSearch", "过滤后结果数量: " + items.size() + ", isInitAuto=" + isInitAuto());
         mQuickAdapter.addAll(mQuickAdapter.size(), items);
         mBinding.quick.setVisibility(View.VISIBLE);
-        if (isInitAuto()) {
-            android.util.Log.d("VideoActivity.setSearch", "自动模式，立即切换到第一个源");
-            nextSite();
-        } else {
-            android.util.Log.d("VideoActivity.setSearch", "非自动模式，不自动切换");
-        }
+        if (isInitAuto()) nextSite();
         if (items.isEmpty()) return;
         App.removeCallbacks(mR4);
     }
@@ -1820,27 +1948,30 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private void nextParse(int position) {
         Parse parse = (Parse) mParseAdapter.get(position + 1);
         Notify.show(getString(R.string.play_switch_parse, parse.getName()));
+        resetError(); // 重置错误计数，允许新解析器重试
         setParseActivated(parse);
     }
 
     private void nextFlag(int position) {
         Flag flag = (Flag) mFlagAdapter.get(position + 1);
         Notify.show(getString(R.string.play_switch_flag, flag.getFlag()));
+        resetError(); // 重置错误计数，允许新线路重试
         setFlagActivated(flag);
     }
 
     private void nextSite() {
-        android.util.Log.d("VideoActivity.nextSite", "准备切换到下一个源，当前搜索结果数: " + mQuickAdapter.size());
         if (mQuickAdapter.size() == 0) {
-            android.util.Log.d("VideoActivity.nextSite", "没有搜索结果，无法切换");
+            android.util.Log.d("VideoActivity.nextSite", "没有更多可用源，停止自动换源");
+            Notify.show("已尝试所有可用源，均无法播放");
+            setAutoMode(false); // 退出自动模式
             return;
         }
         Vod item = (Vod) mQuickAdapter.get(0);
-        android.util.Log.d("VideoActivity.nextSite", "切换到源: " + item.getSiteName() + ", 视频: " + item.getVodName());
         Notify.show(getString(R.string.play_switch_site, item.getSiteName()));
         mQuickAdapter.removeItems(0, 1);
         mBroken.add(getId());
         setInitAuto(false);
+        resetError(); // 重置错误计数，允许新源重试
         getDetail(item);
     }
 

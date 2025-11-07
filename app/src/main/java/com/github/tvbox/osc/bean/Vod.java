@@ -280,6 +280,13 @@ public class Vod implements Parcelable {
         if (!filterResult.playFromList.isEmpty()) {
             this.vodPlayFrom = String.join("$$$", filterResult.playFromList);
             this.vodPlayUrl = String.join("$$$", filterResult.playUrlList);
+        } else {
+            // 如果所有线路都被过滤掉了（都是错误线路），清空数据，避免创建错误线路
+            android.util.Log.d("Vod.setVodFlags", "所有线路都被过滤掉，清空线路数据");
+            this.vodPlayFrom = "";
+            this.vodPlayUrl = "";
+            // 不创建任何线路，直接返回
+            return;
         }
 
         String[] playFlags = getVodPlayFrom().split("\\$\\$\\$");
