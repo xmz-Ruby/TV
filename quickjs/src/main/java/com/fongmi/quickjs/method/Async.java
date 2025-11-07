@@ -19,6 +19,7 @@ public class Async {
     }
 
     private CompletableFuture<Object> call(JSObject object, String name, Object[] args) {
+        if (object == null) return empty();
         JSFunction function = object.getJSFunction(name);
         if (function == null) return empty();
         Object result = function.call(args);

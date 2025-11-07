@@ -56,6 +56,9 @@ public class Spider extends com.github.catvod.crawler.Spider {
     }
 
     private Object call(String func, Object... args) throws Exception {
+        if (jsObject == null) {
+            throw new IllegalStateException("JS spider object is null, initialization may have failed");
+        }
         //return executor.submit((Function.call(jsObject, func, args))).get();
         return CompletableFuture.supplyAsync(() -> Async.run(jsObject, func, args), executor).join().get();
     }
@@ -132,14 +135,14 @@ public class Spider extends com.github.catvod.crawler.Spider {
     @Override
     public void destroy() {
         try {
-            call("destroy");
+            if (jsObject != null) call("destroy");
         } catch (Throwable e) {
             e.printStackTrace();
         }
         submit(() -> {
             executor.shutdownNow();
-            jsObject.release();
-            ctx.destroy();
+            if (jsObject != null) jsObject.release();
+            if (ctx != null) ctx.destroy();
         });
     }
 
@@ -175,11 +178,17 @@ public class Spider extends com.github.catvod.crawler.Spider {
         String spider = "__JS_SPIDER__";
         String global = "globalThis." + spider;
         String content = Module.get().fetch(api);
+        if (content == null || content.isEmpty()) {
+            throw new RuntimeException("Failed to load JS spider from: " + api);
+        }
         boolean bb = content.startsWith("//bb");
         cat = bb || content.contains("__jsEvalReturn");
         if (!bb) ctx.evaluateModule(content.replace(spider, global), api);
         ctx.evaluateModule(String.format(Asset.read("js/lib/spider.js"), api));
         jsObject = (JSObject) ctx.getProperty(ctx.getGlobalObject(), spider);
+        if (jsObject == null) {
+            throw new RuntimeException("Failed to create JS spider object from: " + api);
+        }
     }
 
     private JSObject cfg(String ext) {
@@ -192,6 +201,7 @@ public class Spider extends com.github.catvod.crawler.Spider {
     }
 
     private Object[] proxy1(Map<String, String> params) throws Exception {
+        if (jsObject == null) throw new IllegalStateException("JS spider object is null");
         JSObject object = JSUtil.toObj(ctx, params);
         JSONArray array = new JSONArray(((JSArray) jsObject.getJSFunction("proxy").call(object)).stringify());
         Map<String, String> headers = array.length() > 3 ? Json.toMap(array.optString(3)) : null;

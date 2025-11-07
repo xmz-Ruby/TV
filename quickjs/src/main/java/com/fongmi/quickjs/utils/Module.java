@@ -31,7 +31,7 @@ public class Module {
     }
 
     public String fetch(String name) {
-        if (cache.contains(name)) return cache.get(name);
+        if (cache.containsKey(name)) return cache.get(name);
         if (name.startsWith("http")) cache.put(name, request(name));
         if (name.startsWith("assets")) cache.put(name, Asset.read(name));
         if (name.startsWith("lib/")) cache.put(name, Asset.read("js/" + name));
