@@ -91,7 +91,6 @@ import com.github.tvbox.osc.ui.dialog.DanmuDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeGridDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeListDialog;
 import com.github.tvbox.osc.ui.dialog.InfoDialog;
-import com.github.tvbox.osc.ui.dialog.PlayErrorDialog;
 import com.github.tvbox.osc.ui.dialog.ReceiveDialog;
 import com.github.tvbox.osc.ui.dialog.TrackDialog;
 import com.github.tvbox.osc.utils.Clock;
@@ -130,7 +129,7 @@ import master.flame.danmaku.danmaku.model.IDisplayer;
 import master.flame.danmaku.danmaku.model.android.DanmakuContext;
 import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 
-public class VideoActivity extends BaseActivity implements Clock.Callback, CustomKeyDownVod.Listener, TrackDialog.Listener, PlayerDialog.Listener, ControlDialog.Listener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, CastDialog.Listener, InfoDialog.Listener, PlayErrorDialog.Listener {
+public class VideoActivity extends BaseActivity implements Clock.Callback, CustomKeyDownVod.Listener, TrackDialog.Listener, PlayerDialog.Listener, ControlDialog.Listener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, CastDialog.Listener, InfoDialog.Listener {
 
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
@@ -1444,40 +1443,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private void onError(ErrorEvent event) {
         onErrorPlayer(event);
-        if (shouldAutoSwitchFlag()) {
-            autoSwitchToNextFlag();
-        } else {
-            showPlayErrorDialog(event);
-        }
-    }
-
-    private boolean shouldAutoSwitchFlag() {
-        int currentPosition = mFlagAdapter.getPosition();
-        return currentPosition >= 0 && currentPosition < mFlagAdapter.getItemCount() - 1;
-    }
-
-    private void autoSwitchToNextFlag() {
-        int position = mFlagAdapter.getPosition();
-        if (position < mFlagAdapter.getItemCount() - 1) {
-            Flag nextFlag = mFlagAdapter.get(position + 1);
-            mFlagAdapter.setActivated(nextFlag);
-            mBinding.flag.scrollToPosition(position + 1);
-            setEpisodeAdapter(nextFlag.getEpisodes());
-            setQualityVisible(false);
-            seamless(nextFlag);
-        }
-    }
-
-    private void showPlayErrorDialog(ErrorEvent event) {
-        if (!getSite().isChangeable()) {
-            startFlow();
-            return;
-        }
-        boolean hasMultiQuality = mQualityAdapter != null && mQualityAdapter.getItemCount() > 1;
-        PlayErrorDialog.create()
-                .message(event.getMsg())
-                .hasMultiQuality(hasMultiQuality)
-                .show(this);
+        startFlow();
     }
 
     private void startFlow() {
@@ -1914,36 +1880,6 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             stopSearch();
             super.onBackPressed();
         }
-    }
-
-    @Override
-    public void onPlayErrorRetry() {
-        if (mFlagAdapter != null && mFlagAdapter.getItemCount() > 0) {
-            Flag firstFlag = mFlagAdapter.get(0);
-            mFlagAdapter.setActivated(firstFlag);
-            mBinding.flag.scrollToPosition(0);
-            setEpisodeAdapter(firstFlag.getEpisodes());
-            setQualityVisible(false);
-            seamless(firstFlag);
-        } else {
-            onRefresh();
-        }
-    }
-
-    @Override
-    public void onPlayErrorSwitchQuality() {
-        if (mQualityAdapter != null && mQualityAdapter.getItemCount() > 1) {
-            int currentPos = mQualityAdapter.getPosition();
-            int nextPos = (currentPos + 1) % mQualityAdapter.getItemCount();
-            Result result = mQualityAdapter.getResult();
-            result.getUrl().set(nextPos);
-            onItemClick(result);
-        }
-    }
-
-    @Override
-    public void onPlayErrorAutoSwitch() {
-        startFlow();
     }
 
     @Override
