@@ -47,6 +47,8 @@ def getName(ru):
 
 
 def init(ru, extend=""):
+    if hasattr(ru, 'setExtendInfo'):
+        ru.setExtendInfo(extend)
     ru.init(extend)
 
 

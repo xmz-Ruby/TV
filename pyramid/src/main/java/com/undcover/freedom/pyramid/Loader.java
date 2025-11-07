@@ -12,16 +12,27 @@ import com.github.catvod.utils.Path;
 public class Loader {
 
     private PyObject app;
+    private volatile boolean initialized = false;
+    private final Object lock = new Object();
 
     @Keep
     private void init(Context context) {
-        if (!Python.isStarted()) Python.start(new AndroidPlatform(context));
-        app = Python.getInstance().getModule("app");
+        if (!initialized) {
+            synchronized (lock) {
+                if (!initialized) {
+                    if (!Python.isStarted()) {
+                        Python.start(new AndroidPlatform(context));
+                    }
+                    app = Python.getInstance().getModule("app");
+                    initialized = true;
+                }
+            }
+        }
     }
 
     @Keep
     public Spider spider(Context context, String api) {
-        if (app == null) init(context);
+        if (!initialized) init(context);
         PyObject obj = app.callAttr("spider", Path.py().getAbsolutePath(), api);
         return new Spider(app, obj, api);
     }
