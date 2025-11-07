@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(sed:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

@@ -11,7 +11,7 @@ import com.github.catvod.utils.Prefers;
 public class Setting {
 
     public static String getDoh() {
-        return Prefers.getString("doh", "{\"name\":\"Tencent\",\"url\":\"https://doh.pub/dns-query\"}");
+        return Prefers.getString("doh", "{\"name\":\"System\",\"url\":\"\"}");
     }
 
     public static void putDoh(String doh) {
@@ -155,7 +155,7 @@ public class Setting {
     }
 
     public static int getBuffer() {
-        return Math.min(Math.max(Prefers.getInt("exo_buffer"), 1), 15);
+        return Math.min(Math.max(Prefers.getInt("exo_buffer", 8), 1), 15);
     }
 
     public static void putBuffer(int buffer) {
@@ -171,7 +171,7 @@ public class Setting {
     }
 
     public static int getEpisode() {
-        return Prefers.getInt("episode");
+        return Prefers.getInt("episode", 1);
     }
 
     public static void putEpisode(int episode) {
@@ -383,7 +383,7 @@ public class Setting {
     }
 
     public static boolean isDisplayTime() {
-        return Prefers.getBoolean("display_time", false);
+        return Prefers.getBoolean("display_time", true);
     }
 
     public static void putDisplayTime(boolean display) {
@@ -399,7 +399,7 @@ public class Setting {
     }
 
     public static boolean isDisplayDuration() {
-        return Prefers.getBoolean("display_duration", false);
+        return Prefers.getBoolean("display_duration", true);
     }
 
     public static void putDisplayDuration(boolean display) {
@@ -407,7 +407,7 @@ public class Setting {
     }
 
     public static boolean isDisplayMiniProgress() {
-        return Prefers.getBoolean("display_mini_progress", false);
+        return Prefers.getBoolean("display_mini_progress", true);
     }
 
     public static void putDisplayMiniProgress(boolean display) {
@@ -415,7 +415,7 @@ public class Setting {
     }
 
     public static boolean isDisplayVideoTitle() {
-        return Prefers.getBoolean("display_video_title", false);
+        return Prefers.getBoolean("display_video_title", true);
     }
 
     public static void putDisplayVideoTitle(boolean display) {
@@ -435,7 +435,7 @@ public class Setting {
     }
 
     public static int getFullscreenMenuKey() {
-        return Prefers.getInt("fullscreen_menu_key", 0);
+        return Prefers.getInt("fullscreen_menu_key", 1);
     }
 
     public static void putHomeMenuKey(int key) {
@@ -443,11 +443,11 @@ public class Setting {
     }
 
     public static int getHomeMenuKey() {
-        return Prefers.getInt("home_menu_key", 0);
+        return Prefers.getInt("home_menu_key", 3);
     }
 
     public static boolean isHomeSiteLock() {
-        return Prefers.getBoolean("home_site_lock", false);
+        return Prefers.getBoolean("home_site_lock", true);
     }
 
     public static void putHomeSiteLock(boolean lock) {
