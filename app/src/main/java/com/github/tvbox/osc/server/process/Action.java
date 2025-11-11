@@ -138,8 +138,6 @@ public class Action implements Process {
         if ("apk".equals(type)) apk(params, files);
         else if ("vod_config".equals(type)) vodConfig(params);
         else if ("wall_config".equals(type)) wallConfig(params, files);
-        else if ("push_restore".equals(type)) pushRestore(params, files);
-        else if ("pull_restore".equals(type)) pullRestore(params, files);
     }
 
     private void sendHistory(Device device, Map<String, String> params) {
@@ -244,7 +242,7 @@ public class Action implements Process {
             File wall = new File(Path.download(), fn);
             Path.copy(temp, wall);
             App.post(() -> Notify.progress(App.activity()));
-            WallConfig.load(Config.find("file://" + Environment.DIRECTORY_DOWNLOADS + "/" + fn, 2), new Callback() {
+            WallConfig.load(Config.find("file://" + wall.getAbsolutePath(), 2), new Callback() {
                 @Override
                 public void success() {
                     Notify.dismiss();
@@ -258,46 +256,6 @@ public class Action implements Process {
             temp.delete();
             break;
         }
-    }
-
-    private void pushRestore(Map<String, String> params, Map<String, String> files) {
-        for (String k : files.keySet()) {
-            String fn = params.get(k);
-            File temp = new File(files.get(k));
-            if (!temp.exists()) continue;
-            File restore = Path.cache(System.currentTimeMillis() + "-" + fn);
-            Path.copy(temp, restore);
-            AppDatabase.restore(restore, new Callback() {
-                @Override
-                public void success() {
-                    App.post(() -> Notify.progress(App.activity()));
-                    App.post(() -> {
-                        AppDatabase.reset();
-                        initConfig();
-                    }, 3000);
-                }
-            });
-            temp.delete();
-            break;
-        }
-    }
-
-    private void pullRestore(Map<String, String> params, Map<String, String> files) {
-        String ip = params.get("ip");
-        if (TextUtils.isEmpty(ip)) return;
-        AppDatabase.backup(new Callback() {
-            @Override
-            public void success(String path) {
-                String type = "push_restore";
-                File file = new File(path);
-                MediaType mediaType = MediaType.parse("multipart/form-data");
-                MultipartBody.Builder body = new MultipartBody.Builder();
-                body.setType(MultipartBody.FORM);
-                body.addFormDataPart("name", file.getName());
-                body.addFormDataPart("files-0", file.getName(), RequestBody.create(mediaType, file));
-                OkHttp.newCall(OkHttp.client(Constant.TIMEOUT_TRANSMIT), ip.concat("/action?do=transmit&type=").concat(type), body.build()).enqueue(getCallback());
-            }
-        });
     }
 
     private Callback getCallback() {
@@ -321,11 +279,5 @@ public class Action implements Process {
                 Notify.show(msg);
             }
         };
-    }
-
-    private void initConfig() {
-        WallConfig.get().init();
-        LiveConfig.get().init().load();
-        VodConfig.get().init().load(getCallback());
     }
 }

@@ -57,45 +57,6 @@ public abstract class AppDatabase extends RoomDatabase {
         instance = null;
     }
 
-    public static void backup() {
-        if (Setting.getBackupMode() == 0) backup(new com.github.tvbox.osc.impl.Callback());
-    }
-
-    public static void backup(com.github.tvbox.osc.impl.Callback callback) {
-        App.execute(() -> {
-            File restore = Path.restore();
-            if (!restore.exists()) return;
-            File db = App.get().getDatabasePath(NAME).getAbsoluteFile();
-            File wal = App.get().getDatabasePath(NAME + "-wal").getAbsoluteFile();
-            File shm = App.get().getDatabasePath(NAME + "-shm").getAbsoluteFile();
-            if (db.exists()) Path.copy(db, new File(restore, db.getName()));
-            if (wal.exists()) Path.copy(wal, new File(restore, wal.getName()));
-            if (shm.exists()) Path.copy(shm, new File(restore, shm.getName()));
-            Prefers.backup(new File(restore, NAME + "-pref"));
-            String time = Util.format(new SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault()), (new File(restore, db.getName())).lastModified());
-            File file = new File(Path.tv(), time + "." + BACKUP_SUFFIX);
-            FileUtil.zipFolder(restore, file);
-            App.post(() -> callback.success(file.getAbsolutePath()));
-        });
-    }
-
-    public static void restore(File file, com.github.tvbox.osc.impl.Callback callback) {
-        App.execute(() -> {
-            File restore = Path.restore();
-            if (!restore.exists()) return;
-            FileUtil.extractZip(file, restore);
-            File db = new File(restore, NAME);
-            File wal = new File(restore, NAME + "-wal");
-            File shm = new File(restore, NAME + "-shm");
-            File pref = new File(restore, NAME + "-pref");
-            if (db.exists()) Path.copy(db, App.get().getDatabasePath(db.getName()).getAbsoluteFile());
-            if (wal.exists()) Path.copy(wal, App.get().getDatabasePath(wal.getName()).getAbsoluteFile());
-            if (shm.exists()) Path.copy(shm, App.get().getDatabasePath(shm.getName()).getAbsoluteFile());
-            if (pref.exists()) Prefers.restore(pref);
-            App.post(callback::success);
-        });
-    }
-
     private static AppDatabase create(Context context) {
         return Room.databaseBuilder(context, AppDatabase.class, NAME)
                 .addMigrations(MIGRATION_11_12)

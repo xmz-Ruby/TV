@@ -108,7 +108,7 @@ public class FileChooser {
 
     private static String getPath(String docId, String[] split) {
         if ("primary".equalsIgnoreCase(split[0])) {
-            return split.length > 1 ? Environment.getExternalStorageDirectory() + "/" + split[1] : Environment.getExternalStorageDirectory() + "/";
+            return split.length > 1 ? Path.root() + "/" + split[1] : Path.root() + "/";
         } else {
             return "/storage/" + docId.replace(":", "/");
         }
@@ -119,7 +119,7 @@ public class FileChooser {
         if (docId.startsWith("raw:")) {
             return docId.replaceFirst("raw:", "");
         } else if (fileName != null) {
-            return Environment.getExternalStorageDirectory() + "/Download/" + fileName;
+            return Path.root() + "/" + fileName;
         } else {
             return getDataColumn(context, ContentUris.withAppendedId(Uri.parse("content://downloads/public_downloads"), Long.parseLong(docId)));
         }

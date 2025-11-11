@@ -7,8 +7,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import com.github.tvbox.osc.databinding.DialogTransmitActionBinding;
-import com.github.tvbox.osc.db.AppDatabase;
-import com.github.tvbox.osc.impl.Callback;
 import com.github.tvbox.osc.utils.FileChooser;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -38,7 +36,6 @@ public class TransmitActionDialog {
         this.binding.apk.setOnClickListener(v-> pushApk());
         this.binding.vodConfig.setOnClickListener(v-> pushVodConfig());
         this.binding.wallConfig.setOnClickListener(v-> pushWallConfig());
-        this.binding.pushRestore.setOnClickListener(v-> pushRestore());
     }
 
     public void show() {
@@ -62,16 +59,6 @@ public class TransmitActionDialog {
 
     private void pushWallConfig() {
         FileChooser.from(fragment).type(FileChooser.TYPE_PUSH_WALLPAPER).show();
-        dialog.dismiss();
-    }
-
-    private void pushRestore() {
-        AppDatabase.backup(new Callback() {
-            @Override
-            public void success(String path) {
-                TransmitDialog.create().pushRetore(path).show(fragment);
-            }
-        });
         dialog.dismiss();
     }
 

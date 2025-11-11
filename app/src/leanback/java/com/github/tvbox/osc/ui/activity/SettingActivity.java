@@ -1,6 +1,5 @@
 package com.github.tvbox.osc.ui.activity;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.text.TextUtils;
@@ -20,9 +19,7 @@ import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.bean.Live;
 import com.github.tvbox.osc.bean.Site;
 import com.github.tvbox.osc.databinding.ActivitySettingBinding;
-import com.github.tvbox.osc.db.AppDatabase;
 import com.github.tvbox.osc.event.RefreshEvent;
-import com.github.tvbox.osc.impl.BackupCallback;
 import com.github.tvbox.osc.impl.Callback;
 import com.github.tvbox.osc.impl.ConfigCallback;
 import com.github.tvbox.osc.impl.DohCallback;
@@ -31,7 +28,6 @@ import com.github.tvbox.osc.impl.ProxyCallback;
 import com.github.tvbox.osc.impl.SiteCallback;
 import com.github.tvbox.osc.player.Source;
 import com.github.tvbox.osc.ui.base.BaseActivity;
-import com.github.tvbox.osc.ui.dialog.BackupDialog;
 import com.github.tvbox.osc.ui.dialog.ConfigDialog;
 import com.github.tvbox.osc.ui.dialog.DanmuServerDialog;
 import com.github.tvbox.osc.ui.dialog.DanmuServerHistoryDialog;
@@ -46,19 +42,16 @@ import com.github.tvbox.osc.utils.ResUtil;
 import com.github.tvbox.osc.utils.UrlUtil;
 import com.github.catvod.bean.Doh;
 import com.github.catvod.net.OkHttp;
-import com.permissionx.guolindev.PermissionX;
 
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SettingActivity extends BaseActivity implements BackupCallback, ConfigCallback, SiteCallback, LiveCallback, DohCallback, ProxyCallback {
+public class SettingActivity extends BaseActivity implements ConfigCallback, SiteCallback, LiveCallback, DohCallback, ProxyCallback {
 
     private ActivitySettingBinding mBinding;
-    private String[] backup;
     private int type;
 
     public static void start(Activity activity) {
@@ -90,7 +83,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         mBinding.versionText.setText(BuildConfig.VERSION_NAME);
         mBinding.proxyText.setText(UrlUtil.scheme(Setting.getProxy()));
-        mBinding.backupText.setText((backup = ResUtil.getStringArray(R.array.select_backup))[Setting.getBackupMode()]);
         mBinding.aboutText.setText(BuildConfig.FLAVOR_mode + "-" + BuildConfig.FLAVOR_api + "-" + BuildConfig.FLAVOR_abi);
         setCacheText();
     }
@@ -112,8 +104,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
         mBinding.proxy.setOnClickListener(this::onProxy);
         mBinding.cache.setOnClickListener(this::onCache);
         mBinding.cache.setOnLongClickListener(this::onCacheLongClick);
-        mBinding.backup.setOnClickListener(this::onBackup);
-        mBinding.restore.setOnClickListener(this::onRestore);
         mBinding.player.setOnClickListener(this::onPlayer);
         mBinding.danmu.setOnClickListener(this::onDanmu);
         mBinding.vod.setOnLongClickListener(this::onVodEdit);
@@ -121,7 +111,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
         mBinding.live.setOnLongClickListener(this::onLiveEdit);
         mBinding.liveHome.setOnClickListener(this::onLiveHome);
         mBinding.wall.setOnLongClickListener(this::onWallEdit);
-        mBinding.backup.setOnLongClickListener(this::onBackupMode);
         mBinding.vodHistory.setOnClickListener(this::onVodHistory);
         mBinding.liveHistory.setOnClickListener(this::onLiveHistory);
         mBinding.wallDefault.setOnClickListener(this::setWallDefault);
@@ -136,11 +125,7 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
 
     @Override
     public void setConfig(Config config) {
-        if (config.getUrl().startsWith("file") && !PermissionX.isGranted(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            PermissionX.init(this).permissions(Manifest.permission.WRITE_EXTERNAL_STORAGE).request((allGranted, grantedList, deniedList) -> load(config));
-        } else {
-            load(config);
-        }
+        load(config);
     }
 
     private void load(Config config) {
@@ -339,50 +324,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
                 if (!config.isEmpty()) setConfig(config);
             }
         });
-        return true;
-    }
-
-    @Override
-    public void restore(File file) {
-        PermissionX.init(this).permissions(Manifest.permission.WRITE_EXTERNAL_STORAGE).request((allGranted, grantedList, deniedList) -> AppDatabase.restore(file, new Callback() {
-            @Override
-            public void success() {
-                if (allGranted) {
-                    Notify.progress(getActivity());
-                    App.post(() -> {
-                        AppDatabase.reset();
-                        initConfig();
-                    }, 3000);
-                }
-            }
-        }));
-    }
-
-    private void onRestore(View view) {
-        PermissionX.init(this).permissions(Manifest.permission.WRITE_EXTERNAL_STORAGE).request((allGranted, grantedList, deniedList) -> {
-            if (allGranted) BackupDialog.create(this).show();
-        });
-    }
-
-    private void initConfig() {
-        WallConfig.get().init();
-        LiveConfig.get().init().load();
-        VodConfig.get().init().load(getCallback());
-    }
-
-    private void onBackup(View view) {
-        PermissionX.init(this).permissions(Manifest.permission.WRITE_EXTERNAL_STORAGE).request((allGranted, grantedList, deniedList) -> AppDatabase.backup(new Callback() {
-            @Override
-            public void success(String path) {
-                Notify.show(R.string.backed);
-            }
-        }));
-    }
-
-    private boolean onBackupMode(View view) {
-        int index = Setting.getBackupMode();
-        Setting.putBackupMode(index = index == backup.length - 1 ? 0 : ++index);
-        mBinding.backupText.setText(backup[index]);
         return true;
     }
 
