@@ -58,6 +58,14 @@ public class Setting {
         Prefers.put("ua", ua);
     }
 
+    public static String getDanmuHost() {
+        return Prefers.getString("danmu_host", "");
+    }
+
+    public static void putDanmuHost(String danmuHost) {
+        Prefers.put("danmu_host", danmuHost);
+    }
+
     public static int getWall() {
         return Prefers.getInt("wall", 1);
     }

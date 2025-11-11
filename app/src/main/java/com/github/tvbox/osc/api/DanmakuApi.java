@@ -1,9 +1,12 @@
 package com.github.tvbox.osc.api;
 
+import android.text.TextUtils;
+
 import androidx.annotation.NonNull;
 
 import com.github.tvbox.osc.bean.DanmakuAnime;
 import com.github.tvbox.osc.bean.DanmakuEpisode;
+import com.github.tvbox.osc.Setting;
 import com.github.catvod.net.OkHttp;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -20,8 +23,12 @@ import okhttp3.Response;
 
 public class DanmakuApi {
 
-    private static final String BASE_URL = "https://danmu.mangzhexuexi.com/mangzhexuexi/api/v2";
     private static final Gson gson = new Gson();
+
+    private static String getBaseUrl() {
+        String host = Setting.getDanmuHost();
+        return TextUtils.isEmpty(host) ? "" : host;
+    }
 
     public interface DanmakuCallback<T> {
         void onSuccess(T data);
@@ -35,7 +42,7 @@ public class DanmakuApi {
      */
     public static void searchAnime(String keyword, DanmakuCallback<List<DanmakuAnime>> callback) {
         try {
-            String url = BASE_URL + "/search/anime?keyword=" + URLEncoder.encode(keyword, "UTF-8");
+            String url = getBaseUrl() + "/search/anime?keyword=" + URLEncoder.encode(keyword, "UTF-8");
             OkHttp.newCall(url).enqueue(new Callback() {
                 @Override
                 public void onFailure(@NonNull Call call, @NonNull IOException e) {
@@ -78,7 +85,7 @@ public class DanmakuApi {
      * @param callback 回调
      */
     public static void getBangumiEpisodes(int animeId, DanmakuCallback<List<DanmakuEpisode>> callback) {
-        String url = BASE_URL + "/bangumi/" + animeId;
+        String url = getBaseUrl() + "/bangumi/" + animeId;
         OkHttp.newCall(url).enqueue(new Callback() {
             @Override
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
@@ -121,6 +128,6 @@ public class DanmakuApi {
      * @return 弹幕XML的URL
      */
     public static String getDanmakuUrl(int episodeId) {
-        return BASE_URL + "/comment/" + episodeId + "?format=xml";
+        return getBaseUrl() + "/comment/" + episodeId + "?format=xml";
     }
 }

@@ -3,6 +3,7 @@ package com.github.tvbox.osc.ui.activity;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.text.TextUtils;
 import android.view.View;
 
 import androidx.viewbinding.ViewBinding;
@@ -32,6 +33,8 @@ import com.github.tvbox.osc.player.Source;
 import com.github.tvbox.osc.ui.base.BaseActivity;
 import com.github.tvbox.osc.ui.dialog.BackupDialog;
 import com.github.tvbox.osc.ui.dialog.ConfigDialog;
+import com.github.tvbox.osc.ui.dialog.DanmuServerDialog;
+import com.github.tvbox.osc.ui.dialog.DanmuServerHistoryDialog;
 import com.github.tvbox.osc.ui.dialog.DohDialog;
 import com.github.tvbox.osc.ui.dialog.HistoryDialog;
 import com.github.tvbox.osc.ui.dialog.LiveDialog;
@@ -83,6 +86,7 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
         mBinding.wallUrl.setText(WallConfig.getDesc());
+        mBinding.danmuServerUrl.setText(getDanmuServerDesc());
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         mBinding.versionText.setText(BuildConfig.VERSION_NAME);
         mBinding.proxyText.setText(UrlUtil.scheme(Setting.getProxy()));
@@ -122,6 +126,9 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
         mBinding.liveHistory.setOnClickListener(this::onLiveHistory);
         mBinding.wallDefault.setOnClickListener(this::setWallDefault);
         mBinding.wallRefresh.setOnClickListener(this::setWallRefresh);
+        mBinding.danmuServer.setOnClickListener(this::onDanmuServer);
+        mBinding.danmuServerDefault.setOnClickListener(this::setDanmuServerDefault);
+        mBinding.danmuServerHistory.setOnClickListener(this::onDanmuServerHistory);
         mBinding.custom.setOnClickListener(this::onCustom);
         mBinding.doh.setOnClickListener(this::setDoh);
         mBinding.about.setOnClickListener(this::onAbout);
@@ -396,5 +403,23 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
     protected void onDestroy() {
         super.onDestroy();
         RefreshEvent.history();
+    }
+
+    private String getDanmuServerDesc() {
+        String host = Setting.getDanmuHost();
+        return TextUtils.isEmpty(host) ? getString(R.string.setting_on) : host;
+    }
+
+    private void onDanmuServer(View view) {
+        DanmuServerDialog.create(this, url -> mBinding.danmuServerUrl.setText(getDanmuServerDesc())).show();
+    }
+
+    private void setDanmuServerDefault(View view) {
+        Setting.putDanmuHost("");
+        mBinding.danmuServerUrl.setText(getDanmuServerDesc());
+    }
+
+    private void onDanmuServerHistory(View view) {
+        DanmuServerHistoryDialog.create(this).show();
     }
 }

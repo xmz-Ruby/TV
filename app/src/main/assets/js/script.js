@@ -16,6 +16,10 @@ function setting() {
     doAction('setting', { text: $('#setting_text').val(), name: $('#setting_name').val() });
 }
 
+function danmuServer() {
+    doAction('danmu_server', { url: $('#danmu_server_url').val() });
+}
+
 function file(path) {
     doAction('file', { path: path });
 }

@@ -219,6 +219,7 @@ public class VodConfig {
         setFlags(Json.safeListString(object, "flags"));
         setWall(Json.safeString(object, "wallpaper"));
         setAds(Json.safeListString(object, "ads"));
+        setDanmuHost(Json.safeString(object, "danmu_host"));
     }
 
     private String parseApi(String api) {
@@ -340,5 +341,11 @@ public class VodConfig {
         this.wall = wall;
         boolean load = !TextUtils.isEmpty(wall) && WallConfig.get().needSync(wall);
         if (load) WallConfig.get().config(Config.find(wall, config.getName(), 2).update());
+    }
+
+    private void setDanmuHost(String danmuHost) {
+        if (!TextUtils.isEmpty(danmuHost)) {
+            com.github.tvbox.osc.Setting.putDanmuHost(danmuHost);
+        }
     }
 }
