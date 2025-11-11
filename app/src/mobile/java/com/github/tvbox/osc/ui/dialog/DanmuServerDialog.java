@@ -56,10 +56,9 @@ public class DanmuServerDialog {
 
     private void initView() {
         String host = Setting.getDanmuHost();
-        binding.name.setVisibility(android.view.View.GONE);
+        binding.input.setVisibility(android.view.View.GONE);
         binding.url.setText(host);
-        binding.input.setVisibility(android.view.View.VISIBLE);
-        binding.choose.setVisibility(android.view.View.GONE);
+        binding.choose.setEndIconMode(com.google.android.material.textfield.TextInputLayout.END_ICON_NONE);
         binding.url.setSelection(TextUtils.isEmpty(host) ? 0 : host.length());
     }
 
