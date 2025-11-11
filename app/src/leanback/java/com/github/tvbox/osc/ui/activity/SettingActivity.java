@@ -420,6 +420,6 @@ public class SettingActivity extends BaseActivity implements BackupCallback, Con
     }
 
     private void onDanmuServerHistory(View view) {
-        DanmuServerHistoryDialog.create(this).show();
+        DanmuServerHistoryDialog.create(this, url -> mBinding.danmuServerUrl.setText(getDanmuServerDesc())).show();
     }
 }

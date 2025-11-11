@@ -1,22 +1,19 @@
 package com.github.tvbox.osc.ui.dialog;
 
-import android.app.Activity;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.Setting;
+import com.github.tvbox.osc.databinding.AdapterConfigBinding;
 import com.github.tvbox.osc.databinding.DialogHistoryBinding;
 import com.github.tvbox.osc.ui.custom.SpaceItemDecoration;
-import com.github.tvbox.osc.utils.ResUtil;
 import com.github.catvod.utils.Prefers;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.gson.Gson;
@@ -33,42 +30,36 @@ public class DanmuServerHistoryDialog {
     private final DialogHistoryBinding binding;
     private final AlertDialog dialog;
     private final DanmuServerAdapter adapter;
-    private final Activity activity;
     private final Callback callback;
 
     public interface Callback {
         void onDanmuServerChanged(String url);
     }
 
-    public static DanmuServerHistoryDialog create(Activity activity, Callback callback) {
-        return new DanmuServerHistoryDialog(activity, callback);
+    public static DanmuServerHistoryDialog create(Fragment fragment, Callback callback) {
+        return new DanmuServerHistoryDialog(fragment, callback);
     }
 
-    public DanmuServerHistoryDialog(Activity activity, Callback callback) {
-        this.activity = activity;
+    public DanmuServerHistoryDialog(Fragment fragment, Callback callback) {
         this.callback = callback;
-        this.binding = DialogHistoryBinding.inflate(LayoutInflater.from(activity));
-        this.dialog = new MaterialAlertDialogBuilder(activity).setView(binding.getRoot()).create();
-        this.adapter = new DanmuServerAdapter(activity);
+        this.binding = DialogHistoryBinding.inflate(LayoutInflater.from(fragment.getContext()));
+        this.dialog = new MaterialAlertDialogBuilder(fragment.getActivity()).setView(binding.getRoot()).create();
+        this.adapter = new DanmuServerAdapter();
     }
 
     public void show() {
         setRecyclerView();
         setDialog();
-        binding.recycler.requestFocus();
     }
 
     private void setRecyclerView() {
         binding.recycler.setHasFixedSize(true);
         binding.recycler.setAdapter(adapter);
-        binding.recycler.addItemDecoration(new SpaceItemDecoration(1, 16));
+        binding.recycler.addItemDecoration(new SpaceItemDecoration(1, 8));
     }
 
     private void setDialog() {
         if (adapter.getItemCount() == 0) return;
-        WindowManager.LayoutParams params = dialog.getWindow().getAttributes();
-        params.width = (int) (ResUtil.getScreenWidth() * 0.4f);
-        dialog.getWindow().setAttributes(params);
         dialog.getWindow().setDimAmount(0);
         dialog.show();
     }
@@ -112,30 +103,27 @@ public class DanmuServerHistoryDialog {
     private class DanmuServerAdapter extends RecyclerView.Adapter<DanmuServerAdapter.ViewHolder> {
 
         private final List<String> list;
-        private final Activity activity;
 
-        public DanmuServerAdapter(Activity activity) {
-            this.activity = activity;
+        public DanmuServerAdapter() {
             this.list = getHistory();
         }
 
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.adapter_config, parent, false);
-            return new ViewHolder(view);
+            return new ViewHolder(AdapterConfigBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
         }
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             String url = list.get(position);
-            holder.text.setText(url);
-            holder.text.setOnClickListener(v -> {
+            holder.binding.text.setText(url);
+            holder.binding.text.setOnClickListener(v -> {
                 Setting.putDanmuHost(url);
                 if (callback != null) callback.onDanmuServerChanged(url);
                 dialog.dismiss();
             });
-            holder.delete.setOnClickListener(v -> {
+            holder.binding.delete.setOnClickListener(v -> {
                 removeHistory(url);
                 list.remove(position);
                 notifyItemRemoved(position);
@@ -149,13 +137,11 @@ public class DanmuServerHistoryDialog {
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            private final TextView text;
-            private final View delete;
+            private final AdapterConfigBinding binding;
 
-            ViewHolder(View view) {
-                super(view);
-                text = view.findViewById(R.id.text);
-                delete = view.findViewById(R.id.delete);
+            ViewHolder(AdapterConfigBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

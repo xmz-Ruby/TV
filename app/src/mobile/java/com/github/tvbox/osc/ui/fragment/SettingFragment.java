@@ -3,6 +3,7 @@ package com.github.tvbox.osc.ui.fragment;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,6 +37,8 @@ import com.github.tvbox.osc.ui.activity.MainActivity;
 import com.github.tvbox.osc.ui.base.BaseFragment;
 import com.github.tvbox.osc.ui.dialog.BackupDialog;
 import com.github.tvbox.osc.ui.dialog.ConfigDialog;
+import com.github.tvbox.osc.ui.dialog.DanmuServerDialog;
+import com.github.tvbox.osc.ui.dialog.DanmuServerHistoryDialog;
 import com.github.tvbox.osc.ui.dialog.HistoryDialog;
 import com.github.tvbox.osc.ui.dialog.LiveDialog;
 import com.github.tvbox.osc.ui.dialog.ProxyDialog;
@@ -85,6 +88,11 @@ public class SettingFragment extends BaseFragment implements BackupCallback, Con
         return (MainActivity) getActivity();
     }
 
+    private String getDanmuServerDesc() {
+        String host = Setting.getDanmuHost();
+        return TextUtils.isEmpty(host) ? getString(R.string.setting_on) : host;
+    }
+
     @Override
     protected ViewBinding getBinding(@NonNull LayoutInflater inflater, @Nullable ViewGroup container) {
         return mBinding = FragmentSettingBinding.inflate(inflater, container, false);
@@ -96,6 +104,7 @@ public class SettingFragment extends BaseFragment implements BackupCallback, Con
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
         mBinding.wallUrl.setText(WallConfig.getDesc());
+        mBinding.danmuServerUrl.setText(getDanmuServerDesc());
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         mBinding.versionText.setText(BuildConfig.VERSION_NAME);
         mBinding.backupText.setText((backup = ResUtil.getStringArray(R.array.select_backup))[Setting.getBackupMode()]);
@@ -118,6 +127,8 @@ public class SettingFragment extends BaseFragment implements BackupCallback, Con
         mBinding.vod.setOnClickListener(this::onVod);
         mBinding.live.setOnClickListener(this::onLive);
         mBinding.wall.setOnClickListener(this::onWall);
+        mBinding.danmuServer.setOnClickListener(this::onDanmuServer);
+        mBinding.danmuServerHistory.setOnClickListener(this::onDanmuServerHistory);
         mBinding.proxy.setOnClickListener(this::onProxy);
         mBinding.cache.setOnClickListener(this::onCache);
         mBinding.cache.setOnLongClickListener(this::onCacheLongClick);
@@ -266,6 +277,14 @@ public class SettingFragment extends BaseFragment implements BackupCallback, Con
 
     private void onLiveHistory(View view) {
         HistoryDialog.create(this).type(type = 1).show();
+    }
+
+    private void onDanmuServer(View view) {
+        DanmuServerDialog.create(this, url -> mBinding.danmuServerUrl.setText(getDanmuServerDesc())).show();
+    }
+
+    private void onDanmuServerHistory(View view) {
+        DanmuServerHistoryDialog.create(this, url -> mBinding.danmuServerUrl.setText(getDanmuServerDesc())).show();
     }
 
     private void onPlayer(View view) {
@@ -420,6 +439,7 @@ public class SettingFragment extends BaseFragment implements BackupCallback, Con
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
         mBinding.wallUrl.setText(WallConfig.getDesc());
+        mBinding.danmuServerUrl.setText(getDanmuServerDesc());
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         setCacheText();
     }
@@ -442,6 +462,7 @@ public class SettingFragment extends BaseFragment implements BackupCallback, Con
                 mBinding.vodUrl.setText(VodConfig.getDesc());
                 mBinding.liveUrl.setText(LiveConfig.getDesc());
                 mBinding.wallUrl.setText(WallConfig.getDesc());
+                mBinding.danmuServerUrl.setText(getDanmuServerDesc());
                 break;
         }
     }
