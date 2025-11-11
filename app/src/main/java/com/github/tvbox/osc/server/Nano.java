@@ -29,6 +29,8 @@ public class Nano extends NanoHTTPD {
     private List<Process> process;
 
     public Nano(int port) {
+        // 绑定到0.0.0.0以同时支持127.0.0.1和局域网IP访问
+        // 通过IP白名单来限制只允许本机和局域网访问
         super("0.0.0.0", port);
         addProcess();
     }
@@ -69,6 +71,12 @@ public class Nano extends NanoHTTPD {
 
     @Override
     public Response serve(IHTTPSession session) {
+        // IP访问控制检查
+        String remoteIp = session.getRemoteIpAddress();
+        if (!isAllowedIp(remoteIp)) {
+            return error(Response.Status.FORBIDDEN, "Access denied from IP: " + remoteIp);
+        }
+
         String url = session.getUri().trim();
         Map<String, String> files = new HashMap<>();
         if (session.getMethod() == Method.POST) parse(session, files);
@@ -78,6 +86,47 @@ public class Nano extends NanoHTTPD {
         if (url.startsWith("/device")) return success(Device.get().toString());
         for (Process process : process) if (process.isRequest(session, url)) return process.doResponse(session, url, files);
         return getAssets(url.substring(1));
+    }
+
+    /**
+     * 检查IP是否允许访问
+     * 只允许localhost和局域网IP访问
+     */
+    private boolean isAllowedIp(String remoteIp) {
+        if (remoteIp == null || remoteIp.isEmpty()) {
+            return false;
+        }
+
+        // 允许localhost访问
+        if (remoteIp.equals("127.0.0.1") || remoteIp.equals("0:0:0:0:0:0:0:1") || remoteIp.equals("::1")) {
+            return true;
+        }
+
+        // 允许局域网IP访问
+        // 10.0.0.0/8
+        if (remoteIp.startsWith("10.")) {
+            return true;
+        }
+        // 172.16.0.0/12
+        if (remoteIp.startsWith("172.")) {
+            try {
+                int second = Integer.parseInt(remoteIp.split("\\.")[1]);
+                if (second >= 16 && second <= 31) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        // 192.168.0.0/16
+        if (remoteIp.startsWith("192.168.")) {
+            return true;
+        }
+        // 169.254.0.0/16 (link-local)
+        if (remoteIp.startsWith("169.254.")) {
+            return true;
+        }
+
+        return false;
     }
 
     private void parse(IHTTPSession session, Map<String, String> files) {

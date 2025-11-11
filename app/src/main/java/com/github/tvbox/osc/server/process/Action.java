@@ -80,7 +80,8 @@ public class Action implements Process {
         String path = params.get("path");
         if (TextUtils.isEmpty(path)) return;
         if (path.endsWith(".xml")) RefreshEvent.danmaku(path);
-        else if (path.endsWith(".apk")) FileUtil.openFile(Path.local(path));
+        // APK安装功能已禁用（安全加固）
+        // else if (path.endsWith(".apk")) FileUtil.openFile(Path.local(path));
         else if (path.endsWith(".srt") || path.endsWith(".ssa") || path.endsWith(".ass")) RefreshEvent.subtitle(path);
         else ServerEvent.setting(path);
     }
@@ -213,17 +214,11 @@ public class Action implements Process {
     }
 
     private void apk(Map<String, String> params, Map<String, String> files) {
+        // APK安装功能已禁用（安全加固）
+        // 已移除REQUEST_INSTALL_PACKAGES权限
         for (String k : files.keySet()) {
-            String fn = params.get(k);
             File temp = new File(files.get(k));
-            if (!temp.exists()) continue;
-            if (fn.toLowerCase().endsWith(".apk")) {
-                File apk = Path.cache(System.currentTimeMillis() + "-" + fn);
-                Path.copy(temp, apk);
-                FileUtil.openFile(apk);
-            }
-            temp.delete();
-            break;
+            if (temp.exists()) temp.delete();
         }
     }
 
