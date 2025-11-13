@@ -558,14 +558,6 @@ public class Setting {
         Prefers.put("site_search", search);
     }
 
-    public static boolean isRemoveAd() {
-        return Prefers.getBoolean("remove_ad", false);
-    }
-
-    public static void putRemoveAd(boolean remove) {
-        Prefers.put("remove_ad", remove);
-    }
-
     public static String getThunderCacheDir() {
         return Prefers.getString("thunder_cache_dir", "");
     }
