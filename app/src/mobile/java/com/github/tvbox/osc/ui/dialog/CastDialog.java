@@ -104,7 +104,6 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     protected void initView() {
-        binding.scan.setVisibility(fm ? View.VISIBLE : View.GONE);
         EventBus.getDefault().register(this);
         setRecyclerView();
         getDevice();
