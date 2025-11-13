@@ -21,9 +21,7 @@ import com.github.tvbox.osc.bean.Device;
 import com.github.tvbox.osc.bean.History;
 import com.github.tvbox.osc.bean.Keep;
 import com.github.tvbox.osc.databinding.DialogDeviceBinding;
-import com.github.tvbox.osc.event.ScanEvent;
 import com.github.tvbox.osc.impl.Callback;
-import com.github.tvbox.osc.ui.activity.ScanActivity;
 import com.github.tvbox.osc.ui.adapter.DeviceAdapter;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.tvbox.osc.utils.ResUtil;
@@ -104,7 +102,6 @@ public class SyncDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     @Override
     protected void initEvent() {
         binding.mode.setOnClickListener(v -> onMode());
-        binding.scan.setOnClickListener(v -> onScan());
         binding.refresh.setOnClickListener(v -> onRefresh());
     }
 
@@ -131,10 +128,6 @@ public class SyncDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         binding.mode.setTag(String.valueOf(index));
     }
 
-    private void onScan() {
-        ScanActivity.start(getActivity());
-    }
-
     private void onRefresh() {
         ScanTask.create(this).start(adapter.getIps());
         adapter.clear();
@@ -142,11 +135,6 @@ public class SyncDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     private void onSuccess() {
         dismiss();
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onScanEvent(ScanEvent event) {
-        ScanTask.create(this).start(event.getAddress());
     }
 
     @Override

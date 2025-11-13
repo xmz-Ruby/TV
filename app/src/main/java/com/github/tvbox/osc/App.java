@@ -105,7 +105,6 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        Notify.createChannel();
         LanguageUtil.init(this);
         Logger.addLogAdapter(getLogAdapter());
         OkHttp.get().setProxy(Setting.getProxy());

@@ -23,9 +23,7 @@ import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.bean.Device;
 import com.github.tvbox.osc.bean.History;
 import com.github.tvbox.osc.databinding.DialogDeviceBinding;
-import com.github.tvbox.osc.event.ScanEvent;
 import com.github.tvbox.osc.server.Server;
-import com.github.tvbox.osc.ui.activity.ScanActivity;
 import com.github.tvbox.osc.ui.adapter.DeviceAdapter;
 import com.github.tvbox.osc.utils.DLNADevice;
 import com.github.tvbox.osc.utils.Notify;
@@ -115,7 +113,6 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     protected void initEvent() {
-        binding.scan.setOnClickListener(v -> onScan());
         binding.refresh.setOnClickListener(v -> onRefresh());
     }
 
@@ -134,10 +131,6 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         DLNACastManager.INSTANCE.registerDeviceListener(this);
     }
 
-    private void onScan() {
-        ScanActivity.start(getActivity());
-    }
-
     private void onRefresh() {
         if (fm) ScanTask.create(this).start(adapter.getIps());
         DLNACastManager.INSTANCE.search(null);
@@ -147,11 +140,6 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     private void onCasted() {
         listener.onCasted();
         dismiss();
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onScanEvent(ScanEvent event) {
-        ScanTask.create(this).start(event.getAddress());
     }
 
     @Override

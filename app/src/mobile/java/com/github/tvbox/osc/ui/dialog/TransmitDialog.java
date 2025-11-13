@@ -13,12 +13,10 @@ import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.Constant;
 import com.github.tvbox.osc.api.config.VodConfig;
 import com.github.tvbox.osc.bean.Device;
-import com.github.tvbox.osc.event.ScanEvent;
 import com.github.tvbox.osc.utils.ScanTask;
 import com.github.tvbox.osc.databinding.DialogDeviceBinding;
 import com.github.tvbox.osc.impl.Callback;
 import com.github.tvbox.osc.server.Server;
-import com.github.tvbox.osc.ui.activity.ScanActivity;
 import com.github.tvbox.osc.ui.adapter.DeviceAdapter;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.catvod.net.OkHttp;
@@ -131,7 +129,6 @@ public class TransmitDialog extends BaseDialog implements DeviceAdapter.OnClickL
 
     @Override
     protected void initEvent() {
-        binding.scan.setOnClickListener(v -> onScan());
         binding.refresh.setOnClickListener(v -> onRefresh());
     }
 
@@ -150,10 +147,6 @@ public class TransmitDialog extends BaseDialog implements DeviceAdapter.OnClickL
         adapter.clear();
     }
 
-    private void onScan() {
-        ScanActivity.start(getActivity());
-    }
-
     private void onSuccess() {
         dismiss();
         Notify.dismiss();
@@ -162,11 +155,6 @@ public class TransmitDialog extends BaseDialog implements DeviceAdapter.OnClickL
     private void onError(Exception e) {
         Notify.show(e.getMessage());
         Notify.dismiss();
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onScanEvent(ScanEvent event) {
-        ScanTask.create(this).start(event.getAddress());
     }
 
     @Override

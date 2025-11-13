@@ -133,7 +133,7 @@ public class PlaybackService extends Service {
             public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
                 cache.put(getArtUri(), resource);
                 setLargeIcon(builder, resource);
-                Notify.show(builder.build());
+                getManager().notify(Notify.ID, builder.build());
             }
 
             @Override
@@ -144,7 +144,7 @@ public class PlaybackService extends Service {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onActionEvent(ActionEvent event) {
-        if (event.isUpdate()) Notify.show(buildNotification());
+        if (event.isUpdate()) getManager().notify(Notify.ID, buildNotification());
     }
 
     @Override
