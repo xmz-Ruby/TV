@@ -99,7 +99,8 @@ def localProxy(ru, param):
 
 
 def destroy(ru):
-    ru.destroy()
+    if hasattr(ru, 'destroy'):
+        ru.destroy()
 
 
 def action(ru, action):
