@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 修复 Spider JAR 存储路径脚本
-# 用法: ./fix_spider_storage.sh ~/Downloads/apktool_2.12.1.jar spider.jar output.jar
+# 用法: ~/yorkspace/github/TV/fix_spider_storage.sh ~/yorkspace/apktool_2.12.1.jar ~/yorkspace/单线路1114/TVBoxOSC/tvbox/spider.jar  ~/yorkspace/单线路1114/TVBoxOSC/tvbox/custom_spider_modified.jar
 
 if [ $# -ne 3 ]; then
     echo "用法: $0 <apktool.jar> <输入jar> <输出jar>"
@@ -168,6 +168,7 @@ java -jar "$APKTOOL_JAR" b "$SMALI_DIR" -o "$OUTPUT_JAR" || exit 1
 
 echo "6. 清理..."
 echo "$SMALI_DIR"
-#rm -rf "$SMALI_DIR"
+rm -rf "$SMALI_DIR"
+rm -rf "$OUTPUT_DIR/spider.jar"
 
 echo "完成! 输出: $OUTPUT_JAR"
