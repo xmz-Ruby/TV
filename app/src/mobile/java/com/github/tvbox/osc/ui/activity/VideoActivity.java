@@ -124,6 +124,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 
+import master.flame.danmaku.controller.IDanmakuView;
 import master.flame.danmaku.danmaku.model.BaseDanmaku;
 import master.flame.danmaku.danmaku.model.IDisplayer;
 import master.flame.danmaku.danmaku.model.android.DanmakuContext;
@@ -469,13 +470,45 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         maxLines.put(BaseDanmaku.TYPE_SCROLL_RL, maxLine);
         maxLines.put(BaseDanmaku.TYPE_SCROLL_LR, maxLine);
         maxLines.put(BaseDanmaku.TYPE_FIX_BOTTOM, maxLine);
-        mDanmakuContext.setMaximumLines(maxLines).setScrollSpeedFactor(speed).setDanmakuTransparency(alpha).setScaleTextSize(sizeScale);
+
+        // 基础配置
+        mDanmakuContext.setMaximumLines(maxLines)
+                .setScrollSpeedFactor(speed)
+                .setDanmakuTransparency(alpha)
+                .setScaleTextSize(sizeScale);
+
+        // 性能优化配置
+        // 1. 设置弹幕重叠处理，避免弹幕堆积
+        mDanmakuContext.preventOverlapping(new HashMap<Integer, Boolean>() {{
+            put(BaseDanmaku.TYPE_SCROLL_RL, true);
+            put(BaseDanmaku.TYPE_FIX_TOP, true);
+        }});
+
+        // 2. 设置弹幕显示区域（避免全屏绘制）
+        // 只在屏幕上半部分显示弹幕，减少绘制区域
+        mDanmakuContext.setDanmakuMargin(40);
+
+        // 3. 设置合理的FPS，避免过度绘制（默认25fps足够流畅）
+        mDanmakuContext.setMaximumVisibleSizeInScreen(maxLine * 2); // 限制屏幕上同时显示的弹幕数量
+
+        // 4. 禁用一些不常用的弹幕类型以提升性能
+        mDanmakuContext.setDuplicateMergingEnabled(false); // 禁用重复弹幕合并（减少计算）
     }
 
     private void setDanmuView() {
         mPlayers.setDanmuView(mBinding.danmaku);
+
+        // 启用硬件加速渲染线程，提升性能
+        mBinding.danmaku.setDrawingThreadType(IDanmakuView.THREAD_TYPE_NORMAL_PRIORITY);
+
+        // 启用绘制缓存，大幅提升滑动流畅度
+        mBinding.danmaku.enableDanmakuDrawingCache(true);
+
         setDanmuViewSettings();
-        mDanmakuContext.setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, 3).setDanmakuMargin(8);
+
+        // 使用较细的描边以减少绘制开销（从3降到2）
+        mDanmakuContext.setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, 2).setDanmakuMargin(8);
+
         checkDanmuImg();
     }
 
