@@ -170,6 +170,10 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void setDanmuView(DanmakuView view) {
         view.setCallback(this);
         danmuView = view;
+        // 设置视频播放器同步器，确保弹幕时间与视频时间保持同步
+        if (danmuView.getConfig() != null) {
+            danmuView.getConfig().setDanmakuSync(new VideoPlayerSync(this));
+        }
     }
 
     public ExoPlayer exo() {
@@ -412,9 +416,12 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void seekTo(long time) {
-        if (haveDanmu()) danmuView.seekTo(time);
+        // 先让视频播放器seek，然后弹幕再同步
+        // 这样可以避免弹幕时间领先于视频时间
         if (isExo() && exoPlayer != null) exoPlayer.seekTo(time);
         if (isIjk() && ijkPlayer != null) ijkPlayer.seekTo(time);
+        // 视频seek完成后，弹幕再跟随
+        if (haveDanmu()) danmuView.seekTo(time);
     }
 
     public void play() {
