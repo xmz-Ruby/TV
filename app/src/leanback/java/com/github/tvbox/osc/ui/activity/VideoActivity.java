@@ -482,13 +482,38 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         maxLines.put(BaseDanmaku.TYPE_SCROLL_RL, maxLine);
         maxLines.put(BaseDanmaku.TYPE_SCROLL_LR, maxLine);
         maxLines.put(BaseDanmaku.TYPE_FIX_BOTTOM, maxLine);
-        mDanmakuContext.setMaximumLines(maxLines).setScrollSpeedFactor(speed).setDanmakuTransparency(alpha).setScaleTextSize(sizeScale);
+
+        // 基础配置
+        mDanmakuContext.setMaximumLines(maxLines)
+                .setScrollSpeedFactor(speed)
+                .setDanmakuTransparency(alpha)
+                .setScaleTextSize(sizeScale);
+
+        // 性能优化配置（保持流畅度的同时显示更多弹幕）
+        // 1. 禁用弹幕重叠处理，允许更多弹幕显示
+        mDanmakuContext.preventOverlapping(new HashMap<Integer, Boolean>() {{
+            put(BaseDanmaku.TYPE_SCROLL_RL, false);  // 允许滚动弹幕重叠
+            put(BaseDanmaku.TYPE_FIX_TOP, false);    // 允许顶部弹幕重叠
+        }});
+
+        // 2. 禁用重复弹幕合并，显示所有弹幕
+        mDanmakuContext.setDuplicateMergingEnabled(false);
     }
 
     private void setDanmuView() {
         mPlayers.setDanmuView(mBinding.danmaku);
+
+        // 启用硬件加速渲染线程，提升性能
+        mBinding.danmaku.setDrawingThreadType(master.flame.danmaku.controller.IDanmakuView.THREAD_TYPE_NORMAL_PRIORITY);
+
+        // 启用绘制缓存，大幅提升滑动流畅度
+        mBinding.danmaku.enableDanmakuDrawingCache(true);
+
         setDanmuViewSettings();
-        mDanmakuContext.setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, 3).setDanmakuMargin(8);
+
+        // 使用较细的描边以减少绘制开销（从3降到2）
+        mDanmakuContext.setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, 2).setDanmakuMargin(8);
+
         mBinding.control.danmu.setActivated(Setting.isDanmu());
     }
 
@@ -591,7 +616,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         updateDanmuControlsVisibility();
         if (!Setting.isDanmuLoad()) return;
         mBinding.danmaku.setVisibility(danmu.isEmpty() ? View.GONE : View.VISIBLE);
-        if (danmu.length() > 0) App.execute(() -> mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext));
+        if (danmu.length() > 0) {
+            // 在prepare之前设置同步器到DanmakuContext，确保弹幕时间与视频时间同步
+            mDanmakuContext.setDanmakuSync(new com.github.tvbox.osc.player.VideoPlayerSync(mPlayers));
+            App.execute(() -> mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext));
+        }
     }
 
     private void updateDanmuControlsVisibility() {

@@ -683,7 +683,11 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mBinding.danmaku.release();
         if (!Setting.isDanmuLoad() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) return;
         mBinding.danmaku.setVisibility(danmu.isEmpty() ? View.GONE : View.VISIBLE);
-        if (danmu.length() > 0) App.execute(() -> mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext));
+        if (danmu.length() > 0) {
+            // 在prepare之前设置同步器到DanmakuContext，确保弹幕时间与视频时间同步
+            mDanmakuContext.setDanmakuSync(new com.github.tvbox.osc.player.VideoPlayerSync(mPlayers));
+            App.execute(() -> mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext));
+        }
     }
 
     @Override
