@@ -477,22 +477,15 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                 .setDanmakuTransparency(alpha)
                 .setScaleTextSize(sizeScale);
 
-        // 性能优化配置
-        // 1. 设置弹幕重叠处理，避免弹幕堆积
+        // 性能优化配置（保持流畅度的同时显示更多弹幕）
+        // 1. 禁用弹幕重叠处理，允许更多弹幕显示
         mDanmakuContext.preventOverlapping(new HashMap<Integer, Boolean>() {{
-            put(BaseDanmaku.TYPE_SCROLL_RL, true);
-            put(BaseDanmaku.TYPE_FIX_TOP, true);
+            put(BaseDanmaku.TYPE_SCROLL_RL, false);  // 允许滚动弹幕重叠
+            put(BaseDanmaku.TYPE_FIX_TOP, false);    // 允许顶部弹幕重叠
         }});
 
-        // 2. 设置弹幕显示区域（避免全屏绘制）
-        // 只在屏幕上半部分显示弹幕，减少绘制区域
-        mDanmakuContext.setDanmakuMargin(40);
-
-        // 3. 设置合理的FPS，避免过度绘制（默认25fps足够流畅）
-        mDanmakuContext.setMaximumVisibleSizeInScreen(maxLine * 2); // 限制屏幕上同时显示的弹幕数量
-
-        // 4. 禁用一些不常用的弹幕类型以提升性能
-        mDanmakuContext.setDuplicateMergingEnabled(false); // 禁用重复弹幕合并（减少计算）
+        // 2. 禁用重复弹幕合并，显示所有弹幕
+        mDanmakuContext.setDuplicateMergingEnabled(false);
     }
 
     private void setDanmuView() {
