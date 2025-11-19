@@ -13,6 +13,7 @@ import com.github.tvbox.osc.bean.Channel;
 import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.bean.Depot;
 import com.github.tvbox.osc.bean.Group;
+import com.github.tvbox.osc.bean.Header;
 import com.github.tvbox.osc.bean.Keep;
 import com.github.tvbox.osc.bean.Live;
 import com.github.tvbox.osc.bean.Rule;
@@ -35,6 +36,7 @@ public class LiveConfig {
 
     private List<Live> lives;
     private List<Rule> rules;
+    private List<Header> headers;
     private List<String> ads;
     private Config config;
     private boolean sync;
@@ -84,6 +86,7 @@ public class LiveConfig {
         this.home = null;
         this.ads = new ArrayList<>();
         this.rules = new ArrayList<>();
+        this.headers = new ArrayList<>();
         this.lives = new ArrayList<>();
         return config(Config.live());
     }
@@ -99,6 +102,7 @@ public class LiveConfig {
         this.home = null;
         this.ads.clear();
         this.rules.clear();
+        this.headers.clear();
         this.lives.clear();
         return this;
     }
@@ -197,6 +201,7 @@ public class LiveConfig {
     private void initOther(JsonObject object) {
         if (home == null) setHome(lives.isEmpty() ? new Live() : lives.get(0), true);
         setRules(Rule.arrayFrom(object.getAsJsonArray("rules")));
+        setHeaders(Header.arrayFrom(object.getAsJsonArray("headers")));
         setAds(Json.safeListString(object, "ads"));
     }
 
@@ -277,6 +282,14 @@ public class LiveConfig {
         for (Rule rule : rules) if ("proxy".equals(rule.getName())) OkHttp.selector().addAll(rule.getHosts());
         rules.remove(Rule.create("proxy"));
         this.rules = rules;
+    }
+
+    public List<Header> getHeaders() {
+        return headers == null ? Collections.emptyList() : headers;
+    }
+
+    private void setHeaders(List<Header> headers) {
+        this.headers = headers;
     }
 
     public List<String> getAds() {

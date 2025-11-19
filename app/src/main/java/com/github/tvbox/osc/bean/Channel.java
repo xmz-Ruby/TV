@@ -1,11 +1,13 @@
 package com.github.tvbox.osc.bean;
 
+import android.net.Uri;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
 
 import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.utils.ImgUtil;
 import com.github.tvbox.osc.utils.ResUtil;
 import com.github.catvod.utils.Json;
@@ -346,6 +348,15 @@ public class Channel {
 
     public Map<String, String> getHeaders() {
         Map<String, String> headers = Json.toMap(getHeader());
+        String host = Uri.parse(getCurrent()).getHost();
+        if (host != null) {
+            for (Header h : LiveConfig.get().getHeaders()) {
+                if (host.equals(h.getHost())) {
+                    headers.putAll(Json.toMap(h.getHeader()));
+                    break;
+                }
+            }
+        }
         if (!getUa().isEmpty()) headers.put(HttpHeaders.USER_AGENT, getUa());
         if (!getOrigin().isEmpty()) headers.put(HttpHeaders.ORIGIN, getOrigin());
         if (!getReferer().isEmpty()) headers.put(HttpHeaders.REFERER, getReferer());
