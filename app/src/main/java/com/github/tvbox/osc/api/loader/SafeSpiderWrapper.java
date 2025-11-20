@@ -135,10 +135,10 @@ public class SafeSpiderWrapper extends Spider {
      */
     @Override
     public Object[] proxyLocal(Map<String, String> params) throws Exception {
-        if (enableSafeMode) {
-            Logger.i("SafeSpiderWrapper: 安全模式：禁止外部 spider 使用 proxyLocal");
-            return null;
-        }
+//        if (enableSafeMode) {
+//            Logger.i("SafeSpiderWrapper: 安全模式：禁止外部 spider 使用 proxyLocal");
+//            return null;
+//        }
         return wrappedSpider.proxyLocal(params);
     }
 
