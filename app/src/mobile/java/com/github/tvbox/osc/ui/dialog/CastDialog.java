@@ -35,9 +35,6 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
 import org.fourthline.cling.support.lastchange.EventedValue;
 import org.fourthline.cling.support.model.TransportState;
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.IOException;
 import java.util.List;
@@ -52,6 +49,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     private final FormBody.Builder body;
     private final OkHttpClient client;
+    private final ScanTask scanTask;
 
     private DialogDeviceBinding binding;
     private DeviceAdapter adapter;
@@ -59,12 +57,15 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     private Listener listener;
     private CastVideo video;
     private boolean fm;
+    private boolean seekPending;
+    private boolean hasSeeked;
 
     public static CastDialog create() {
         return new CastDialog();
     }
 
     public CastDialog() {
+        scanTask = new ScanTask(this);
         body = new FormBody.Builder();
         body.add("device", Device.get().toString());
         body.add("config", Config.vod().toString());
@@ -104,7 +105,6 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     protected void initView() {
-        EventBus.getDefault().register(this);
         setRecyclerView();
         getDevice();
         initDLNA();
@@ -116,7 +116,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     private void setRecyclerView() {
-        binding.recycler.setHasFixedSize(true);
+        binding.recycler.setHasFixedSize(false);
         binding.recycler.setAdapter(adapter = new DeviceAdapter(this));
     }
 
@@ -131,9 +131,10 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     private void onRefresh() {
-        if (fm) ScanTask.create(this).start(adapter.getIps());
-        DLNACastManager.INSTANCE.search(null);
         adapter.clear();
+        if (fm) scanTask.start(adapter.getIps());
+        DLNADevice.get().disconnect();
+        DLNACastManager.INSTANCE.search(null);
     }
 
     private void onCasted() {
@@ -158,6 +159,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     public void onConnected(@NonNull org.fourthline.cling.model.meta.Device<?, ?, ?> device) {
+        android.util.Log.d("CastDialog", "onConnected - position: " + video.getPosition());
         control.setAVTransportURI(video.getUrl(), video.getName(), this);
     }
 
@@ -168,8 +170,37 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     public void onSuccess(Unit unit) {
+        android.util.Log.d("CastDialog", "onSuccess - seeking to position: " + video.getPosition());
+        seekPending = video.getPosition() > 0;
+        hasSeeked = false;
         control.play("1", null);
-        onCasted();
+        if (seekPending) {
+            // 延迟 5 秒执行 seek，给播放器足够的时间准备
+            App.post(() -> performSeek(), 5000);
+        } else {
+            onCasted();
+        }
+    }
+
+    private void performSeek() {
+        if (!seekPending || hasSeeked) return;
+        hasSeeked = true;
+        android.util.Log.d("CastDialog", "Performing delayed seek to: " + video.getPosition());
+        control.seek(video.getPosition(), new ServiceActionCallback<Unit>() {
+            @Override
+            public void onSuccess(Unit result) {
+                android.util.Log.d("CastDialog", "Seek successful!");
+                seekPending = false;
+                App.post(() -> onCasted(), 500);
+            }
+
+            @Override
+            public void onFailure(@NonNull String error) {
+                android.util.Log.e("CastDialog", "Seek failed: " + error);
+                seekPending = false;
+                App.post(() -> onCasted(), 500);
+            }
+        });
     }
 
     @Override
@@ -198,7 +229,6 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     public void onDestroyView() {
         super.onDestroyView();
         DLNADevice.get().disconnect();
-        EventBus.getDefault().unregister(this);
         DLNACastManager.INSTANCE.unregisterListener(this);
         DLNACastManager.INSTANCE.unbindCastService(App.get());
     }
