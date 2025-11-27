@@ -1,0 +1,180 @@
+package com.github.tvbox.osc.server.process;
+
+import android.util.Base64;
+
+import com.github.tvbox.osc.server.Nano;
+import com.github.catvod.net.OkHttp;
+
+import java.io.InputStream;
+import java.net.SocketException;
+import java.util.HashMap;
+import java.util.Map;
+
+import fi.iki.elonen.NanoHTTPD;
+import okhttp3.Headers;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+public class CastProxy implements Process {
+
+    private final OkHttpClient client;
+
+    public CastProxy() {
+        this.client = OkHttp.client();
+    }
+
+    @Override
+    public boolean isRequest(NanoHTTPD.IHTTPSession session, String path) {
+        return "/cast_proxy".equals(path);
+    }
+
+    @Override
+    public NanoHTTPD.Response doResponse(NanoHTTPD.IHTTPSession session, String path, Map<String, String> files) {
+        Response response = null;
+        try {
+            Map<String, String> params = session.getParms();
+
+            // 获取原始 URL
+            String url = params.get("url");
+            if (url == null || url.isEmpty()) {
+                android.util.Log.w("CastProxy", "Missing url parameter");
+                return Nano.error("Missing url parameter");
+            }
+
+            // 解析 headers
+            Map<String, String> headers = new HashMap<>();
+            String headersParam = params.get("headers");
+            if (headersParam != null && !headersParam.isEmpty()) {
+                try {
+                    String decoded = new String(Base64.decode(headersParam, Base64.URL_SAFE));
+                    String[] pairs = decoded.split("&");
+                    for (String pair : pairs) {
+                        int idx = pair.indexOf('=');
+                        if (idx > 0) {
+                            String key = pair.substring(0, idx);
+                            String value = pair.substring(idx + 1);
+                            headers.put(key, value);
+                        }
+                    }
+                    android.util.Log.d("CastProxy", "Decoded " + headers.size() + " headers");
+                } catch (Exception e) {
+                    android.util.Log.e("CastProxy", "Failed to decode headers", e);
+                }
+            }
+
+            // 获取客户端的 Range 请求
+            String rangeHeader = session.getHeaders().get("range");
+            android.util.Log.d("CastProxy", "Proxying: " + url);
+            android.util.Log.d("CastProxy", "Client Range header: " + rangeHeader);
+            android.util.Log.d("CastProxy", "Custom headers count: " + headers.size());
+
+            // 构建请求
+            Request.Builder builder = new Request.Builder().url(url);
+
+            // 添加自定义 headers
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                builder.addHeader(entry.getKey(), entry.getValue());
+            }
+
+            // 转发客户端的 Range 请求
+            if (rangeHeader != null && !rangeHeader.isEmpty()) {
+                builder.addHeader("Range", rangeHeader);
+                android.util.Log.d("CastProxy", "Forwarding Range request: " + rangeHeader);
+            }
+
+            // 执行请求
+            android.util.Log.d("CastProxy", "Sending request...");
+            response = client.newCall(builder.build()).execute();
+
+            int responseCode = response.code();
+            android.util.Log.d("CastProxy", "Response code: " + responseCode);
+            android.util.Log.d("CastProxy", "Response message: " + response.message());
+
+            // 处理非成功响应（但 206 Partial Content 是成功的）
+            if (!response.isSuccessful() && responseCode != 206) {
+                android.util.Log.w("CastProxy", "Request failed with code: " + responseCode);
+                String errorBody = "";
+                try {
+                    errorBody = response.body().string();
+                    android.util.Log.w("CastProxy", "Error body: " + errorBody.substring(0, Math.min(200, errorBody.length())));
+                } catch (Exception e) {
+                    android.util.Log.w("CastProxy", "Could not read error body", e);
+                }
+                return Nano.error(NanoHTTPD.Response.Status.lookup(responseCode),
+                                 "Failed to fetch: " + responseCode + " - " + errorBody);
+            }
+
+            // 获取响应流和元数据
+            InputStream inputStream = response.body().byteStream();
+            String contentType = response.header("Content-Type", "application/octet-stream");
+            long contentLength = response.body().contentLength();
+            String contentRange = response.header("Content-Range");
+
+            android.util.Log.d("CastProxy", "Streaming content: " + contentType +
+                              (contentLength > 0 ? " (" + contentLength + " bytes)" : ""));
+            if (contentRange != null) {
+                android.util.Log.d("CastProxy", "Content-Range: " + contentRange);
+            }
+
+            // 创建响应 - 根据是否是 Range 请求选择状态码
+            NanoHTTPD.Response.Status status = (responseCode == 206) ?
+                NanoHTTPD.Response.Status.PARTIAL_CONTENT :
+                NanoHTTPD.Response.Status.OK;
+
+            NanoHTTPD.Response nanoResponse;
+            if (contentLength > 0) {
+                // 如果知道内容长度，使用固定长度响应
+                nanoResponse = NanoHTTPD.newFixedLengthResponse(
+                    status,
+                    contentType,
+                    inputStream,
+                    contentLength
+                );
+            } else {
+                // 否则使用分块传输
+                nanoResponse = NanoHTTPD.newChunkedResponse(
+                    status,
+                    contentType,
+                    inputStream
+                );
+            }
+
+            // 复制重要的响应头
+            Headers responseHeaders = response.headers();
+            for (String name : responseHeaders.names()) {
+                String lowerName = name.toLowerCase();
+                // 跳过已经处理的头
+                if (lowerName.equals("content-type") ||
+                    lowerName.equals("content-length") ||
+                    lowerName.equals("transfer-encoding")) {
+                    continue;
+                }
+                // 转发 Content-Range 等重要头
+                nanoResponse.addHeader(name, responseHeaders.get(name));
+            }
+
+            // 添加 CORS 头
+            nanoResponse.addHeader("Access-Control-Allow-Origin", "*");
+            nanoResponse.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            nanoResponse.addHeader("Access-Control-Allow-Headers", "*");
+
+            // 添加 Accept-Ranges 支持断点续传
+            nanoResponse.addHeader("Accept-Ranges", "bytes");
+
+            android.util.Log.d("CastProxy", "Response prepared successfully");
+            return nanoResponse;
+
+        } catch (SocketException e) {
+            // Broken pipe 是正常的，客户端主动断开连接（如 seek 操作）
+            android.util.Log.d("CastProxy", "Client disconnected: " + e.getMessage());
+            return null; // 返回 null 表示连接已关闭，不需要发送响应
+        } catch (Exception e) {
+            android.util.Log.e("CastProxy", "Proxy error: " + e.getMessage(), e);
+            return Nano.error("Proxy error: " + e.getMessage());
+        } finally {
+            // 注意：不要在这里关闭 response，因为 inputStream 还在使用中
+            // NanoHTTPD 会在发送完响应后自动关闭流
+        }
+    }
+}

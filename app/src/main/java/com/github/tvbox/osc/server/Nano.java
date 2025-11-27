@@ -39,6 +39,7 @@ public class Nano extends NanoHTTPD {
         process = new ArrayList<>();
         process.add(new Action());
         process.add(new Cache());
+        process.add(new com.github.tvbox.osc.server.process.CastProxy());
         process.add(new DanmakuPage());
         process.add(new Local());
         process.add(new Media());
