@@ -23,16 +23,40 @@ public class Media implements Process {
 
     @Override
     public NanoHTTPD.Response doResponse(NanoHTTPD.IHTTPSession session, String path, Map<String, String> files) {
-        if (isNull()) return Nano.success("{}");
         JsonObject result = new JsonObject();
-        result.addProperty("url", getUrl());
-        result.addProperty("state", getState());
-        result.addProperty("speed", getSpeed());
-        result.addProperty("title", getTitle());
-        result.addProperty("artist", getArtist());
-        result.addProperty("artwork", getArtUri());
-        result.addProperty("duration", getDuration());
-        result.addProperty("position", getPosition());
+
+        // 检查是否正在投屏
+        if (Server.get().isCasting()) {
+            // 投屏模式：返回投屏信息
+            result.addProperty("url", Server.get().getCastUrl());
+            result.addProperty("state", PlaybackStateCompat.STATE_PLAYING); // 假设投屏时是播放状态
+            result.addProperty("speed", 1.0f);
+            result.addProperty("title", Server.get().getCurrentTitle());
+            result.addProperty("artist", Server.get().getCurrentEpisode());
+            result.addProperty("artwork", "");
+            result.addProperty("duration", Server.get().getCastDuration());
+            result.addProperty("position", Server.get().getCastPosition());
+            result.addProperty("currentTitle", Server.get().getCurrentTitle());
+            result.addProperty("currentEpisode", Server.get().getCurrentEpisode());
+            result.addProperty("isCasting", true);
+        } else if (isNull()) {
+            // 没有播放器且没有投屏：返回空数据
+            return Nano.success("{}");
+        } else {
+            // 本地播放模式：返回播放器信息
+            result.addProperty("url", getUrl());
+            result.addProperty("state", getState());
+            result.addProperty("speed", getSpeed());
+            result.addProperty("title", getTitle());
+            result.addProperty("artist", getArtist());
+            result.addProperty("artwork", getArtUri());
+            result.addProperty("duration", getDuration());
+            result.addProperty("position", getPosition());
+            result.addProperty("currentTitle", Server.get().getCurrentTitle());
+            result.addProperty("currentEpisode", Server.get().getCurrentEpisode());
+            result.addProperty("isCasting", false);
+        }
+
         return Nano.success(result.toString());
     }
 

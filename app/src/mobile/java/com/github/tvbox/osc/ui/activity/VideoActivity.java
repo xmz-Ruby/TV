@@ -668,6 +668,13 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         setUseParse(VodConfig.hasParse() && ((result.getPlayUrl().isEmpty() && VodConfig.get().getFlags().contains(result.getFlag())) || result.getJx() == 1));
         if (mControlDialog != null && mControlDialog.isVisible()) mControlDialog.setParseVisible(isUseParse());
         mBinding.control.parse.setVisibility(isFullscreen() && isUseParse() ? View.VISIBLE : View.GONE);
+
+        // 设置当前播放信息（用于 Emby 回传）
+        com.github.tvbox.osc.server.Server.get().setCurrentMedia(
+            mBinding.name.getText().toString(),
+            mBinding.control.title.getText().toString()
+        );
+
         mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
         setQualityVisible(result.getUrl().isMulti());
         mBinding.swipeLayout.setRefreshing(false);

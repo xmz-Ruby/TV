@@ -598,6 +598,12 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         result.getUrl().set(mQualityAdapter.getPosition());
         setUseParse(VodConfig.hasParse() && ((result.getPlayUrl().isEmpty() && VodConfig.get().getFlags().contains(result.getFlag())) || result.getJx() == 1));
 
+        // 设置当前播放信息（用于 Emby 回传）
+        com.github.tvbox.osc.server.Server.get().setCurrentMedia(
+            mBinding.name.getText().toString(),
+            mBinding.widget.title.getText().toString()
+        );
+
         // 在启动播放器之前设置position，确保播放器从正确的位置开始
         if (mPendingResumePosition > 0) {
             mPlayers.setPosition(mPendingResumePosition);

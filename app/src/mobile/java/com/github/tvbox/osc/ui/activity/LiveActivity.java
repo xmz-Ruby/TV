@@ -730,6 +730,12 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     }
 
     private void start(Channel result) {
+        // 设置当前播放信息（用于 Emby 回传）
+        com.github.tvbox.osc.server.Server.get().setCurrentMedia(
+            mBinding.control.title.getText().toString(),
+            result.getNumber() + " " + result.getName()
+        );
+
         mPlayers.start(result, getTimeout());
     }
 

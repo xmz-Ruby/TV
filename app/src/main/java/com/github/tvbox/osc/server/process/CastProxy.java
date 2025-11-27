@@ -36,6 +36,7 @@ public class CastProxy implements Process {
     @Override
     public NanoHTTPD.Response doResponse(NanoHTTPD.IHTTPSession session, String path, Map<String, String> files) {
         Response response = null;
+        boolean shouldCloseResponse = false;
         try {
             Map<String, String> params = session.getParms();
 
@@ -129,6 +130,8 @@ public class CastProxy implements Process {
                 inputStream = new ByteArrayInputStream(contentBytes);
                 contentLength = contentBytes.length;
                 android.util.Log.d("CastProxy", "Rewritten m3u8 size: " + contentLength + " bytes");
+                // m3u8 内容已经完全读取，可以关闭原始 response
+                shouldCloseResponse = true;
             }
 
             // 创建响应 - 根据是否是 Range 请求选择状态码
@@ -182,13 +185,37 @@ public class CastProxy implements Process {
         } catch (SocketException e) {
             // Broken pipe 是正常的，客户端主动断开连接（如 seek 操作）
             android.util.Log.d("CastProxy", "Client disconnected: " + e.getMessage());
+            // 客户端断开时需要关闭 response
+            if (response != null) {
+                try {
+                    response.close();
+                } catch (Exception ex) {
+                    // 忽略关闭异常
+                }
+            }
             return null; // 返回 null 表示连接已关闭，不需要发送响应
         } catch (Exception e) {
             android.util.Log.e("CastProxy", "Proxy error: " + e.getMessage(), e);
+            // 发生错误时需要关闭 response
+            if (response != null) {
+                try {
+                    response.close();
+                } catch (Exception ex) {
+                    // 忽略关闭异常
+                }
+            }
             return Nano.error("Proxy error: " + e.getMessage());
         } finally {
-            // 注意：不要在这里关闭 response，因为 inputStream 还在使用中
-            // NanoHTTPD 会在发送完响应后自动关闭流
+            // 如果已经读取完内容（如 m3u8 重写），关闭 response
+            // 否则不要关闭，因为 inputStream 还在使用中，NanoHTTPD 会在发送完响应后自动关闭流
+            if (shouldCloseResponse && response != null) {
+                try {
+                    response.close();
+                    android.util.Log.d("CastProxy", "Response closed after content read");
+                } catch (Exception e) {
+                    android.util.Log.w("CastProxy", "Error closing response", e);
+                }
+            }
         }
     }
 

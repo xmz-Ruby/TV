@@ -45,12 +45,18 @@ public class CastVideo {
             url = Uri.parse(url).getQueryParameter("url");
         }
 
-        // 如果有 headers 且是网络 URL，通过本地代理
-        if (headers != null && !headers.isEmpty() && (url.startsWith("http://") || url.startsWith("https://"))) {
+        // 检查是否已经是本地代理 URL
+        boolean isLocalProxy = url.contains("127.0.0.1:" + Server.get().getPort()) ||
+                              url.contains(Util.getIp() + ":" + Server.get().getPort());
+
+        // 如果有 headers 且是网络 URL，且不是本地代理，通过 cast_proxy
+        if (headers != null && !headers.isEmpty() &&
+            (url.startsWith("http://") || url.startsWith("https://")) &&
+            !isLocalProxy) {
             url = buildProxyUrl(url, headers);
         }
 
-        // 替换 127.0.0.1 为实际 IP
+        // 替换 127.0.0.1 为实际 IP（确保 DLNA 设备可以访问）
         if (url.contains("127.0.0.1")) {
             url = url.replace("127.0.0.1", Util.getIp());
         }

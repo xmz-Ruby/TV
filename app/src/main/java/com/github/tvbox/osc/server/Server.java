@@ -13,6 +13,10 @@ public class Server {
     // 当前播放信息
     private volatile String currentTitle = "";
     private volatile String currentEpisode = "";
+    private volatile boolean isCasting = false;
+    private volatile String castUrl = "";
+    private volatile long castPosition = 0;
+    private volatile long castDuration = 0;
 
     private static class Loader {
         static volatile Server INSTANCE = new Server();
@@ -95,5 +99,53 @@ public class Server {
      */
     public String getCurrentEpisode() {
         return currentEpisode;
+    }
+
+    /**
+     * 设置投屏状态
+     */
+    public void setCasting(boolean casting, String url) {
+        this.isCasting = casting;
+        this.castUrl = url != null ? url : "";
+        if (!casting) {
+            this.castPosition = 0;
+            this.castDuration = 0;
+        }
+    }
+
+    /**
+     * 更新投屏播放进度
+     */
+    public void updateCastProgress(long position, long duration) {
+        this.castPosition = position;
+        this.castDuration = duration;
+    }
+
+    /**
+     * 是否正在投屏
+     */
+    public boolean isCasting() {
+        return isCasting;
+    }
+
+    /**
+     * 获取投屏 URL
+     */
+    public String getCastUrl() {
+        return castUrl;
+    }
+
+    /**
+     * 获取投屏播放位置
+     */
+    public long getCastPosition() {
+        return castPosition;
+    }
+
+    /**
+     * 获取投屏总时长
+     */
+    public long getCastDuration() {
+        return castDuration;
     }
 }

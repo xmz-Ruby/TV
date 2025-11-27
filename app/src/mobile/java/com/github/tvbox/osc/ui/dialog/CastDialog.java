@@ -138,6 +138,8 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     private void onCasted() {
+        // 启动投屏控制页面
+        com.github.tvbox.osc.ui.activity.CastControlActivity.start(getContext(), control);
         listener.onCasted();
         dismiss();
     }
@@ -171,6 +173,10 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     @Override
     public void onSuccess(Unit unit) {
         android.util.Log.d("CastDialog", "onSuccess - seeking to position: " + video.getPosition());
+
+        // 设置投屏状态（用于 Emby 回传）
+        com.github.tvbox.osc.server.Server.get().setCasting(true, video.getUrl());
+
         seekPending = video.getPosition() > 0;
         hasSeeked = false;
         control.play("1", null);
@@ -228,9 +234,14 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        DLNADevice.get().disconnect();
+
+        // 注意：不在这里断开 DLNA 连接和清除投屏状态
+        // 因为投屏控制页面还在运行，需要保持连接
+        // 连接和状态将在 CastControlActivity 中管理
+
+        // 只取消注册监听器
         DLNACastManager.INSTANCE.unregisterListener(this);
-        DLNACastManager.INSTANCE.unbindCastService(App.get());
+        // 不要 unbind service，因为 CastControlActivity 还需要使用
     }
 
     @Override
