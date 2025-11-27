@@ -5,8 +5,12 @@ import android.util.Base64;
 import com.github.tvbox.osc.server.Nano;
 import com.github.catvod.net.OkHttp;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.SocketException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -117,6 +121,16 @@ public class CastProxy implements Process {
                 android.util.Log.d("CastProxy", "Content-Range: " + contentRange);
             }
 
+            // 如果是 m3u8 播放列表，需要重写其中的 URL
+            if (isM3u8Content(contentType, url)) {
+                android.util.Log.d("CastProxy", "Detected m3u8 playlist, rewriting URLs");
+                String rewrittenContent = rewriteM3u8Playlist(inputStream, url, headersParam);
+                byte[] contentBytes = rewrittenContent.getBytes("UTF-8");
+                inputStream = new ByteArrayInputStream(contentBytes);
+                contentLength = contentBytes.length;
+                android.util.Log.d("CastProxy", "Rewritten m3u8 size: " + contentLength + " bytes");
+            }
+
             // 创建响应 - 根据是否是 Range 请求选择状态码
             NanoHTTPD.Response.Status status = (responseCode == 206) ?
                 NanoHTTPD.Response.Status.PARTIAL_CONTENT :
@@ -175,6 +189,113 @@ public class CastProxy implements Process {
         } finally {
             // 注意：不要在这里关闭 response，因为 inputStream 还在使用中
             // NanoHTTPD 会在发送完响应后自动关闭流
+        }
+    }
+
+    /**
+     * 检查是否是 m3u8 内容
+     */
+    private boolean isM3u8Content(String contentType, String url) {
+        if (contentType != null) {
+            String lowerType = contentType.toLowerCase();
+            if (lowerType.contains("application/vnd.apple.mpegurl") ||
+                lowerType.contains("application/x-mpegurl") ||
+                lowerType.contains("audio/mpegurl")) {
+                return true;
+            }
+        }
+        // 也检查 URL 扩展名
+        return url.toLowerCase().contains(".m3u8");
+    }
+
+    /**
+     * 重写 m3u8 播放列表中的 URL
+     */
+    private String rewriteM3u8Playlist(InputStream inputStream, String baseUrl, String headersParam) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
+        StringBuilder result = new StringBuilder();
+        String line;
+
+        // 获取基础 URL（用于解析相对路径）
+        URL base = new URL(baseUrl);
+        String baseUrlStr = base.getProtocol() + "://" + base.getHost() +
+                           (base.getPort() != -1 ? ":" + base.getPort() : "") +
+                           base.getPath();
+        // 移除文件名，只保留目录路径
+        int lastSlash = baseUrlStr.lastIndexOf('/');
+        if (lastSlash > 0) {
+            baseUrlStr = baseUrlStr.substring(0, lastSlash + 1);
+        }
+
+        android.util.Log.d("CastProxy", "Base URL for m3u8: " + baseUrlStr);
+
+        while ((line = reader.readLine()) != null) {
+            // 跳过注释行和空行
+            if (line.trim().isEmpty() || line.trim().startsWith("#")) {
+                result.append(line).append("\n");
+                continue;
+            }
+
+            // 这是一个 URL 行，需要重写
+            String segmentUrl = line.trim();
+
+            // 如果是相对 URL，转换为绝对 URL
+            if (!segmentUrl.startsWith("http://") && !segmentUrl.startsWith("https://")) {
+                if (segmentUrl.startsWith("/")) {
+                    // 绝对路径
+                    segmentUrl = base.getProtocol() + "://" + base.getHost() +
+                               (base.getPort() != -1 ? ":" + base.getPort() : "") + segmentUrl;
+                } else {
+                    // 相对路径
+                    segmentUrl = baseUrlStr + segmentUrl;
+                }
+                android.util.Log.d("CastProxy", "Converted relative URL to: " + segmentUrl);
+            }
+
+            // 如果是 .ts 或其他媒体片段，或者是嵌套的 m3u8，都需要通过代理
+            if (needsProxy(segmentUrl)) {
+                String proxyUrl = buildProxyUrl(segmentUrl, headersParam);
+                android.util.Log.d("CastProxy", "Rewriting segment: " + segmentUrl + " -> " + proxyUrl);
+                result.append(proxyUrl).append("\n");
+            } else {
+                result.append(segmentUrl).append("\n");
+            }
+        }
+
+        reader.close();
+        return result.toString();
+    }
+
+    /**
+     * 判断 URL 是否需要通过代理
+     */
+    private boolean needsProxy(String url) {
+        String lower = url.toLowerCase();
+        // .ts 片段、.m3u8 子播放列表、或其他媒体格式都需要代理
+        return lower.contains(".ts") || lower.contains(".m3u8") ||
+               lower.contains(".mp4") || lower.contains(".m4s");
+    }
+
+    /**
+     * 构建代理 URL
+     */
+    private String buildProxyUrl(String originalUrl, String headersParam) {
+        try {
+            StringBuilder proxyUrl = new StringBuilder();
+            proxyUrl.append(com.github.tvbox.osc.server.Server.get().getAddress());
+            proxyUrl.append("/cast_proxy?url=");
+            proxyUrl.append(android.net.Uri.encode(originalUrl));
+
+            // 如果有 headers 参数，也添加上
+            if (headersParam != null && !headersParam.isEmpty()) {
+                proxyUrl.append("&headers=");
+                proxyUrl.append(headersParam);
+            }
+
+            return proxyUrl.toString();
+        } catch (Exception e) {
+            android.util.Log.e("CastProxy", "Failed to build proxy URL", e);
+            return originalUrl;
         }
     }
 }
