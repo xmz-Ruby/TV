@@ -70,6 +70,9 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         body.add("device", Device.get().toString());
         body.add("config", Config.vod().toString());
         client = OkHttp.client(Constant.TIMEOUT_SYNC);
+
+        // 在创建投屏对话框时就生成 token，确保构建 CastVideo URL 时 token 已存在
+        Server.get().generateAndSetCastProxyToken();
     }
 
     public CastDialog history(History history) {
@@ -242,6 +245,13 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         // 只取消注册监听器
         DLNACastManager.INSTANCE.unregisterListener(this);
         // 不要 unbind service，因为 CastControlActivity 还需要使用
+
+        // 如果没有成功投屏（control 为 null），清除 token
+        // 如果已经成功投屏，token 将在 CastControlActivity 销毁时清除
+        if (control == null) {
+            Server.get().setCasting(false, null);
+            android.util.Log.d("CastDialog", "Cast dialog closed without casting, token cleared");
+        }
     }
 
     @Override

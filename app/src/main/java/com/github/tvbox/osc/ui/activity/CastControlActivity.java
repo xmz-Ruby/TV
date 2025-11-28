@@ -32,6 +32,10 @@ public class CastControlActivity extends BaseActivity {
     private boolean isPaused = false;
     private int consecutiveZeroDurationCount = 0;
     private static final int MAX_ZERO_DURATION_COUNT = 3; // 连续3次检测到时长为0则认为播放已停止
+    private long castStartTime = 0; // 投屏开始时间
+    private static final long CAST_STARTUP_GRACE_PERIOD = 30000; // 投屏启动宽限期：30秒
+    private long lastValidPosition = -1; // 上次有效的播放位置
+    private boolean hasEverPlayed = false; // 是否曾经成功播放过
 
     public static void start(Context context, DeviceControl control) {
         Intent intent = new Intent(context, CastControlActivity.class);
@@ -58,6 +62,9 @@ public class CastControlActivity extends BaseActivity {
             finish();
             return;
         }
+
+        // 记录投屏开始时间
+        castStartTime = System.currentTimeMillis();
 
         // 设置视频信息
         binding.title.setText(Server.get().getCurrentTitle());
@@ -222,22 +229,53 @@ public class CastControlActivity extends BaseActivity {
                                     long position = parseTime(positionInfo.getRelTime());
                                     long duration = parseTime(mediaInfo.getMediaDuration());
 
+                                    // 改进的播放检测逻辑：结合 duration 和代理活跃状态
+                                    boolean proxyActive = Server.get().isCastProxyActive();
+                                    int activeConnections = Server.get().getCastProxyActiveConnections();
+                                    long timeSinceStart = System.currentTimeMillis() - castStartTime;
+                                    boolean inGracePeriod = timeSinceStart < CAST_STARTUP_GRACE_PERIOD;
+
+                                    android.util.Log.d("CastControl", String.format(
+                                        "Status check - duration: %d, position: %d, proxyActive: %b, connections: %d, timeSinceStart: %d, inGracePeriod: %b",
+                                        duration, position, proxyActive, activeConnections, timeSinceStart, inGracePeriod
+                                    ));
+
+                                    // 如果代理活跃，说明投屏端正在通过 cast_proxy 播放
+                                    if (proxyActive) {
+                                        android.util.Log.d("CastControl", "Proxy is active, cast is playing via cast_proxy");
+                                        // 重置计数器
+                                        consecutiveZeroDurationCount = 0;
+                                        hasEverPlayed = true;
+
+                                        // 如果 DLNA 返回的 duration 为 0，但代理活跃，说明是直接通过 cast_proxy 播放
+                                        // 这种情况下我们无法从 DLNA 获取准确的进度，但至少知道正在播放
+                                        if (duration == 0) {
+                                            android.util.Log.d("CastControl", "Direct cast_proxy playback detected (DLNA duration=0 but proxy active)");
+                                        }
+                                    }
                                     // 检测播放是否已停止
-                                    if (duration == 0) {
+                                    else if (duration == 0) {
                                         consecutiveZeroDurationCount++;
                                         android.util.Log.d("CastControl", "Detected zero duration, count: " + consecutiveZeroDurationCount);
 
-                                        if (consecutiveZeroDurationCount >= MAX_ZERO_DURATION_COUNT) {
-                                            android.util.Log.d("CastControl", "Receiver stopped playback, closing control activity");
+                                        // 改进的停止判断逻辑：
+                                        // 1. 如果在启动宽限期内（30秒），不判断为停止（给投屏端足够的启动时间）
+                                        // 2. 如果代理有活跃连接或最近有请求，说明投屏端正在播放，不判断为停止
+                                        // 3. 只有当超过宽限期、代理不活跃、且连续多次 duration=0 时，才判断为真正停止
+                                        if (!inGracePeriod && consecutiveZeroDurationCount >= MAX_ZERO_DURATION_COUNT) {
+                                            android.util.Log.d("CastControl", "Receiver stopped playback (no proxy activity), closing control activity");
                                             runOnUiThread(() -> {
                                                 Notify.show("投屏已停止");
                                                 finish();
                                             });
                                             return;
+                                        } else if (inGracePeriod) {
+                                            android.util.Log.d("CastControl", "In grace period, waiting for cast to start...");
                                         }
                                     } else {
-                                        // 重置计数器
+                                        // duration > 0，正常播放
                                         consecutiveZeroDurationCount = 0;
+                                        hasEverPlayed = true;
                                     }
 
                                     // 更新到 Server

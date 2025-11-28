@@ -27,6 +27,7 @@ import fi.iki.elonen.NanoHTTPD;
 public class Nano extends NanoHTTPD {
 
     private List<Process> process;
+    private com.github.tvbox.osc.server.process.CastProxy castProxy;
 
     public Nano(int port) {
         // 绑定到0.0.0.0以同时支持127.0.0.1和局域网IP访问
@@ -39,12 +40,20 @@ public class Nano extends NanoHTTPD {
         process = new ArrayList<>();
         process.add(new Action());
         process.add(new Cache());
-        process.add(new com.github.tvbox.osc.server.process.CastProxy());
+        castProxy = new com.github.tvbox.osc.server.process.CastProxy();
+        process.add(castProxy);
         process.add(new DanmakuPage());
         process.add(new Local());
         process.add(new Media());
         process.add(new Parse());
         process.add(new Proxy());
+    }
+
+    /**
+     * 获取 CastProxy 实例
+     */
+    public com.github.tvbox.osc.server.process.CastProxy getCastProxy() {
+        return castProxy;
     }
 
     public static Response success() {

@@ -23,9 +23,33 @@ import okhttp3.Response;
 public class CastProxy implements Process {
 
     private final OkHttpClient client;
+    private volatile long lastRequestTime = 0;
+    private volatile int activeConnections = 0;
 
     public CastProxy() {
         this.client = OkHttp.client();
+    }
+
+    /**
+     * 获取最后一次请求时间
+     */
+    public long getLastRequestTime() {
+        return lastRequestTime;
+    }
+
+    /**
+     * 获取当前活跃连接数
+     */
+    public int getActiveConnections() {
+        return activeConnections;
+    }
+
+    /**
+     * 检查代理是否活跃（最近5秒内有请求或有活跃连接）
+     */
+    public boolean isActive() {
+        long timeSinceLastRequest = System.currentTimeMillis() - lastRequestTime;
+        return activeConnections > 0 || timeSinceLastRequest < 5000;
     }
 
     @Override
@@ -35,10 +59,23 @@ public class CastProxy implements Process {
 
     @Override
     public NanoHTTPD.Response doResponse(NanoHTTPD.IHTTPSession session, String path, Map<String, String> files) {
+        // 记录请求时间和增加活跃连接数
+        lastRequestTime = System.currentTimeMillis();
+        activeConnections++;
+        android.util.Log.d("CastProxy", "Request started, active connections: " + activeConnections);
+
         Response response = null;
         boolean shouldCloseResponse = false;
         try {
             Map<String, String> params = session.getParms();
+
+            // 验证 token
+            String token = params.get("token");
+            if (!com.github.tvbox.osc.server.Server.get().validateCastProxyToken(token)) {
+                android.util.Log.w("CastProxy", "Invalid or missing token: " + token);
+                activeConnections--; // 验证失败，减少连接计数
+                return Nano.error(NanoHTTPD.Response.Status.FORBIDDEN, "Invalid or missing cast proxy token");
+            }
 
             // 获取原始 URL
             String url = params.get("url");
@@ -206,6 +243,10 @@ public class CastProxy implements Process {
             }
             return Nano.error("Proxy error: " + e.getMessage());
         } finally {
+            // 减少活跃连接数
+            activeConnections--;
+            android.util.Log.d("CastProxy", "Request finished, active connections: " + activeConnections);
+
             // 如果已经读取完内容（如 m3u8 重写），关闭 response
             // 否则不要关闭，因为 inputStream 还在使用中，NanoHTTPD 会在发送完响应后自动关闭流
             if (shouldCloseResponse && response != null) {
@@ -312,6 +353,13 @@ public class CastProxy implements Process {
             proxyUrl.append(com.github.tvbox.osc.server.Server.get().getAddress());
             proxyUrl.append("/cast_proxy?url=");
             proxyUrl.append(android.net.Uri.encode(originalUrl));
+
+            // 添加 token 参数
+            String token = com.github.tvbox.osc.server.Server.get().getCastProxyToken();
+            if (token != null && !token.isEmpty()) {
+                proxyUrl.append("&token=");
+                proxyUrl.append(android.net.Uri.encode(token));
+            }
 
             // 如果有 headers 参数，也添加上
             if (headersParam != null && !headersParam.isEmpty()) {

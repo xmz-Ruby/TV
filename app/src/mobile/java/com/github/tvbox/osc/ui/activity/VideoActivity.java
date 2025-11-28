@@ -1595,6 +1595,13 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void onPlay() {
+        // 检查是否正在投屏，如果正在投屏则不允许 App 端播放
+        if (com.github.tvbox.osc.server.Server.get().isCasting()) {
+            com.github.tvbox.osc.utils.Notify.show("正在投屏中，请先停止投屏");
+            android.util.Log.d("VideoActivity", "Cannot play on app while casting");
+            return;
+        }
+
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         checkPlayImg(true);
         mPlayers.play();

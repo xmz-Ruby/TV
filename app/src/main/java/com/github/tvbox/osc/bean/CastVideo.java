@@ -73,9 +73,24 @@ public class CastVideo {
             }
             String headersBase64 = Base64.encodeToString(headerStr.toString().getBytes(), Base64.URL_SAFE | Base64.NO_WRAP);
 
-            // 构造代理 URL: http://本机IP:9978/cast_proxy?url=xxx&headers=xxx
-            return Server.get().getAddress() + "/cast_proxy?url=" +
-                   Uri.encode(originalUrl) + "&headers=" + headersBase64;
+            // 构造代理 URL: http://本机IP:9978/cast_proxy?url=xxx&token=xxx&headers=xxx
+            StringBuilder proxyUrl = new StringBuilder();
+            proxyUrl.append(Server.get().getAddress());
+            proxyUrl.append("/cast_proxy?url=");
+            proxyUrl.append(Uri.encode(originalUrl));
+
+            // 添加 token 参数
+            String token = Server.get().getCastProxyToken();
+            if (token != null && !token.isEmpty()) {
+                proxyUrl.append("&token=");
+                proxyUrl.append(Uri.encode(token));
+            }
+
+            // 添加 headers 参数
+            proxyUrl.append("&headers=");
+            proxyUrl.append(headersBase64);
+
+            return proxyUrl.toString();
         } catch (Exception e) {
             android.util.Log.e("CastVideo", "Failed to build proxy URL", e);
             return originalUrl;
