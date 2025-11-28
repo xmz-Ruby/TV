@@ -30,6 +30,8 @@ public class CastControlActivity extends BaseActivity {
     private Runnable progressUpdateTask;
     private boolean isUserSeeking = false;
     private boolean isPaused = false;
+    private int consecutiveZeroDurationCount = 0;
+    private static final int MAX_ZERO_DURATION_COUNT = 3; // 连续3次检测到时长为0则认为播放已停止
 
     public static void start(Context context, DeviceControl control) {
         Intent intent = new Intent(context, CastControlActivity.class);
@@ -219,6 +221,24 @@ public class CastControlActivity extends BaseActivity {
                                     // 从 PositionInfo 和 MediaInfo 中提取时间
                                     long position = parseTime(positionInfo.getRelTime());
                                     long duration = parseTime(mediaInfo.getMediaDuration());
+
+                                    // 检测播放是否已停止
+                                    if (duration == 0) {
+                                        consecutiveZeroDurationCount++;
+                                        android.util.Log.d("CastControl", "Detected zero duration, count: " + consecutiveZeroDurationCount);
+
+                                        if (consecutiveZeroDurationCount >= MAX_ZERO_DURATION_COUNT) {
+                                            android.util.Log.d("CastControl", "Receiver stopped playback, closing control activity");
+                                            runOnUiThread(() -> {
+                                                Notify.show("投屏已停止");
+                                                finish();
+                                            });
+                                            return;
+                                        }
+                                    } else {
+                                        // 重置计数器
+                                        consecutiveZeroDurationCount = 0;
+                                    }
 
                                     // 更新到 Server
                                     Server.get().updateCastProgress(position, duration);
