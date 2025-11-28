@@ -194,7 +194,8 @@ public class CastControlActivity extends BaseActivity {
             });
         }
 
-        DLNACastManager.INSTANCE.disconnectDevice(null);
+        // 断开 DLNA 设备连接
+        DLNADevice.get().disconnect();
         Notify.show("已停止投屏");
         finish();
     }

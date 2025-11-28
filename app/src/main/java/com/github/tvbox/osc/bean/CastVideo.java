@@ -51,8 +51,7 @@ public class CastVideo {
 
         // 如果有 headers 且是网络 URL，且不是本地代理，通过 cast_proxy
         if (headers != null && !headers.isEmpty() &&
-            (url.startsWith("http://") || url.startsWith("https://")) &&
-            !isLocalProxy) {
+            (url.startsWith("http://") || url.startsWith("https://"))) {
             url = buildProxyUrl(url, headers);
         }
 
