@@ -142,9 +142,19 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     private void onCasted() {
         // 启动投屏控制页面
-        com.github.tvbox.osc.ui.activity.CastControlActivity.start(getContext(), control);
-        listener.onCasted();
-        dismiss();
+        // 使用 getActivity() 而不是 getContext()，因为 getContext() 可能在异步回调时返回 null
+        FragmentActivity activity = getActivity();
+        if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) {
+            com.github.tvbox.osc.ui.activity.CastControlActivity.start(activity, control);
+            if (listener != null) {
+                listener.onCasted();
+            }
+            dismiss();
+        } else {
+            android.util.Log.e("CastDialog", "Cannot start CastControlActivity: activity is null or finishing");
+            // 清理投屏状态
+            Server.get().setCasting(false, null);
+        }
     }
 
     @Override
@@ -165,6 +175,11 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     @Override
     public void onConnected(@NonNull org.fourthline.cling.model.meta.Device<?, ?, ?> device) {
         android.util.Log.d("CastDialog", "onConnected - position: " + video.getPosition());
+
+        // 立即进入投屏控制页面
+        onCasted();
+
+        // 后台设置播放URL
         control.setAVTransportURI(video.getUrl(), video.getName(), this);
     }
 
@@ -178,7 +193,10 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         android.util.Log.d("CastDialog", "onSuccess - seeking to position: " + video.getPosition());
 
         // 设置投屏状态（用于 Emby 回传）
-        com.github.tvbox.osc.server.Server.get().setCasting(true, video.getUrl());
+        // 使用 originalUrl 而不是代理后的 URL，以便正确恢复播放进度
+        String urlForTracking = video.getOriginalUrl() != null ? video.getOriginalUrl() : video.getUrl();
+        com.github.tvbox.osc.server.Server.get().setCasting(true, urlForTracking);
+        android.util.Log.d("CastDialog", "Cast URL for tracking: " + urlForTracking);
 
         seekPending = video.getPosition() > 0;
         hasSeeked = false;
@@ -186,9 +204,8 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         if (seekPending) {
             // 延迟 5 秒执行 seek，给播放器足够的时间准备
             App.post(() -> performSeek(), 5000);
-        } else {
-            onCasted();
         }
+        // 不再在这里调用 onCasted()，因为已经在 onConnected 时调用了
     }
 
     private void performSeek() {
@@ -200,14 +217,12 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
             public void onSuccess(Unit result) {
                 android.util.Log.d("CastDialog", "Seek successful!");
                 seekPending = false;
-                App.post(() -> onCasted(), 500);
             }
 
             @Override
             public void onFailure(@NonNull String error) {
                 android.util.Log.e("CastDialog", "Seek failed: " + error);
                 seekPending = false;
-                App.post(() -> onCasted(), 500);
             }
         });
     }
