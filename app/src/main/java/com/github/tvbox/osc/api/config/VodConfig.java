@@ -194,6 +194,17 @@ public class VodConfig {
                 setHome(site);
             }
         }
+        // Eagerly load all site-specific JARs
+        loadAllSiteJars();
+    }
+
+    private void loadAllSiteJars() {
+        for (Site site : sites) {
+            String jar = site.getJar();
+            if (!jar.isEmpty() && site.getApi().startsWith("csp_")) {
+                BaseLoader.get().parseJar(jar);
+            }
+        }
     }
 
     private void initLive(JsonObject object) {
