@@ -66,10 +66,12 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
     private Players mPlayers;
     private Runnable mR1;
     private Runnable mR2;
+    private Runnable mR3;
     private Clock mClock;
     private long position;
     private long duration;
     private int scale;
+    private long lastMemoryCheck = 0;
 
     private PlayerView getExo() {
         return mBinding.exo;
@@ -105,8 +107,10 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
         mParser = new DIDLParser();
         mR1 = this::hideControl;
         mR2 = this::setTraffic;
+        mR3 = this::checkMemoryAndService;
         setVideoView();
         checkAction();
+        startMemoryMonitor();
     }
 
     @Override
@@ -295,6 +299,68 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
         App.post(mR1, Constant.INTERVAL_HIDE);
     }
 
+    private void startMemoryMonitor() {
+        App.post(mR3, 30000); // 每30秒检查一次
+    }
+
+    private void checkMemoryAndService() {
+        try {
+            // 检查内存使用情况
+            Runtime runtime = Runtime.getRuntime();
+            long usedMemory = runtime.totalMemory() - runtime.freeMemory();
+            long maxMemory = runtime.maxMemory();
+            float memoryUsagePercent = (float) usedMemory / maxMemory * 100;
+
+            if (memoryUsagePercent > 80) {
+                android.util.Log.w("CastActivity", String.format(
+                    "High memory usage: %.1f%% (%d MB / %d MB)",
+                    memoryUsagePercent,
+                    usedMemory / (1024 * 1024),
+                    maxMemory / (1024 * 1024)
+                ));
+
+                // 建议垃圾回收
+                if (memoryUsagePercent > 90) {
+                    android.util.Log.w("CastActivity", "Critical memory usage, requesting GC");
+                    System.gc();
+                }
+            }
+
+            // 检查DLNA服务状态
+            if (mService == null) {
+                android.util.Log.w("CastActivity", "DLNA service is null, attempting to rebind");
+                try {
+                    bindService(new Intent(this, DLNARendererService.class), this, Context.BIND_AUTO_CREATE);
+                } catch (Exception e) {
+                    android.util.Log.e("CastActivity", "Failed to rebind DLNA service", e);
+                }
+            }
+
+            // 检查投屏代理状态
+            if (com.github.tvbox.osc.server.Server.get().isCasting()) {
+                int activeConnections = com.github.tvbox.osc.server.Server.get().getCastProxyActiveConnections();
+                long lastRequestTime = com.github.tvbox.osc.server.Server.get().getCastProxyLastRequestTime();
+                long timeSinceLastRequest = System.currentTimeMillis() - lastRequestTime;
+
+                android.util.Log.d("CastActivity", String.format(
+                    "Cast proxy status - Active connections: %d, Time since last request: %d ms",
+                    activeConnections, timeSinceLastRequest
+                ));
+
+                // 如果超过60秒没有请求且没有活跃连接，可能播放已卡住
+                if (timeSinceLastRequest > 60000 && activeConnections == 0 && lastRequestTime > 0) {
+                    android.util.Log.w("CastActivity", "Cast proxy appears to be stuck, no requests for 60+ seconds");
+                }
+            }
+
+        } catch (Exception e) {
+            android.util.Log.e("CastActivity", "Error in memory/service check", e);
+        }
+
+        // 继续定期检查
+        App.post(mR3, 30000);
+    }
+
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onActionEvent(ActionEvent event) {
         if (ActionEvent.PLAY.equals(event.getAction()) || ActionEvent.PAUSE.equals(event.getAction())) {
@@ -329,6 +395,10 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
                 hideProgress();
                 mPlayers.reset();
                 setTrackVisible(true);
+                // 立即更新duration和position，确保DLNA服务能返回正确的时长
+                position = mPlayers.getPosition();
+                duration = mPlayers.getDuration();
+                android.util.Log.i("CastActivity", "Player ready - duration: " + duration + ", position: " + position);
                 setState(RenderState.PLAYING);
                 mBinding.widget.size.setText(mPlayers.getSizeText());
                 break;
@@ -416,11 +486,31 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
 
     @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
-        (mService = ((RendererServiceBinder) service).getService()).bindRealPlayer(this);
+        try {
+            mService = ((RendererServiceBinder) service).getService();
+            if (mService != null) {
+                mService.bindRealPlayer(this);
+                android.util.Log.i("CastActivity", "DLNA service connected successfully");
+            } else {
+                android.util.Log.e("CastActivity", "DLNA service is null after connection");
+            }
+        } catch (Exception e) {
+            android.util.Log.e("CastActivity", "Error connecting to DLNA service", e);
+        }
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
+        android.util.Log.w("CastActivity", "DLNA service disconnected unexpectedly");
+        mService = null;
+
+        // 尝试重新绑定服务
+        try {
+            android.util.Log.i("CastActivity", "Attempting to rebind DLNA service");
+            bindService(new Intent(this, DLNARendererService.class), this, Context.BIND_AUTO_CREATE);
+        } catch (Exception e) {
+            android.util.Log.e("CastActivity", "Failed to rebind DLNA service", e);
+        }
     }
 
     @Override
@@ -561,10 +651,28 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        android.util.Log.i("CastActivity", "onDestroy called");
+
         mClock.release();
         mPlayers.release();
-        unbindService(this);
-        mService.bindRealPlayer(null);
-        App.removeCallbacks(mR1, mR2);
+
+        try {
+            unbindService(this);
+        } catch (Exception e) {
+            android.util.Log.w("CastActivity", "Error unbinding service", e);
+        }
+
+        if (mService != null) {
+            try {
+                mService.bindRealPlayer(null);
+            } catch (Exception e) {
+                android.util.Log.w("CastActivity", "Error unbinding real player", e);
+            }
+        }
+
+        // 移除所有回调，包括内存监控
+        App.removeCallbacks(mR1, mR2, mR3);
+
+        android.util.Log.i("CastActivity", "onDestroy completed");
     }
 }

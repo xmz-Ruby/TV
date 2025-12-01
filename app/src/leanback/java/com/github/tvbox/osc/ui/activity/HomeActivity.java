@@ -108,7 +108,27 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
     @Override
     protected void initView() {
+        android.util.Log.i("HomeActivity", "Starting DLNA Renderer Service...");
+
+        // 通过反射修改Build.MODEL来改变DLNA设备名称
+        String customName = getString(R.string.app_name) + " TV";
+        try {
+            java.lang.reflect.Field modelField = android.os.Build.class.getDeclaredField("MODEL");
+            modelField.setAccessible(true);
+
+            java.lang.reflect.Field modifiersField = java.lang.reflect.Field.class.getDeclaredField("accessFlags");
+            modifiersField.setAccessible(true);
+            modifiersField.setInt(modelField, modelField.getModifiers() & ~java.lang.reflect.Modifier.FINAL);
+
+            modelField.set(null, customName);
+            android.util.Log.i("HomeActivity", "Modified Build.MODEL to: " + customName);
+        } catch (Exception e) {
+            android.util.Log.e("HomeActivity", "Failed to modify Build.MODEL: " + e.getMessage());
+        }
+
         DLNARendererService.Companion.start(this, R.drawable.ic_logo);
+        android.util.Log.i("HomeActivity", "DLNA Renderer Service started");
+
         mClock = Clock.create(mBinding.clock).format("MM/dd HH:mm:ss");
         Server.get().start();
         Tbs.init();

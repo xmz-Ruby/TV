@@ -92,6 +92,9 @@ public class CastControlActivity extends BaseActivity {
         // 播放/暂停按钮
         binding.playPause.setOnClickListener(v -> togglePlayPause());
 
+        // 刷新按钮
+        binding.refresh.setOnClickListener(v -> refreshCasting());
+
         // 停止投屏按钮
         binding.stop.setOnClickListener(v -> stopCasting());
 
@@ -183,6 +186,89 @@ public class CastControlActivity extends BaseActivity {
     }
 
     /**
+     * 刷新投屏
+     */
+    private void refreshCasting() {
+        if (control == null) {
+            Notify.show("投屏连接已断开");
+            return;
+        }
+
+        Notify.show("正在重新投屏...");
+
+        // 获取当前播放位置
+        long currentPosition = Server.get().getCastPosition();
+
+        // 停止当前播放
+        control.stop(new ServiceActionCallback<Unit>() {
+            @Override
+            public void onSuccess(Unit result) {
+                android.util.Log.d("CastControl", "Stopped for refresh");
+
+                // 延迟500ms后重新设置播放URL
+                App.post(() -> {
+                    String castUrl = Server.get().getCastUrl();
+                    String title = Server.get().getCurrentTitle();
+
+                    control.setAVTransportURI(castUrl, title, new ServiceActionCallback<Unit>() {
+                        @Override
+                        public void onSuccess(Unit result) {
+                            android.util.Log.d("CastControl", "URL set for refresh, starting playback");
+
+                            // 开始播放
+                            control.play("1", new ServiceActionCallback<Unit>() {
+                                @Override
+                                public void onSuccess(Unit result) {
+                                    android.util.Log.d("CastControl", "Playback started after refresh");
+
+                                    // 如果有播放位置，延迟5秒后跳转
+                                    if (currentPosition > 0) {
+                                        App.post(() -> {
+                                            control.seek(currentPosition, new ServiceActionCallback<Unit>() {
+                                                @Override
+                                                public void onSuccess(Unit result) {
+                                                    android.util.Log.d("CastControl", "Seeked to position after refresh: " + currentPosition);
+                                                    Notify.show("刷新成功");
+                                                }
+
+                                                @Override
+                                                public void onFailure(@NonNull String error) {
+                                                    android.util.Log.e("CastControl", "Seek failed after refresh: " + error);
+                                                    Notify.show("刷新成功，但跳转失败");
+                                                }
+                                            });
+                                        }, 5000);
+                                    } else {
+                                        Notify.show("刷新成功");
+                                    }
+                                }
+
+                                @Override
+                                public void onFailure(@NonNull String error) {
+                                    android.util.Log.e("CastControl", "Play failed after refresh: " + error);
+                                    Notify.show("刷新失败: " + error);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(@NonNull String error) {
+                            android.util.Log.e("CastControl", "Set URL failed after refresh: " + error);
+                            Notify.show("刷新失败: " + error);
+                        }
+                    });
+                }, 500);
+            }
+
+            @Override
+            public void onFailure(@NonNull String error) {
+                android.util.Log.e("CastControl", "Stop failed for refresh: " + error);
+                Notify.show("刷新失败: " + error);
+            }
+        });
+    }
+
+    /**
      * 停止投屏
      */
     private void stopCasting() {
@@ -227,25 +313,43 @@ public class CastControlActivity extends BaseActivity {
                                 public void onSuccess(MediaInfo mediaInfo) {
                                     // 从 PositionInfo 和 MediaInfo 中提取时间
                                     long position = parseTime(positionInfo.getRelTime());
-                                    long duration = parseTime(mediaInfo.getMediaDuration());
+                                    long dlnaDuration = parseTime(mediaInfo.getMediaDuration());
 
-                                    // 改进的播放检测逻辑：结合 duration 和代理活跃状态
+                                    // 如果DLNA端没有返回duration，使用之前保存的视频总时长
+                                    final long duration;
+                                    if (dlnaDuration == 0) {
+                                        long savedDuration = Server.get().getCastDuration();
+                                        if (savedDuration > 0) {
+                                            duration = savedDuration;
+                                            android.util.Log.d("CastControl", "Using saved video duration from Server: " + duration);
+                                        } else {
+                                            duration = 0;
+                                        }
+                                    } else {
+                                        duration = dlnaDuration;
+                                    }
+
+                                    // 改进的播放检测逻辑：结合 duration、position 变化和代理活跃状态
                                     boolean proxyActive = Server.get().isCastProxyActive();
                                     int activeConnections = Server.get().getCastProxyActiveConnections();
                                     long timeSinceStart = System.currentTimeMillis() - castStartTime;
                                     boolean inGracePeriod = timeSinceStart < CAST_STARTUP_GRACE_PERIOD;
 
+                                    // 检查 position 是否有变化（关键改进：position 增长说明播放活跃）
+                                    boolean positionChanged = (lastValidPosition >= 0 && position > lastValidPosition);
+
                                     android.util.Log.d("CastControl", String.format(
-                                        "Status check - duration: %d, position: %d, proxyActive: %b, connections: %d, timeSinceStart: %d, inGracePeriod: %b",
-                                        duration, position, proxyActive, activeConnections, timeSinceStart, inGracePeriod
+                                        "Status check - duration: %d, position: %d, lastPos: %d, posChanged: %b, proxyActive: %b, connections: %d, timeSinceStart: %d, inGracePeriod: %b",
+                                        duration, position, lastValidPosition, positionChanged, proxyActive, activeConnections, timeSinceStart, inGracePeriod
                                     ));
 
                                     // 如果代理活跃，说明投屏端正在通过 cast_proxy 播放
                                     if (proxyActive) {
                                         android.util.Log.d("CastControl", "Proxy is active, cast is playing via cast_proxy");
-                                        // 重置计数器
+                                        // 重置计数器和记录位置
                                         consecutiveZeroDurationCount = 0;
                                         hasEverPlayed = true;
+                                        lastValidPosition = position;
 
                                         // 如果 DLNA 返回的 duration 为 0，但代理活跃，说明是直接通过 cast_proxy 播放
                                         // 这种情况下我们无法从 DLNA 获取准确的进度，但至少知道正在播放
@@ -253,29 +357,28 @@ public class CastControlActivity extends BaseActivity {
                                             android.util.Log.d("CastControl", "Direct cast_proxy playback detected (DLNA duration=0 but proxy active)");
                                         }
                                     }
-                                    // 检测播放是否已停止
+                                    // 如果 position 在增长，说明播放活跃（即使 duration=0 或 proxyActive=false）
+                                    else if (positionChanged) {
+                                        android.util.Log.d("CastControl", "Position is increasing, playback is active");
+                                        // 重置计数器和记录位置
+                                        consecutiveZeroDurationCount = 0;
+                                        hasEverPlayed = true;
+                                        lastValidPosition = position;
+                                    }
+                                    // 检测播放是否已停止（仅记录日志，不自动退出）
                                     else if (duration == 0) {
                                         consecutiveZeroDurationCount++;
                                         android.util.Log.d("CastControl", "Detected zero duration, count: " + consecutiveZeroDurationCount);
 
-                                        // 改进的停止判断逻辑：
-                                        // 1. 如果在启动宽限期内（30秒），不判断为停止（给投屏端足够的启动时间）
-                                        // 2. 如果代理有活跃连接或最近有请求，说明投屏端正在播放，不判断为停止
-                                        // 3. 只有当超过宽限期、代理不活跃、且连续多次 duration=0 时，才判断为真正停止
-                                        if (!inGracePeriod && consecutiveZeroDurationCount >= MAX_ZERO_DURATION_COUNT) {
-                                            android.util.Log.d("CastControl", "Receiver stopped playback (no proxy activity), closing control activity");
-                                            runOnUiThread(() -> {
-                                                Notify.show("投屏已停止");
-                                                finish();
-                                            });
-                                            return;
-                                        } else if (inGracePeriod) {
-                                            android.util.Log.d("CastControl", "In grace period, waiting for cast to start...");
+                                        // 更新 lastValidPosition（即使没有变化也要记录，用于下次比较）
+                                        if (position > 0) {
+                                            lastValidPosition = position;
                                         }
                                     } else {
                                         // duration > 0，正常播放
                                         consecutiveZeroDurationCount = 0;
                                         hasEverPlayed = true;
+                                        lastValidPosition = position;
                                     }
 
                                     // 更新到 Server

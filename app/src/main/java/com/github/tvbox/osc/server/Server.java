@@ -14,7 +14,8 @@ public class Server {
     private volatile String currentTitle = "";
     private volatile String currentEpisode = "";
     private volatile boolean isCasting = false;
-    private volatile String castUrl = "";
+    private volatile String castUrl = "";  // 原始 URL（用于 Emby 回传匹配）
+    private volatile String castProxyUrl = "";  // 代理 URL（实际投屏使用的 URL）
     private volatile long castPosition = 0;
     private volatile long castDuration = 0;
 
@@ -113,6 +114,7 @@ public class Server {
         if (!casting) {
             this.castPosition = 0;
             this.castDuration = 0;
+            this.castProxyUrl = "";
             // 停止投屏时清除 token
             this.castProxyToken = null;
             android.util.Log.d("Server", "Cast stopped, token cleared");
@@ -121,6 +123,14 @@ public class Server {
             // token 已经在 CastDialog 构造函数中生成
             android.util.Log.d("Server", "Cast started, using existing token: " + castProxyToken);
         }
+    }
+
+    /**
+     * 设置投屏代理 URL（实际投屏使用的 URL）
+     */
+    public void setCastProxyUrl(String proxyUrl) {
+        this.castProxyUrl = proxyUrl != null ? proxyUrl : "";
+        android.util.Log.d("Server", "Cast proxy URL set: " + castProxyUrl);
     }
 
     /**
@@ -171,10 +181,17 @@ public class Server {
     }
 
     /**
-     * 获取投屏 URL
+     * 获取投屏 URL（原始 URL，用于 Emby 回传匹配）
      */
     public String getCastUrl() {
         return castUrl;
+    }
+
+    /**
+     * 获取投屏代理 URL（实际投屏使用的 URL）
+     */
+    public String getCastProxyUrl() {
+        return castProxyUrl;
     }
 
     /**

@@ -129,14 +129,22 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     private void initDLNA() {
+        android.util.Log.i("CastDialog", "Initializing DLNA Cast Manager...");
         DLNACastManager.INSTANCE.bindCastService(App.get());
         DLNACastManager.INSTANCE.registerDeviceListener(this);
+        android.util.Log.i("CastDialog", "DLNA Cast Manager initialized, starting device search...");
     }
 
     private void onRefresh() {
+        android.util.Log.i("CastDialog", "Refreshing device list...");
         adapter.clear();
-        if (fm) scanTask.start(adapter.getIps());
+        // HTTP设备扫描已禁用，只使用DLNA投屏
+        // if (fm) {
+        //     android.util.Log.d("CastDialog", "Starting FM device scan...");
+        //     scanTask.start(adapter.getIps());
+        // }
         DLNADevice.get().disconnect();
+        android.util.Log.i("CastDialog", "Starting DLNA device search...");
         DLNACastManager.INSTANCE.search(null);
     }
 
@@ -164,11 +172,13 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     public void onDeviceAdded(@NonNull org.fourthline.cling.model.meta.Device<?, ?, ?> device) {
+        android.util.Log.i("CastDialog", "DLNA device discovered: " + device.getDetails().getFriendlyName() + " (" + device.getIdentity().getUdn().getIdentifierString() + ")");
         adapter.addAll(DLNADevice.get().add(device));
     }
 
     @Override
     public void onDeviceRemoved(@NonNull org.fourthline.cling.model.meta.Device<?, ?, ?> device) {
+        android.util.Log.i("CastDialog", "DLNA device removed: " + device.getDetails().getFriendlyName());
         adapter.remove(DLNADevice.get().remove(device));
     }
 
@@ -197,6 +207,16 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         String urlForTracking = video.getOriginalUrl() != null ? video.getOriginalUrl() : video.getUrl();
         com.github.tvbox.osc.server.Server.get().setCasting(true, urlForTracking);
         android.util.Log.d("CastDialog", "Cast URL for tracking: " + urlForTracking);
+
+        // 设置代理 URL（用于 /media 接口显示实际投屏使用的 URL）
+        com.github.tvbox.osc.server.Server.get().setCastProxyUrl(video.getUrl());
+        android.util.Log.d("CastDialog", "Cast proxy URL: " + video.getUrl());
+
+        // 保存视频总时长到Server（用于DLNA端没有返回duration时的回退方案）
+        if (video.getDuration() > 0) {
+            com.github.tvbox.osc.server.Server.get().updateCastProgress(video.getPosition(), video.getDuration());
+            android.util.Log.d("CastDialog", "Saved video duration to Server: " + video.getDuration());
+        }
 
         seekPending = video.getPosition() > 0;
         hasSeeked = false;
@@ -245,8 +265,15 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     public void onItemClick(Device item) {
-        if (item.isDLNA()) control = DLNACastManager.INSTANCE.connectDevice(DLNADevice.get().find(item), this);
-        else OkHttp.newCall(client, item.getIp().concat("/action?do=cast"), body.build()).enqueue(this);
+        android.util.Log.d("CastDialog", "Device clicked - Name: " + item.getName() + ", Type: " + item.getType() + ", isDLNA: " + item.isDLNA());
+
+        if (item.isDLNA()) {
+            android.util.Log.i("CastDialog", "Connecting to DLNA device: " + item.getName());
+            control = DLNACastManager.INSTANCE.connectDevice(DLNADevice.get().find(item), this);
+        } else {
+            android.util.Log.i("CastDialog", "Sending HTTP cast request to: " + item.getIp());
+            OkHttp.newCall(client, item.getIp().concat("/action?do=cast"), body.build()).enqueue(this);
+        }
     }
 
     @Override

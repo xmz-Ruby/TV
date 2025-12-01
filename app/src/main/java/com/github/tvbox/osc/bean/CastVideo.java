@@ -13,27 +13,37 @@ import java.util.Map;
 public class CastVideo {
 
     private final long position;
+    private final long duration;
     private final String name;
     private final String url;
     private final String originalUrl;
     private final Map<String, String> headers;
 
     public static CastVideo get(String name, String url) {
-        return new CastVideo(name, url, 0, null);
+        return new CastVideo(name, url, 0, 0, null);
     }
 
     public static CastVideo get(String name, String url, long position) {
-        return new CastVideo(name, url, position, null);
+        return new CastVideo(name, url, position, 0, null);
+    }
+
+    public static CastVideo get(String name, String url, long position, long duration) {
+        return new CastVideo(name, url, position, duration, null);
     }
 
     public static CastVideo get(String name, String url, long position, Map<String, String> headers) {
-        return new CastVideo(name, url, position, headers);
+        return new CastVideo(name, url, position, 0, headers);
     }
 
-    private CastVideo(String name, String url, long position, Map<String, String> headers) {
+    public static CastVideo get(String name, String url, long position, long duration, Map<String, String> headers) {
+        return new CastVideo(name, url, position, duration, headers);
+    }
+
+    private CastVideo(String name, String url, long position, long duration, Map<String, String> headers) {
         this.originalUrl = url;
         this.headers = headers;
         this.position = position;
+        this.duration = duration;
         this.name = name;
 
         // 处理本地文件
@@ -115,5 +125,9 @@ public class CastVideo {
 
     public long getPosition() {
         return position;
+    }
+
+    public long getDuration() {
+        return duration;
     }
 }

@@ -4,6 +4,12 @@
     <string name="app_name">LetMeSeeSee</string>
     <string name="app_exit">Press back again to exit</string>
 
+    <!-- DLNA Device Name Configuration -->
+    <string name="dlna_device_name">LetMeSeeSee TV</string>
+    <string name="upnp_device_name">LetMeSeeSee TV</string>
+    <string name="renderer_name">LetMeSeeSee TV</string>
+    <string name="device_friendly_name">LetMeSeeSee TV</string>
+
     <!-- Vod -->
     <string name="vod_last">Last seen <xliff:g name="name">%s</xliff:g></string>
 

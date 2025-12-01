@@ -28,7 +28,12 @@ public class Media implements Process {
         // 检查是否正在投屏
         if (Server.get().isCasting()) {
             // 投屏模式：返回投屏信息
-            result.addProperty("url", Server.get().getCastUrl());
+            // 优先返回代理 URL（实际投屏使用的 URL），如果没有则返回原始 URL
+            String displayUrl = Server.get().getCastProxyUrl();
+            if (displayUrl.isEmpty()) {
+                displayUrl = Server.get().getCastUrl();
+            }
+            result.addProperty("url", displayUrl);
             result.addProperty("state", PlaybackStateCompat.STATE_PLAYING); // 假设投屏时是播放状态
             result.addProperty("speed", 1.0f);
             result.addProperty("title", Server.get().getCurrentTitle());

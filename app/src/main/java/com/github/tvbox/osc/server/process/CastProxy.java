@@ -25,6 +25,7 @@ public class CastProxy implements Process {
     private final OkHttpClient client;
     private volatile long lastRequestTime = 0;
     private volatile int activeConnections = 0;
+    private static final int MAX_ACTIVE_CONNECTIONS = 50; // 最大并发连接数
 
     public CastProxy() {
         this.client = OkHttp.client();
@@ -59,6 +60,13 @@ public class CastProxy implements Process {
 
     @Override
     public NanoHTTPD.Response doResponse(NanoHTTPD.IHTTPSession session, String path, Map<String, String> files) {
+        // 检查连接数限制
+        if (activeConnections >= MAX_ACTIVE_CONNECTIONS) {
+            android.util.Log.w("CastProxy", "Too many active connections: " + activeConnections + ", rejecting request");
+            return Nano.error(NanoHTTPD.Response.Status.SERVICE_UNAVAILABLE,
+                "Too many active connections. Please try again later.");
+        }
+
         // 记录请求时间和增加活跃连接数
         lastRequestTime = System.currentTimeMillis();
         activeConnections++;
@@ -81,6 +89,7 @@ public class CastProxy implements Process {
             String url = params.get("url");
             if (url == null || url.isEmpty()) {
                 android.util.Log.w("CastProxy", "Missing url parameter");
+                activeConnections--; // URL缺失，减少连接计数
                 return Nano.error("Missing url parameter");
             }
 
@@ -245,7 +254,21 @@ public class CastProxy implements Process {
         } finally {
             // 减少活跃连接数
             activeConnections--;
-            android.util.Log.d("CastProxy", "Request finished, active connections: " + activeConnections);
+            long requestDuration = System.currentTimeMillis() - lastRequestTime;
+            android.util.Log.d("CastProxy", String.format(
+                "Request finished, active connections: %d, duration: %dms",
+                activeConnections, requestDuration));
+
+            // 如果连接数异常（负数），记录警告并重置
+            if (activeConnections < 0) {
+                android.util.Log.w("CastProxy", "Active connections became negative: " + activeConnections + ", resetting to 0");
+                activeConnections = 0;
+            }
+
+            // 如果连接数过高，记录警告
+            if (activeConnections > MAX_ACTIVE_CONNECTIONS * 0.8) {
+                android.util.Log.w("CastProxy", "High connection count: " + activeConnections + "/" + MAX_ACTIVE_CONNECTIONS);
+            }
 
             // 如果已经读取完内容（如 m3u8 重写），关闭 response
             // 否则不要关闭，因为 inputStream 还在使用中，NanoHTTPD 会在发送完响应后自动关闭流
