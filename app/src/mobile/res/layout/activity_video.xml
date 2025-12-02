@@ -54,6 +54,13 @@
             android:layout_height="match_parent"
             android:visibility="gone" />
 
+        <include
+            android:id="@+id/castControl"
+            layout="@layout/view_cast_control"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
     </FrameLayout>
 
     <include

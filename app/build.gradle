@@ -142,7 +142,7 @@ dependencies {
     implementation(ext: 'aar', name: 'danmaku', group: 'fongmi', version: 'release')
     implementation(ext: 'aar', name: 'dlna-core-release', group: 'fongmi', version: 'release')
     implementation(ext: 'aar', name: 'dlna-dmc-release', group: 'fongmi', version: 'release')
-    implementation(ext: 'aar', name: 'dlna-dmr-release', group: 'fongmi', version: 'release')
+    leanbackImplementation(ext: 'aar', name: 'dlna-dmr-release', group: 'fongmi', version: 'release')
     implementation project(':lib-common')
     implementation project(':lib-container')
     implementation project(':lib-database')

@@ -172,6 +172,14 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private Clock mClock;
     private PiP mPiP;
 
+    // DLNA投屏相关
+    private com.android.cast.dlna.dmc.control.DeviceControl mCastControl;
+    private boolean isCasting = false;
+    private boolean isCastPlaying = true; // 投屏播放状态，默认为播放中
+    private Runnable mCastProgressUpdate;
+    private long mCastPosition = 0;
+    private long mCastDuration = 0;
+
     public static void push(FragmentActivity activity, String text) {
         if (FileChooser.isValid(activity, Uri.parse(text))) file(activity, FileChooser.getPathFromUri(activity, Uri.parse(text)));
         else start(activity, Sniffer.getUrl(text));
@@ -714,6 +722,11 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         notifyItemChanged(mEpisodeAdapter);
         mBinding.episode.scrollToPosition(mEpisodeAdapter.getPosition());
         onRefresh();
+
+        // 如果正在投屏，自动投屏新视频
+        if (isCasting && mCastControl != null) {
+            App.post(() -> castCurrentVideo(), 2000);
+        }
     }
 
     @Override
@@ -818,7 +831,29 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void onCast() {
-        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders())).fm(true).show(this);
+        // 如果正在投屏，显示投屏控制选项
+        if (isCasting) {
+            // 创建一个简单的对话框，提供停止投屏和切换设备选项
+            android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+            builder.setTitle("投屏控制");
+            builder.setItems(new CharSequence[]{"停止投屏", "切换设备"}, (dialog, which) -> {
+                if (which == 0) {
+                    // 停止投屏
+                    stopCasting();
+                } else {
+                    // 切换设备 - 停止当前投屏并打开设备选择对话框
+                    stopCasting();
+                    App.post(() -> {
+                        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders())).fm(true).show(this);
+                    }, 500);
+                }
+            });
+            builder.setNegativeButton("取消", null);
+            builder.show();
+        } else {
+            // 未投屏，打开设备选择对话框
+            CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders())).fm(true).show(this);
+        }
     }
 
     private void onInfo() {
@@ -859,6 +894,14 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private void checkPlay() {
         setR1Callback();
+
+        // 如果正在投屏，控制投屏设备
+        if (isCasting) {
+            toggleCastPlayPause();
+            return;
+        }
+
+        // 否则控制本地播放器
         if (mPlayers.isPlaying()) onPaused();
         else if (mPlayers.isEmpty()) onRefresh();
         else onPlay();
@@ -868,14 +911,28 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         setR1Callback();
         Episode item = mEpisodeAdapter.getNext();
         if (item.isActivated()) Notify.show(R.string.error_play_next);
-        else onItemClick(item);
+        else {
+            onItemClick(item);
+
+            // 如果正在投屏，自动投屏新视频
+            if (isCasting && mCastControl != null) {
+                App.post(() -> castCurrentVideo(), 2000);
+            }
+        }
     }
 
     private void checkPrev() {
         setR1Callback();
         Episode item = mEpisodeAdapter.getPrev();
         if (item.isActivated()) Notify.show(R.string.error_play_prev);
-        else onItemClick(item);
+        else {
+            onItemClick(item);
+
+            // 如果正在投屏，自动投屏新视频
+            if (isCasting && mCastControl != null) {
+                App.post(() -> castCurrentVideo(), 2000);
+            }
+        }
     }
 
     private void onSetting() {
@@ -1719,6 +1776,27 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     @Override
+    public void onCastedWithControl(com.android.cast.dlna.dmc.control.DeviceControl control) {
+        mCastControl = control;
+        isCasting = true;
+        isCastPlaying = true; // 投屏开始时默认为播放状态
+
+        // 暂停本地播放
+        onPaused();
+
+        // 隐藏播放器，显示投屏状态
+        showCastingUI();
+
+        // 启动投屏进度更新
+        startCastProgressUpdate();
+
+        // 显示投屏状态
+        Notify.show("投屏已启动");
+
+        android.util.Log.d("VideoActivity", "Cast control received, casting started");
+    }
+
+    @Override
     public void onScale(int tag) {
         mHistory.setScale(tag);
         setScale(tag);
@@ -1919,10 +1997,534 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         }
     }
 
+    // ==================== DLNA投屏控制方法 ====================
+
+    /**
+     * 显示投屏状态UI
+     */
+    private void showCastingUI() {
+        // 隐藏播放器和其他控件
+        getExo().setVisibility(View.GONE);
+        getIjk().setVisibility(View.GONE);
+        mBinding.danmaku.setVisibility(View.GONE);
+        mBinding.widget.getRoot().setVisibility(View.GONE);
+        mBinding.control.getRoot().setVisibility(View.GONE);
+        mBinding.display.getRoot().setVisibility(View.GONE);
+
+        // 显示投屏控制界面
+        mBinding.castControl.getRoot().setVisibility(View.VISIBLE);
+
+        // 设置设备名称显示
+        android.widget.TextView deviceNameDisplay = mBinding.castControl.getRoot().findViewById(R.id.cast_device_name_display);
+        if (deviceNameDisplay != null) {
+            String deviceName = com.github.tvbox.osc.utils.DLNADevice.get().getConnectedDeviceName();
+            deviceNameDisplay.setText(deviceName != null ? deviceName : "投屏设备");
+        }
+
+        // 设置更换设备按钮点击事件
+        android.widget.ImageView changeDevice = mBinding.castControl.getRoot().findViewById(R.id.cast_change_device);
+        if (changeDevice != null) {
+            changeDevice.setOnClickListener(v -> changeCastDevice());
+        }
+
+        // 初始化进度显示
+        updateCastProgress();
+
+        // 设置播放/暂停按钮点击事件
+        android.widget.ImageView playPause = mBinding.castControl.getRoot().findViewById(R.id.cast_play_pause);
+        if (playPause != null) {
+            playPause.setOnClickListener(v -> toggleCastPlayPause());
+            // 初始化按钮图标状态
+            updateCastPlayPauseButton();
+        }
+
+        // 设置停止投屏按钮点击事件
+        android.widget.ImageView stop = mBinding.castControl.getRoot().findViewById(R.id.cast_stop);
+        if (stop != null) {
+            stop.setOnClickListener(v -> stopCasting());
+        }
+
+        // 设置进度拖动条
+        android.widget.SeekBar seekBar = mBinding.castControl.getRoot().findViewById(R.id.cast_seek_bar);
+        if (seekBar != null) {
+            seekBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                private boolean isUserSeeking = false;
+
+                @Override
+                public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                    if (fromUser && isUserSeeking) {
+                        // 用户拖动时实时更新时间显示
+                        long newPosition = (long) (mCastDuration * progress / 100.0);
+                        android.widget.TextView positionText = mBinding.castControl.getRoot().findViewById(R.id.cast_position);
+                        if (positionText != null) {
+                            positionText.setText(formatTime(newPosition));
+                        }
+                    }
+                }
+
+                @Override
+                public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+                    isUserSeeking = true;
+                    android.util.Log.d("VideoActivity", "User started seeking");
+                }
+
+                @Override
+                public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+                    isUserSeeking = false;
+                    // 用户松手时执行跳转
+                    int progress = seekBar.getProgress();
+                    long newPosition = (long) (mCastDuration * progress / 100.0);
+                    seekToCastPosition(newPosition);
+                    android.util.Log.d("VideoActivity", "User seeked to: " + newPosition + "ms");
+                }
+            });
+        }
+
+        android.util.Log.d("VideoActivity", "Casting UI shown");
+    }
+
+    /**
+     * 隐藏投屏状态UI，恢复播放器
+     */
+    private void hideCastingUI() {
+        // 隐藏投屏控制界面
+        mBinding.castControl.getRoot().setVisibility(View.GONE);
+
+        // 恢复播放器和控件显示
+        mBinding.widget.getRoot().setVisibility(View.VISIBLE);
+        setPlayerView();
+
+        android.util.Log.d("VideoActivity", "Casting UI hidden");
+    }
+
+    /**
+     * 更新投屏进度显示
+     */
+    private void updateCastProgress() {
+        if (!isCasting) return;
+
+        // 更新拖动条和时间显示
+        android.widget.SeekBar seekBar = mBinding.castControl.getRoot().findViewById(R.id.cast_seek_bar);
+        android.widget.TextView positionText = mBinding.castControl.getRoot().findViewById(R.id.cast_position);
+        android.widget.TextView durationText = mBinding.castControl.getRoot().findViewById(R.id.cast_duration);
+
+        if (positionText != null && durationText != null) {
+            int progress = 0;
+            if (mCastDuration > 0) {
+                progress = (int) (mCastPosition * 100 / mCastDuration);
+            }
+
+            // 更新SeekBar (只在用户不拖动时更新)
+            if (seekBar != null && !seekBar.isPressed()) {
+                seekBar.setProgress(progress);
+            }
+
+            positionText.setText(formatTime(mCastPosition));
+            durationText.setText(formatTime(mCastDuration));
+        }
+    }
+
+    /**
+     * 格式化时间显示
+     */
+    private String formatTime(long milliseconds) {
+        long seconds = milliseconds / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+
+        seconds = seconds % 60;
+        minutes = minutes % 60;
+
+        if (hours > 0) {
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%02d:%02d", minutes, seconds);
+        }
+    }
+
+    /**
+     * 启动投屏进度更新
+     */
+    private void startCastProgressUpdate() {
+        if (mCastProgressUpdate != null) {
+            App.removeCallbacks(mCastProgressUpdate);
+        }
+
+        mCastProgressUpdate = new Runnable() {
+            @Override
+            public void run() {
+                if (mCastControl != null && isCasting) {
+                    // 查询投屏设备的播放位置和时长
+                    mCastControl.getPositionInfo(new com.android.cast.dlna.dmc.control.ServiceActionCallback<org.fourthline.cling.support.model.PositionInfo>() {
+                        @Override
+                        public void onSuccess(org.fourthline.cling.support.model.PositionInfo positionInfo) {
+                            mCastControl.getMediaInfo(new com.android.cast.dlna.dmc.control.ServiceActionCallback<org.fourthline.cling.support.model.MediaInfo>() {
+                                @Override
+                                public void onSuccess(org.fourthline.cling.support.model.MediaInfo mediaInfo) {
+                                    long position = parseTime(positionInfo.getRelTime());
+                                    long duration = parseTime(mediaInfo.getMediaDuration());
+
+                                    // 如果DLNA端没有返回duration，使用本地保存的时长
+                                    if (duration == 0) {
+                                        duration = com.github.tvbox.osc.server.Server.get().getCastDuration();
+                                    }
+
+                                    mCastPosition = position;
+                                    mCastDuration = duration;
+
+                                    // 更新到Server
+                                    com.github.tvbox.osc.server.Server.get().updateCastProgress(position, duration);
+
+                                    // 更新UI显示
+                                    runOnUiThread(() -> updateCastProgress());
+
+                                    // 检查是否播放完毕
+                                    if (duration > 0 && position > 0 && position >= duration - 5000) {
+                                        // 播放即将结束，自动切换下一集
+                                        onCastPlaybackEnded();
+                                    }
+                                }
+
+                                @Override
+                                public void onFailure(@androidx.annotation.NonNull String error) {
+                                    android.util.Log.e("VideoActivity", "Failed to get cast duration: " + error);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(@androidx.annotation.NonNull String error) {
+                            android.util.Log.e("VideoActivity", "Failed to get cast position: " + error);
+                        }
+                    });
+
+                    // 每1秒更新一次
+                    App.post(mCastProgressUpdate, 1000);
+                }
+            }
+        };
+
+        // 首次延迟500ms后开始更新
+        App.post(mCastProgressUpdate, 500);
+    }
+
+    /**
+     * 停止投屏进度更新
+     */
+    private void stopCastProgressUpdate() {
+        if (mCastProgressUpdate != null) {
+            App.removeCallbacks(mCastProgressUpdate);
+            mCastProgressUpdate = null;
+        }
+    }
+
+    /**
+     * 解析时间字符串 (格式: HH:MM:SS 或 HH:MM:SS.mmm)
+     */
+    private long parseTime(String timeStr) {
+        if (timeStr == null || timeStr.isEmpty() || "NOT_IMPLEMENTED".equals(timeStr)) {
+            return 0;
+        }
+
+        try {
+            // 移除毫秒部分
+            if (timeStr.contains(".")) {
+                timeStr = timeStr.substring(0, timeStr.indexOf("."));
+            }
+
+            String[] parts = timeStr.split(":");
+            if (parts.length == 3) {
+                long hours = Long.parseLong(parts[0]);
+                long minutes = Long.parseLong(parts[1]);
+                long seconds = Long.parseLong(parts[2]);
+                return (hours * 3600 + minutes * 60 + seconds) * 1000;
+            }
+        } catch (Exception e) {
+            android.util.Log.e("VideoActivity", "Failed to parse time: " + timeStr, e);
+        }
+
+        return 0;
+    }
+
+    /**
+     * 投屏播放完毕，自动切换下一集
+     */
+    private void onCastPlaybackEnded() {
+        android.util.Log.d("VideoActivity", "Cast playback ended, switching to next episode");
+
+        // 停止当前投屏
+        if (mCastControl != null) {
+            mCastControl.stop(new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                @Override
+                public void onSuccess(kotlin.Unit result) {
+                    android.util.Log.d("VideoActivity", "Cast stopped successfully");
+                }
+
+                @Override
+                public void onFailure(@androidx.annotation.NonNull String error) {
+                    android.util.Log.e("VideoActivity", "Failed to stop cast: " + error);
+                }
+            });
+        }
+
+        // 切换到下一集
+        App.post(() -> {
+            Episode nextEpisode = mEpisodeAdapter.getNext();
+            if (!nextEpisode.isActivated()) {
+                // 有下一集，切换并自动投屏
+                onItemClick(nextEpisode);
+                // 延迟等待新视频加载完成后自动投屏
+                App.post(() -> {
+                    if (isCasting && mCastControl != null) {
+                        castCurrentVideo();
+                    }
+                }, 2000);
+            } else {
+                // 没有下一集了，停止投屏
+                stopCasting();
+                Notify.show("播放完毕");
+            }
+        }, 500);
+    }
+
+    /**
+     * 投屏当前视频
+     */
+    private void castCurrentVideo() {
+        if (mCastControl == null || !isCasting) {
+            android.util.Log.w("VideoActivity", "Cannot cast: no cast control or not casting");
+            return;
+        }
+
+        String url = mPlayers.getUrl();
+        String title = mBinding.control.title.getText().toString();
+
+        // 检查URL是否有效
+        if (url == null || url.isEmpty()) {
+            android.util.Log.w("VideoActivity", "Cannot cast: URL is null or empty, video may not be loaded yet");
+            Notify.show("视频加载中，请稍后...");
+            // 延迟重试
+            App.post(() -> castCurrentVideo(), 1000);
+            return;
+        }
+
+        android.util.Log.d("VideoActivity", "Casting video: " + title + ", URL: " + url);
+
+        // 停止当前播放
+        mCastControl.stop(new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+            @Override
+            public void onSuccess(kotlin.Unit result) {
+                // 延迟后设置新的播放URL
+                App.post(() -> {
+                    mCastControl.setAVTransportURI(url, title, new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                        @Override
+                        public void onSuccess(kotlin.Unit result) {
+                            // 开始播放
+                            mCastControl.play("1", new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                                @Override
+                                public void onSuccess(kotlin.Unit result) {
+                                    android.util.Log.d("VideoActivity", "Cast playback started");
+                                    Notify.show("投屏成功");
+
+                                    // 更新本地投屏状态
+                                    mCastPosition = 0;
+                                    // 不要立即设置duration为0，保持之前的值，等DLNA返回正确的duration
+                                    // mCastDuration = mPlayers.getDuration();
+
+                                    // 更新Server状态（不更新duration，保持之前的值）
+                                    com.github.tvbox.osc.server.Server.get().setCasting(true, url);
+                                    // 只更新position为0，不更新duration
+                                    // com.github.tvbox.osc.server.Server.get().updateCastProgress(0, mCastDuration);
+
+                                    // 更新UI显示
+                                    updateCastProgress();
+                                }
+
+                                @Override
+                                public void onFailure(@androidx.annotation.NonNull String error) {
+                                    android.util.Log.e("VideoActivity", "Failed to start cast playback: " + error);
+                                    Notify.show("投屏播放失败: " + error);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(@androidx.annotation.NonNull String error) {
+                            android.util.Log.e("VideoActivity", "Failed to set cast URL: " + error);
+                            Notify.show("投屏设置失败: " + error);
+                        }
+                    });
+                }, 500);
+            }
+
+            @Override
+            public void onFailure(@androidx.annotation.NonNull String error) {
+                android.util.Log.e("VideoActivity", "Failed to stop cast: " + error);
+            }
+        });
+    }
+
+    /**
+     * 停止投屏
+     */
+    private void stopCasting() {
+        stopCastProgressUpdate();
+
+        if (mCastControl != null) {
+            mCastControl.stop(new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                @Override
+                public void onSuccess(kotlin.Unit result) {
+                    android.util.Log.d("VideoActivity", "Cast stopped successfully");
+                }
+
+                @Override
+                public void onFailure(@androidx.annotation.NonNull String error) {
+                    android.util.Log.e("VideoActivity", "Failed to stop cast: " + error);
+                }
+            });
+        }
+
+        // 断开DLNA设备连接
+        com.github.tvbox.osc.utils.DLNADevice.get().disconnect();
+
+        // 清除投屏状态
+        com.github.tvbox.osc.server.Server.get().setCasting(false, null);
+        isCasting = false;
+        isCastPlaying = true; // 重置播放状态
+        mCastControl = null;
+        mCastPosition = 0;
+        mCastDuration = 0;
+
+        // 恢复播放器UI
+        hideCastingUI();
+
+        Notify.show("已停止投屏");
+        android.util.Log.d("VideoActivity", "Casting stopped");
+    }
+
+    /**
+     * 更换投屏设备
+     */
+    private void changeCastDevice() {
+        android.util.Log.d("VideoActivity", "Changing cast device...");
+
+        // 保存当前播放进度和状态
+        long currentPosition = mCastPosition;
+
+        // 直接打开设备选择对话框，不停止当前投屏
+        // 当用户选择新设备后，会自动断开旧设备并连接新设备
+        CastDialog.create()
+            .history(mHistory)
+            .video(CastVideo.get(
+                mBinding.name.getText().toString(),
+                mPlayers.getUrl(),
+                currentPosition,  // 使用当前进度
+                mCastDuration > 0 ? mCastDuration : mPlayers.getDuration(),
+                mPlayers.getHeaders()
+            ))
+            .fm(true)
+            .show(this);
+
+        android.util.Log.d("VideoActivity", "Opening device selection dialog with position: " + currentPosition);
+    }
+
+    /**
+     * 投屏播放/暂停切换
+     */
+    private void toggleCastPlayPause() {
+        if (mCastControl == null || !isCasting) return;
+
+        if (isCastPlaying) {
+            // 当前正在播放，执行暂停
+            mCastControl.pause(new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                @Override
+                public void onSuccess(kotlin.Unit result) {
+                    isCastPlaying = false;
+                    updateCastPlayPauseButton();
+                    Notify.show("已暂停投屏");
+                    android.util.Log.d("VideoActivity", "Cast paused");
+                }
+
+                @Override
+                public void onFailure(@androidx.annotation.NonNull String error) {
+                    android.util.Log.e("VideoActivity", "Failed to pause cast: " + error);
+                    Notify.show("暂停失败: " + error);
+                }
+            });
+        } else {
+            // 当前已暂停，执行播放
+            mCastControl.play("1", new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                @Override
+                public void onSuccess(kotlin.Unit result) {
+                    isCastPlaying = true;
+                    updateCastPlayPauseButton();
+                    Notify.show("已恢复投屏");
+                    android.util.Log.d("VideoActivity", "Cast resumed");
+                }
+
+                @Override
+                public void onFailure(@androidx.annotation.NonNull String error) {
+                    android.util.Log.e("VideoActivity", "Failed to resume cast: " + error);
+                    Notify.show("播放失败: " + error);
+                }
+            });
+        }
+    }
+
+    /**
+     * 更新投屏播放/暂停按钮图标
+     */
+    private void updateCastPlayPauseButton() {
+        android.widget.ImageView playPause = mBinding.castControl.getRoot().findViewById(R.id.cast_play_pause);
+        if (playPause != null) {
+            if (isCastPlaying) {
+                // 正在播放，显示暂停图标
+                playPause.setImageResource(R.drawable.ic_notify_pause);
+            } else {
+                // 已暂停，显示播放图标
+                playPause.setImageResource(R.drawable.ic_notify_play);
+            }
+        }
+    }
+
+    /**
+     * 跳转到指定投屏位置
+     */
+    private void seekToCastPosition(long positionMs) {
+        if (mCastControl == null || !isCasting) {
+            android.util.Log.w("VideoActivity", "Cannot seek: not casting");
+            return;
+        }
+
+        android.util.Log.d("VideoActivity", "Seeking to position: " + positionMs + "ms");
+
+        mCastControl.seek(positionMs, new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+            @Override
+            public void onSuccess(kotlin.Unit result) {
+                // 更新本地记录的位置
+                mCastPosition = positionMs;
+                updateCastProgress();
+                android.util.Log.d("VideoActivity", "Seek successful to: " + positionMs + "ms");
+            }
+
+            @Override
+            public void onFailure(@androidx.annotation.NonNull String error) {
+                android.util.Log.e("VideoActivity", "Seek failed: " + error);
+                Notify.show("跳转失败: " + error);
+            }
+        });
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
         stopSearch();
+
+        // 清理投屏资源
+        if (isCasting) {
+            stopCasting();
+        }
+
         mClock.release();
         mPlayers.release();
         Timer.get().reset();

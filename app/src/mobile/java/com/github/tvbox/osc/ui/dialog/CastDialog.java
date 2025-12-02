@@ -149,17 +149,16 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     private void onCasted() {
-        // 启动投屏控制页面
-        // 使用 getActivity() 而不是 getContext()，因为 getContext() 可能在异步回调时返回 null
+        // 将投屏控制传递给VideoActivity，而不是跳转到独立页面
         FragmentActivity activity = getActivity();
         if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) {
-            com.github.tvbox.osc.ui.activity.CastControlActivity.start(activity, control);
             if (listener != null) {
+                listener.onCastedWithControl(control);
                 listener.onCasted();
             }
             dismiss();
         } else {
-            android.util.Log.e("CastDialog", "Cannot start CastControlActivity: activity is null or finishing");
+            android.util.Log.e("CastDialog", "Cannot cast: activity is null or finishing");
             // 清理投屏状态
             Server.get().setCasting(false, null);
         }
@@ -185,6 +184,9 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     @Override
     public void onConnected(@NonNull org.fourthline.cling.model.meta.Device<?, ?, ?> device) {
         android.util.Log.d("CastDialog", "onConnected - position: " + video.getPosition());
+
+        // 保存当前连接的设备信息
+        DLNADevice.get().setConnectedDevice(device);
 
         // 立即进入投屏控制页面
         onCasted();
@@ -320,5 +322,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     public interface Listener {
 
         void onCasted();
+
+        void onCastedWithControl(DeviceControl control);
     }
 }

@@ -1084,6 +1084,12 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     }
 
     @Override
+    public void onCastedWithControl(com.android.cast.dlna.dmc.control.DeviceControl control) {
+        // LiveActivity 暂不支持投屏控制集成，保持原有行为
+        // 如果需要支持，可以参考 VideoActivity 的实现
+    }
+
+    @Override
     public void onSpeedUp() {
         if (!mPlayers.isVod() || !mPlayers.isPlaying() || !mPlayers.canAdjustSpeed()) return;
         mBinding.control.action.speed.setText(mPlayers.setSpeed(mPlayers.getSpeed() < 3 ? 3 : 5));

@@ -9,6 +9,7 @@ import java.util.List;
 public class DLNADevice {
 
     private final List<org.fourthline.cling.model.meta.Device<?, ?, ?>> devices;
+    private org.fourthline.cling.model.meta.Device<?, ?, ?> connectedDevice;
 
     private static class Loader {
         static volatile DLNADevice INSTANCE = new DLNADevice();
@@ -53,10 +54,26 @@ public class DLNADevice {
 
     public void disconnect() {
         for (org.fourthline.cling.model.meta.Device<?, ?, ?> device : devices) DLNACastManager.INSTANCE.disconnectDevice(device);
+        connectedDevice = null;
     }
 
     public org.fourthline.cling.model.meta.Device<?, ?, ?> find(com.github.tvbox.osc.bean.Device item) {
         for (org.fourthline.cling.model.meta.Device<?, ?, ?> device : devices) if (device.getIdentity().getUdn().getIdentifierString().equals(item.getUuid())) return device;
+        return null;
+    }
+
+    public void setConnectedDevice(org.fourthline.cling.model.meta.Device<?, ?, ?> device) {
+        this.connectedDevice = device;
+    }
+
+    public org.fourthline.cling.model.meta.Device<?, ?, ?> getConnectedDevice() {
+        return connectedDevice;
+    }
+
+    public String getConnectedDeviceName() {
+        if (connectedDevice != null && connectedDevice.getDetails() != null) {
+            return connectedDevice.getDetails().getFriendlyName();
+        }
         return null;
     }
 }
