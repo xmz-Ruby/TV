@@ -35,7 +35,7 @@
         android:paddingEnd="16dp"
         android:paddingBottom="16dp"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-        app:maxHeight="204dp"
+        app:maxHeight="400dp"
         tools:listitem="@layout/adapter_quality" />
 
 </LinearLayout>

@@ -1,12 +1,17 @@
 package com.github.tvbox.osc.ui.dialog;
 
 import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 
 import androidx.fragment.app.FragmentActivity;
 
+import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.bean.Result;
 import com.github.tvbox.osc.databinding.DialogQualityListBinding;
 import com.github.tvbox.osc.ui.adapter.QualityDialogAdapter;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 public class QualityListDialog {
@@ -51,6 +56,19 @@ public class QualityListDialog {
         dialog = new BottomSheetDialog(activity);
         dialog.setContentView(binding.getRoot());
         dialog.show();
+
+        // 强制弹窗完全展开
+        View bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+        if (bottomSheet != null) {
+            BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
+            behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            behavior.setSkipCollapsed(true);
+
+            // 设置弹窗高度为wrap_content，让内容完全显示
+            ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
+            layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            bottomSheet.setLayoutParams(layoutParams);
+        }
     }
 
     private void initView() {
