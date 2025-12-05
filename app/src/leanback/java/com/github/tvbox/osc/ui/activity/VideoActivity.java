@@ -76,6 +76,7 @@ import com.github.tvbox.osc.ui.dialog.DescDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeDialog;
 import com.github.tvbox.osc.ui.dialog.FileChooserDialog;
 import com.github.tvbox.osc.ui.dialog.PlayerDialog;
+import com.github.tvbox.osc.ui.dialog.QualityDialog;
 import com.github.tvbox.osc.ui.dialog.SubtitleDialog;
 import com.github.tvbox.osc.ui.dialog.TrackDialog;
 import com.github.tvbox.osc.ui.presenter.ArrayPresenter;
@@ -123,7 +124,7 @@ import okhttp3.Call;
 import okhttp3.Response;
 import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 
-public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback, com.github.tvbox.osc.impl.DanmuSettingCallback {
+public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback, com.github.tvbox.osc.impl.DanmuSettingCallback, com.github.tvbox.osc.ui.dialog.QualityDialog.Listener {
 
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
@@ -440,7 +441,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mBinding.flag.setAdapter(new ItemBridgeAdapter(mFlagAdapter = new ArrayObjectAdapter(mFlagPresenter = new FlagPresenter(this::setFlagActivated))));
         mBinding.quality.setHorizontalSpacing(ResUtil.dp2px(8));
         mBinding.quality.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
-        mBinding.quality.setAdapter(mQualityAdapter = new QualityAdapter(this::setQualityActivated));
+        mBinding.quality.setAdapter(mQualityAdapter = new QualityAdapter(this::onQualityButtonClick));
         mBinding.array.setHorizontalSpacing(ResUtil.dp2px(8));
         mBinding.array.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
         mBinding.array.setAdapter(new ItemBridgeAdapter(mArrayAdapter = new ArrayObjectAdapter(mArrayPresenter = new ArrayPresenter(this))));
@@ -1027,6 +1028,18 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         setR2Callback(100);
     }
 
+    private void onQualityButtonClick(Result result) {
+        if (result.getUrl().getValues().size() > 1) {
+            QualityDialog.create().result(result).show(this);
+            hideControl();
+        }
+    }
+
+    @Override
+    public void onQualityClick(Result result) {
+        setQualityActivated(result);
+    }
+
     private void setQualityActivated(Result result) {
         try {
             long currentPosition = mPlayers.getPosition();
@@ -1068,6 +1081,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
             mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
             mBinding.danmaku.hide();
+            mQualityAdapter.notifyDataSetChanged();
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
             e.printStackTrace();

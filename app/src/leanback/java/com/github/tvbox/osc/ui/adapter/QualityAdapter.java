@@ -45,7 +45,7 @@ public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHold
 
     @Override
     public int getItemCount() {
-        return mResult.getUrl().getValues().size();
+        return mResult.getUrl().getValues().isEmpty() ? 0 : 1;
     }
 
     @NonNull
@@ -57,16 +57,15 @@ public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHold
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         holder.binding.text.setNextFocusDownId(nextFocusDown);
-        holder.binding.text.setText(mResult.getUrl().n(position));
-        holder.binding.text.setOnClickListener(v -> onItemClick(position));
-        holder.binding.text.setActivated(mResult.getUrl().getPosition() == position);
+        int currentPosition = mResult.getUrl().getPosition();
+        String qualityText = mResult.getUrl().n(currentPosition) + " - 点击切换画质";
+        holder.binding.text.setText(qualityText);
+        holder.binding.text.setOnClickListener(v -> onItemClick());
+        holder.binding.text.setActivated(true);
     }
 
-    private void onItemClick(int position) {
-        this.position = position;
-        mResult.getUrl().set(position);
+    private void onItemClick() {
         mListener.onItemClick(mResult);
-        notifyItemRangeChanged(0, getItemCount());
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {

@@ -27,6 +27,14 @@
     <string name="detail_actor">Actor: <xliff:g name="name">%s</xliff:g></string>
     <string name="detail_content">Summary: <xliff:g name="name">%s</xliff:g></string>
     <string name="detail_desc">Summary</string>
+    <string name="detail_flag">Line</string>
+    <string name="detail_quality">Quality</string>
+    <string name="quality_select">选择画质</string>
+    <string name="quality_click_to_change">点击切换画质</string>
+    <string name="detail_episode">Episode</string>
+    <string name="detail_more">More</string>
+    <string name="detail_download">Download</string>
+    <string name="detail_reverse">Reverse</string>
 
     <!-- Keep -->
     <string name="keep">Keep</string>

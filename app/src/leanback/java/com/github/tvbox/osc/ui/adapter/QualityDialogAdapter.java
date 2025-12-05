@@ -9,19 +9,18 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.github.tvbox.osc.bean.Result;
 import com.github.tvbox.osc.databinding.AdapterQualityBinding;
 
-public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHolder> {
+public class QualityDialogAdapter extends RecyclerView.Adapter<QualityDialogAdapter.ViewHolder> {
 
     private final OnClickListener mListener;
     private Result mResult;
     private int position;
 
-    public QualityAdapter(OnClickListener listener) {
+    public QualityDialogAdapter(OnClickListener listener) {
         this.mListener = listener;
         this.mResult = Result.empty();
     }
 
     public interface OnClickListener {
-
         void onItemClick(Result result);
     }
 

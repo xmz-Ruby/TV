@@ -7,15 +7,15 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.tvbox.osc.bean.Result;
-import com.github.tvbox.osc.databinding.AdapterQualityBinding;
+import com.github.tvbox.osc.databinding.AdapterQualityDialogBinding;
 
-public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHolder> {
+public class QualityDialogAdapter extends RecyclerView.Adapter<QualityDialogAdapter.ViewHolder> {
 
     private final OnClickListener mListener;
     private Result mResult;
     private int position;
 
-    public QualityAdapter(OnClickListener listener) {
+    public QualityDialogAdapter(OnClickListener listener) {
         this.mListener = listener;
         this.mResult = Result.empty();
     }
@@ -50,7 +50,7 @@ public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHold
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new ViewHolder(AdapterQualityBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+        return new ViewHolder(AdapterQualityDialogBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
@@ -69,9 +69,9 @@ public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHold
 
     static class ViewHolder extends RecyclerView.ViewHolder {
 
-        private final AdapterQualityBinding binding;
+        private final AdapterQualityDialogBinding binding;
 
-        ViewHolder(@NonNull AdapterQualityBinding binding) {
+        ViewHolder(@NonNull AdapterQualityDialogBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
         }

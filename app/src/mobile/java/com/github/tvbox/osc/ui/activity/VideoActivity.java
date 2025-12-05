@@ -91,6 +91,7 @@ import com.github.tvbox.osc.ui.dialog.DanmuDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeGridDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeListDialog;
 import com.github.tvbox.osc.ui.dialog.InfoDialog;
+import com.github.tvbox.osc.ui.dialog.QualityListDialog;
 import com.github.tvbox.osc.ui.dialog.ReceiveDialog;
 import com.github.tvbox.osc.ui.dialog.TrackDialog;
 import com.github.tvbox.osc.utils.Clock;
@@ -374,6 +375,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mBinding.content.setOnClickListener(view -> onContent());
         mBinding.reverse.setOnClickListener(view -> onReverse());
         mBinding.download.setOnClickListener(view -> onDownload());
+        mBinding.qualityMore.setOnClickListener(view -> onQualityMore());
         mBinding.name.setOnLongClickListener(view -> onChange());
         mBinding.content.setOnLongClickListener(view -> onCopy());
         mBinding.control.cast.setOnClickListener(view -> onCast());
@@ -684,10 +686,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         );
 
         mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
+        mQualityAdapter.addAll(result);
         setQualityVisible(result.getUrl().isMulti());
         mBinding.swipeLayout.setRefreshing(false);
         checkDanmu(result.getDanmaku());
-        mQualityAdapter.addAll(result);
     }
 
     private void setDownload(Result result) {
@@ -785,6 +787,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private void setQualityVisible(boolean visible) {
         mBinding.qualityText.setVisibility(visible ? View.VISIBLE : View.GONE);
         mBinding.quality.setVisibility(visible ? View.VISIBLE : View.GONE);
+        mBinding.qualityMore.setVisibility(visible && mQualityAdapter.getItemCount() > 5 ? View.VISIBLE : View.GONE);
     }
 
     private void reverseEpisode(boolean scroll) {
@@ -1055,6 +1058,18 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private void onEpisodes() {
         mDialogs.add(EpisodeListDialog.create(this).episodes(mEpisodeAdapter.getItems()).show());
+    }
+
+    private void onQualityMore() {
+        mDialogs.add(QualityListDialog.create(this)
+                .result(mQualityAdapter.getResult())
+                .setOnClickListener(new QualityListDialog.OnClickListener() {
+                    @Override
+                    public void onItemClick(Result result) {
+                        VideoActivity.this.onItemClick(result);
+                    }
+                })
+                .show());
     }
 
     private void onDanmuSearch() {
