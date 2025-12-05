@@ -1867,6 +1867,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     @Override
     public void onSeek(int time) {
+        // 投屏时不显示本地播放器的seek UI
+        if (isCasting) {
+            return;
+        }
         mBinding.widget.action.setImageResource(time > 0 ? R.drawable.ic_widget_forward : R.drawable.ic_widget_rewind);
         mBinding.widget.time.setText(mPlayers.getPositionTime(time));
         mBinding.widget.seek.setVisibility(View.VISIBLE);
@@ -1875,6 +1879,11 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     @Override
     public void onSeekEnd(int time) {
+        // 投屏时不操作本地播放器
+        if (isCasting) {
+            mBinding.widget.seek.setVisibility(View.GONE);
+            return;
+        }
         mBinding.widget.seek.setVisibility(View.GONE);
         mPlayers.seekTo(time);
         showProgress();
@@ -1970,14 +1979,18 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         super.onStart();
         mClock.stop().start();
         setStop(false);
-        onPlay();
+        // 投屏时不自动播放本地播放器
+        if (!isCasting) {
+            onPlay();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         if (isForeground()) return;
-        if (isRedirect()) onPlay();
+        // 投屏时不自动播放本地播放器
+        if (isRedirect() && !isCasting) onPlay();
         App.post(mR0, 1000);
         setForeground(true);
         setRedirect(false);
