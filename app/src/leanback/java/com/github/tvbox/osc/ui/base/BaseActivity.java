@@ -3,7 +3,6 @@ package com.github.tvbox.osc.ui.base;
 import android.app.Activity;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.View;
 
@@ -14,18 +13,12 @@ import androidx.leanback.widget.ArrayObjectAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
 
-import com.github.tvbox.osc.R;
-import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.event.RefreshEvent;
-import com.github.tvbox.osc.utils.FileUtil;
-import com.github.tvbox.osc.utils.ResUtil;
 import com.github.tvbox.osc.utils.Util;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
-
-import java.io.File;
 
 import me.jessyan.autosize.AutoSizeCompat;
 
@@ -47,15 +40,10 @@ public abstract class BaseActivity extends AppCompatActivity {
     @Override
     public void setContentView(View view) {
         super.setContentView(view);
-        refreshWall();
     }
 
     protected Activity getActivity() {
         return this;
-    }
-
-    protected boolean customWall() {
-        return true;
     }
 
     protected boolean handleBack() {
@@ -96,17 +84,6 @@ public abstract class BaseActivity extends AppCompatActivity {
         });
     }
 
-    private void refreshWall() {
-        try {
-            if (!customWall()) return;
-            File file = FileUtil.getWall(Setting.getWall());
-            if (file.exists() && file.length() > 0) getWindow().setBackgroundDrawable(Drawable.createFromPath(file.getAbsolutePath()));
-            else getWindow().setBackgroundDrawableResource(ResUtil.getDrawable(file.getName()));
-        } catch (Exception e) {
-            getWindow().setBackgroundDrawableResource(R.drawable.wallpaper_1);
-        }
-    }
-
     private Resources hackResources(Resources resources) {
         try {
             AutoSizeCompat.autoConvertDensityOfGlobal(resources);
@@ -118,7 +95,6 @@ public abstract class BaseActivity extends AppCompatActivity {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onRefreshEvent(RefreshEvent event) {
-        if (event.getType() == RefreshEvent.Type.WALL) refreshWall();
     }
 
     @Override

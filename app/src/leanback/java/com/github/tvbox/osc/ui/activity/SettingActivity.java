@@ -78,7 +78,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.vod.requestFocus();
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
-        mBinding.wallUrl.setText(WallConfig.getDesc());
         mBinding.danmuServerUrl.setText(getDanmuServerDesc());
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         mBinding.versionText.setText(BuildConfig.VERSION_NAME);
@@ -100,7 +99,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
     protected void initEvent() {
         mBinding.vod.setOnClickListener(this::onVod);
         mBinding.live.setOnClickListener(this::onLive);
-        mBinding.wall.setOnClickListener(this::onWall);
         mBinding.proxy.setOnClickListener(this::onProxy);
         mBinding.cache.setOnClickListener(this::onCache);
         mBinding.cache.setOnLongClickListener(this::onCacheLongClick);
@@ -110,11 +108,8 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         mBinding.vodHome.setOnClickListener(this::onVodHome);
         mBinding.live.setOnLongClickListener(this::onLiveEdit);
         mBinding.liveHome.setOnClickListener(this::onLiveHome);
-        mBinding.wall.setOnLongClickListener(this::onWallEdit);
         mBinding.vodHistory.setOnClickListener(this::onVodHistory);
         mBinding.liveHistory.setOnClickListener(this::onLiveHistory);
-        mBinding.wallDefault.setOnClickListener(this::setWallDefault);
-        mBinding.wallRefresh.setOnClickListener(this::setWallRefresh);
         mBinding.danmuServer.setOnClickListener(this::onDanmuServer);
         mBinding.danmuServerDefault.setOnClickListener(this::setDanmuServerDefault);
         mBinding.danmuServerHistory.setOnClickListener(this::onDanmuServerHistory);
@@ -139,11 +134,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
                 Notify.progress(this);
                 LiveConfig.load(config, getCallback());
                 mBinding.liveUrl.setText(config.getDesc());
-                break;
-            case 2:
-                Notify.progress(this);
-                WallConfig.load(config, getCallback());
-                mBinding.wallUrl.setText(config.getDesc());
                 break;
         }
     }
@@ -180,10 +170,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
                 Notify.dismiss();
                 RefreshEvent.config();
                 break;
-            case 2:
-                Notify.dismiss();
-                RefreshEvent.config();
-                break;
         }
     }
 
@@ -210,10 +196,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         ConfigDialog.create(this).type(type = 1).show();
     }
 
-    private void onWall(View view) {
-        ConfigDialog.create(this).type(type = 2).show();
-    }
-
     private boolean onVodEdit(View view) {
         ConfigDialog.create(this).type(type = 0).edit().show();
         return true;
@@ -221,11 +203,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
 
     private boolean onLiveEdit(View view) {
         ConfigDialog.create(this).type(type = 1).edit().show();
-        return true;
-    }
-
-    private boolean onWallEdit(View view) {
-        ConfigDialog.create(this).type(type = 2).edit().show();
         return true;
     }
 
@@ -251,21 +228,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
 
     private void onDanmu(View view) {
         SettingDanmuActivity.start(this);
-    }
-
-    private void setWallDefault(View view) {
-        WallConfig.refresh(Setting.getWall() == 4 ? 1 : Setting.getWall() + 1);
-    }
-
-    private void setWallRefresh(View view) {
-        Notify.progress(this);
-        WallConfig.get().load(new Callback() {
-            @Override
-            public void success() {
-                Notify.dismiss();
-                setCacheText();
-            }
-        });
     }
 
     private void onCustom(View view) {
@@ -335,7 +297,6 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
                 setCacheText();
                 mBinding.vodUrl.setText(VodConfig.getDesc());
                 mBinding.liveUrl.setText(LiveConfig.getDesc());
-                mBinding.wallUrl.setText(WallConfig.getDesc());
                 break;
         }
     }

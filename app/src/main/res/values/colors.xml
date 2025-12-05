@@ -30,4 +30,6 @@
     <color name="green_primary_dark">#388E3C</color>
     <color name="green_accent">#8BC34A</color>
 
+    <color name="dark_blue">#002c41</color>
+
 </resources>
