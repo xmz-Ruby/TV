@@ -163,10 +163,35 @@ for root, dirs, files in os.walk(smali_dir):
                     f.write(new_content)
 PYTHON_SCRIPT
 
-echo "5. 重新编译..."
+echo "5. 替换静态字符串 URL..."
+SMALI_DIR_EXPORT="$SMALI_DIR" python3 << 'PYTHON_SCRIPT'
+import os
+import re
+
+smali_dir = os.environ['SMALI_DIR_EXPORT']
+
+for root, dirs, files in os.walk(smali_dir):
+    for file in files:
+        if file.endswith('.smali'):
+            filepath = os.path.join(root, file)
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # 替换 https://pizazz.s3.bitiful.net 为 http://127.0.0.1:9978
+            pattern = r'const-string (v\d+), "https://pizazz\.s3\.bitiful\.net'
+            replacement = r'const-string \1, "http://127.0.0.1:9978/file'
+
+            new_content = re.sub(pattern, replacement, content)
+
+            if new_content != content:
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+PYTHON_SCRIPT
+
+echo "6. 重新编译..."
 java -jar "$APKTOOL_JAR" b "$SMALI_DIR" -o "$OUTPUT_JAR" || exit 1
 
-echo "6. 清理..."
+echo "7. 清理..."
 echo "$SMALI_DIR"
 rm -rf "$SMALI_DIR"
 
