@@ -12,7 +12,7 @@ public class FlagSorter {
 
     // 需要过滤掉的线路关键字
     private static final String[] FILTER_KEYWORDS = {
-        "百度", "度盘", "天翼", "123", "迅雷", "采集", "不可用", "广告",
+        "采集", "不可用", "广告",
         "错误", "无效", "失效", "error", "invalid", "expired", "unavailable"
     };
 
@@ -127,7 +127,7 @@ public class FlagSorter {
 
         // 按优先级顺序检查（优先级高的先检查）
         // 优先级1：包含"预览"
-        if (flagName.contains("预览") || flagName.toLowerCase().contains("preview")) {
+        if (flagName.contains("预览") || flagName.toLowerCase().contains("preview") || flagName.contains("普画")) {
             return 1;
         }
 
