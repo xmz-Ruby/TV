@@ -28,18 +28,24 @@ public class WordAdapter extends RecyclerView.Adapter<WordAdapter.ViewHolder> {
     }
 
     public void addAll(List<String> items) {
+        int oldSize = mItems.size();
         mItems.clear();
         mItems.addAll(items);
-        notifyDataSetChanged();
+        notifyItemRangeRemoved(0, oldSize);
+        notifyItemRangeInserted(0, mItems.size());
     }
 
     public void clear() {
+        int oldSize = mItems.size();
         mItems.clear();
+        notifyItemRangeRemoved(0, oldSize);
     }
 
     public void appendAll(List<String> items) {
-        mItems.addAll(items.subList(0, Math.min(items.size(), 20)));
-        notifyDataSetChanged();
+        int position = mItems.size();
+        int sizeToAdd = Math.min(items.size(), 20);
+        mItems.addAll(items.subList(0, sizeToAdd));
+        notifyItemRangeInserted(position, sizeToAdd);
     }
 
     @Override

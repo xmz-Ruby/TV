@@ -105,9 +105,11 @@ public class CollectFragment extends BaseFragment implements CustomScroller.Call
 
     public void addVideo(List<Vod> items) {
         if (checkLastSize(items) || getActivity() == null || getActivity().isFinishing()) return;
-        List<ListRow> rows = new ArrayList<>();
+        // 复用 VodPresenter 实例，减少对象创建
+        VodPresenter presenter = new VodPresenter(this);
+        List<ListRow> rows = new ArrayList<>(Lists.partition(items, Product.getColumn()).size());
         for (List<Vod> part : Lists.partition(items, Product.getColumn())) {
-            mLast = new ArrayObjectAdapter(new VodPresenter(this));
+            mLast = new ArrayObjectAdapter(presenter);
             mLast.setItems(part, null);
             rows.add(new ListRow(mLast));
         }

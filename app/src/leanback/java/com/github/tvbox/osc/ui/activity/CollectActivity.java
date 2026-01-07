@@ -125,7 +125,7 @@ public class CollectActivity extends BaseActivity {
     private void search() {
         mAdapter.add(Collect.all());
         mBinding.pager.getAdapter().notifyDataSetChanged();
-        mExecutor = new PauseExecutor(Constant.THREAD_POOL);
+        mExecutor = new PauseExecutor(Constant.THREAD_POOL * 2);
         mBinding.result.setText(getString(R.string.collect_result, getKeyword()));
         for (Site site : mSites) mExecutor.execute(() -> search(site));
     }
