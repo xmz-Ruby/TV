@@ -236,10 +236,15 @@ public class SiteViewModel extends ViewModel {
     public void searchContent(Site site, String keyword, String page) {
         execute(result, () -> {
             if (site.getType() == 3) {
+                SpiderDebug.log("搜索[" + site.getName() + "] key=" + site.getKey() + " keyword=" + keyword + " page=" + page);
                 String searchContent = site.spider().searchContent(Trans.t2s(keyword), false, page);
                 SpiderDebug.log(site.getName() + "," + searchContent);
                 Result result = Result.fromJson(searchContent);
-                for (Vod vod : result.getList()) vod.setSite(site);
+                for (Vod vod : result.getList()) {
+                    vod.setSite(site);
+                    SpiderDebug.log("结果绑定 siteKey=" + site.getKey() + " vodName=" + vod.getVodName());
+                }
+                SpiderDebug.log("搜索[" + site.getName() + "]完成，返回" + result.getList().size() + "条结果");
                 return result;
             } else {
                 ArrayMap<String, String> params = new ArrayMap<>();
