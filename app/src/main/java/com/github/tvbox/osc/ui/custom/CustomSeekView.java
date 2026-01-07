@@ -28,11 +28,17 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
 
     private Runnable refresh;
     private Players player;
+    private OnSeekListener seekListener;
 
     private long currentDuration;
     private long currentPosition;
     private long currentBuffered;
     private boolean scrubbing;
+
+    public interface OnSeekListener {
+        void onSeekStart();
+        void onSeekComplete(long position);
+    }
 
     public CustomSeekView(Context context) {
         this(context, null);
@@ -59,6 +65,10 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
 
     public void setListener(Players player) {
         this.player = player;
+    }
+
+    public void setSeekListener(OnSeekListener listener) {
+        this.seekListener = listener;
     }
 
     private void start() {
@@ -143,6 +153,9 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
     public void onScrubStart(@NonNull TimeBar timeBar, long position) {
         scrubbing = true;
         positionView.setText(player.stringToTime(position));
+        if (seekListener != null) {
+            seekListener.onSeekStart();
+        }
     }
 
     @Override
@@ -153,6 +166,11 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
     @Override
     public void onScrubStop(@NonNull TimeBar timeBar, long position, boolean canceled) {
         scrubbing = false;
-        if (!canceled) seekToTimeBarPosition(position);
+        if (!canceled) {
+            seekToTimeBarPosition(position);
+            if (seekListener != null) {
+                seekListener.onSeekComplete(position);
+            }
+        }
     }
 }

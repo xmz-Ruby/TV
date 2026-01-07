@@ -71,6 +71,7 @@ import com.github.tvbox.osc.ui.adapter.QualityAdapter;
 import com.github.tvbox.osc.ui.base.BaseActivity;
 import com.github.tvbox.osc.ui.custom.CustomKeyDownVod;
 import com.github.tvbox.osc.ui.custom.CustomMovement;
+import com.github.tvbox.osc.ui.custom.CustomSeekView;
 import com.github.tvbox.osc.ui.dialog.DanmakuSearchDialog;
 import com.github.tvbox.osc.ui.dialog.DescDialog;
 import com.github.tvbox.osc.ui.dialog.EpisodeDialog;
@@ -146,6 +147,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private List<String> mBroken;
     private History mHistory;
     private long mPendingResumePosition = -1;
+    private long mLastUserSeekTime = 0;  // 记录用户最后一次 seek 操作的时间
     private Players mPlayers;
     private boolean background;
     private boolean fullscreen;
@@ -352,12 +354,34 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         setViewModel();
         checkCast();
         checkId();
+        // 设置投屏进度回调，当投屏端调整进度时更新 mLastUserSeekTime
+        com.github.tvbox.osc.server.Server.get().setCastSeekCallback(new com.github.tvbox.osc.server.Server.CastSeekCallback() {
+            @Override
+            public void onCastSeek(long position) {
+                mLastUserSeekTime = System.currentTimeMillis();
+                android.util.Log.d("VideoActivity", "投屏端调整进度，更新 mLastUserSeekTime: " + mLastUserSeekTime + ", position: " + position);
+            }
+        });
     }
 
     @Override
     @SuppressLint("ClickableViewAccessibility")
     protected void initEvent() {
         mBinding.control.seek.setListener(mPlayers);
+        mBinding.control.seek.setSeekListener(new CustomSeekView.OnSeekListener() {
+            @Override
+            public void onSeekStart() {
+                // 用户开始拖动进度条
+                android.util.Log.d("VideoActivity", "用户开始 seek 操作");
+            }
+
+            @Override
+            public void onSeekComplete(long position) {
+                // 用户完成 seek 操作，记录时间
+                mLastUserSeekTime = System.currentTimeMillis();
+                android.util.Log.d("VideoActivity", "用户完成 seek 操作，位置: " + position + "ms");
+            }
+        });
         mBinding.desc.setOnClickListener(view -> onDesc());
         mBinding.keep.setOnClickListener(view -> onKeep());
         mBinding.video.setOnClickListener(view -> onVideo());
@@ -943,6 +967,22 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         android.util.Log.d("VideoActivity.seamless", "查询条件剧名: " + vodName);
         android.util.Log.d("VideoActivity.seamless", "目标线路: " + flag.getFlag());
 
+        // 检查是否正在投屏
+        boolean isCasting = com.github.tvbox.osc.server.Server.get().isCasting();
+        android.util.Log.d("VideoActivity.seamless", "是否正在投屏: " + isCasting);
+
+        // 检查用户最近是否有 seek 操作（10秒内）
+        long timeSinceLastSeek = System.currentTimeMillis() - mLastUserSeekTime;
+        boolean hasRecentUserSeek = timeSinceLastSeek < 10000;
+        android.util.Log.d("VideoActivity.seamless", "用户最后 seek 时间: " + timeSinceLastSeek + "ms 前，是否有最近操作: " + hasRecentUserSeek);
+
+        // 投屏场景下的特殊处理
+        if (isCasting && hasRecentUserSeek) {
+            android.util.Log.d("VideoActivity.seamless", "投屏场景下用户最近有 seek 操作，跳过 PlayStatus 恢复，保持当前播放位置");
+            // 直接返回，不恢复历史位置
+            return;
+        }
+
         // 检查目标线路是否有效
         if (isInvalidFlag(flag.getFlag())) {
             android.util.Log.d("VideoActivity.seamless", "目标线路无效，跳过: " + flag.getFlag());
@@ -961,7 +1001,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         android.util.Log.d("VideoActivity.seamless", "PlayStatus查询结果: " + (status != null ? "存在" : "不存在"));
 
         Episode episode = null;
-        if (status != null) {
+        if (status != null && !hasRecentUserSeek) {
+            // 只有在没有用户最近 seek 操作时，才恢复历史位置
             android.util.Log.d("VideoActivity.seamless", "PlayStatus详情: vodId=" + status.getVodId() + ", 源=" + status.getSourceKey() + ", 线路=" + status.getFlagName() + ", 集=" + status.getEpisodeName() + ", 画质索引=" + status.getQualityIndex() + ", 进度=" + status.getPosition() + "ms");
 
             // 检查PlayStatus中的线路是否有效
@@ -975,8 +1016,13 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                 if (episode != null && !episode.isActivated()) {
                     mHistory.setVodRemarks(episode.getName());
                     mHistory.setEpisodeUrl(episode.getUrl());
-                    mHistory.setPosition(status.getPosition());
-                    mPendingResumePosition = Math.max(mPendingResumePosition, status.getPosition());
+                    // 只有当历史位置有效时才恢复
+                    long resumePosition = status.getPosition();
+                    if (resumePosition > 0) {
+                        mHistory.setPosition(resumePosition);
+                        mPendingResumePosition = Math.max(mPendingResumePosition, resumePosition);
+                        android.util.Log.d("VideoActivity.seamless", "恢复播放进度: " + resumePosition + "ms");
+                    }
 
                     // 恢复画质索引
                     if (status.getQualityIndex() >= 0) {
@@ -989,6 +1035,9 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                     Notify.show(getString(R.string.play_auto_match_episode, 0, episode.getName()));
                 }
             }
+        } else if (hasRecentUserSeek) {
+            android.util.Log.d("VideoActivity.seamless", "用户最近有 seek 操作，跳过恢复历史进度，保持当前播放位置");
+            // 保持当前的 mPendingResumePosition，不恢复历史位置
         }
 
         // 如果PlayStatus不存在或者没有匹配到集数，默认选第一集

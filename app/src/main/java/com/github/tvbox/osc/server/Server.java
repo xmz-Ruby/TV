@@ -22,6 +22,13 @@ public class Server {
     // 投屏代理 token 认证
     private volatile String castProxyToken = null;
 
+    // 投屏进度更新回调（用于通知 VideoActivity 更新 mLastUserSeekTime）
+    public interface CastSeekCallback {
+        void onCastSeek(long position);
+    }
+
+    private volatile CastSeekCallback castSeekCallback = null;
+
     private static class Loader {
         static volatile Server INSTANCE = new Server();
     }
@@ -171,6 +178,19 @@ public class Server {
     public void updateCastProgress(long position, long duration) {
         this.castPosition = position;
         this.castDuration = duration;
+        // 通知 VideoActivity 更新 mLastUserSeekTime
+        if (castSeekCallback != null) {
+            castSeekCallback.onCastSeek(position);
+            android.util.Log.d("Server", "投屏进度更新，通知回调: position=" + position);
+        }
+    }
+
+    /**
+     * 设置投屏进度更新回调
+     */
+    public void setCastSeekCallback(CastSeekCallback callback) {
+        this.castSeekCallback = callback;
+        android.util.Log.d("Server", "投屏进度回调已设置: " + (callback != null ? "是" : "否"));
     }
 
     /**
