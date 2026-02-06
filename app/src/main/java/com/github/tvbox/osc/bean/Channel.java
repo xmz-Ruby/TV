@@ -296,6 +296,18 @@ public class Channel {
         setLine(getLine() > 0 ? getLine() - 1 : getUrls().size() - 1);
     }
 
+    /**
+     * 尝试下一个线路，如果已尝试完所有线路则返回false
+     * @return true表示成功切换到下一个线路，false表示已尝试完所有线路
+     */
+    public boolean tryNextLine() {
+        if (getLine() < getUrls().size() - 1) {
+            setLine(getLine() + 1);
+            return true;
+        }
+        return false;
+    }
+
     public String getCurrent() {
         return getUrls().isEmpty() ? "" : getUrls().get(getLine());
     }

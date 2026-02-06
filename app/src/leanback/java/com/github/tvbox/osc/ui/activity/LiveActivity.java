@@ -99,6 +99,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     private int toggleCount;
     private int errorCount;
     private int count;
+    private int mInitialLine; // 记录开始播放时的线路索引，用于判断是否已尝试所有线路
 
     public static void start(Context context) {
         if (!LiveConfig.isEmpty()) context.startActivity(new Intent(context, LiveActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("empty", false));
@@ -647,6 +648,8 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
         setArtwork(item.getLogo());
         App.post(mR0, 100);
         mChannel = item;
+        // 记录当前频道的初始线路索引
+        mInitialLine = item.getLine();
         setPlayerView();
         showInfo();
     }
@@ -866,11 +869,19 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
 
     private void startFlow() {
         if (!Setting.isChange()) return;
-        if (!mChannel.isLast()) {
-            nextLine(true);
-        } else if (isGone(mBinding.recycler)) {
+        // 尝试切换到下一个线路
+        if (mChannel.tryNextLine()) {
+            // 成功切换到下一个线路
+            showInfo();
+            fetch();
+        } else {
+            // 已尝试完所有线路，重置线路并切换频道
             mChannel.setLine(0);
-            nextChannel();
+            if (isGone(mBinding.recycler)) {
+                nextChannel();
+            } else {
+                nextPlayer();
+            }
         }
     }
 
