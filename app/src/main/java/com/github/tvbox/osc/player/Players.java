@@ -81,6 +81,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private MediaSessionCompat session;
     private IjkVideoView ijkPlayer;
     private DanmakuView danmuView;
+    private VideoPlayerSync danmuSync;
     private ExoPlayer exoPlayer;
     private ParseJob parseJob;
     private List<Sub> subs;
@@ -172,7 +173,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         danmuView = view;
         // 设置视频播放器同步器，确保弹幕时间与视频时间保持同步
         if (danmuView.getConfig() != null) {
-            danmuView.getConfig().setDanmakuSync(new VideoPlayerSync(this));
+            danmuSync = new VideoPlayerSync(this);
+            danmuView.getConfig().setDanmakuSync(danmuSync);
         }
     }
 
@@ -416,12 +418,26 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void seekTo(long time) {
+        // 标记seek操作，让同步器在seek后保持弹幕播放状态
+        if (danmuSync != null) {
+            danmuSync.markSeek();
+        }
         // 先让视频播放器seek，然后弹幕再同步
         // 这样可以避免弹幕时间领先于视频时间
+        boolean wasPlaying = isPlaying();
         if (isExo() && exoPlayer != null) exoPlayer.seekTo(time);
         if (isIjk() && ijkPlayer != null) ijkPlayer.seekTo(time);
         // 视频seek完成后，弹幕再跟随
         if (haveDanmu()) danmuView.seekTo(time);
+        // seek操作后恢复弹幕的显示和播放状态
+        // 解决拖动进度条后弹幕消失的问题
+        if (haveDanmu() && Setting.isDanmu()) {
+            danmuView.show();
+            // 如果seek前视频正在播放，或者seek后视频正在播放，恢复弹幕播放
+            if (wasPlaying || isPlaying()) {
+                danmuView.resume();
+            }
+        }
     }
 
     public void play() {

@@ -380,6 +380,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                 // 用户完成 seek 操作，记录时间
                 mLastUserSeekTime = System.currentTimeMillis();
                 android.util.Log.d("VideoActivity", "用户完成 seek 操作，位置: " + position + "ms");
+                // 恢复弹幕显示和播放状态
+                resumeDanmuAfterSeek();
             }
         });
         mBinding.desc.setOnClickListener(view -> onDesc());
@@ -1300,6 +1302,74 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private void showDanmu() {
         if (Setting.isDanmu()) mBinding.danmaku.show();
         else mBinding.danmaku.hide();
+    }
+
+    /**
+     * 在seek操作后恢复弹幕的显示和播放状态
+     * 解决拖动进度条后弹幕消失的问题
+     * 模拟手动开关弹幕的操作来恢复弹幕
+     */
+    private void resumeDanmuAfterSeek() {
+        android.util.Log.d("VideoActivity", "resumeDanmuAfterSeek: 开始恢复弹幕");
+        if (mBinding.danmaku == null || !mBinding.danmaku.isPrepared()) {
+            android.util.Log.d("VideoActivity", "resumeDanmuAfterSeek: 弹幕未准备好，跳过恢复");
+            return;
+        }
+        if (!Setting.isDanmu()) {
+            android.util.Log.d("VideoActivity", "resumeDanmuAfterSeek: 弹幕开关已关闭，跳过恢复");
+            return;
+        }
+        // 模拟手动开关弹幕的操作来恢复弹幕
+        // 第一步：先隐藏弹幕
+        android.util.Log.d("VideoActivity", "resumeDanmuAfterSeek: 步骤1 - 隐藏弹幕");
+        mBinding.danmaku.hide();
+        // 第二步：等待视频播放状态稳定后重新显示弹幕
+        waitForPlayingAndResumeDanmu();
+    }
+
+    /**
+     * 等待视频开始播放后恢复弹幕
+     * 解决seek后视频还在缓冲导致弹幕恢复失败的问题
+     */
+    private void waitForPlayingAndResumeDanmu() {
+        final int MAX_WAIT_MS = 3000; // 最多等待3秒
+        final int CHECK_INTERVAL_MS = 100; // 每100ms检查一次
+        final long startTime = System.currentTimeMillis();
+
+        Runnable checkRunnable = new Runnable() {
+            @Override
+            public void run() {
+                long elapsed = System.currentTimeMillis() - startTime;
+                if (elapsed > MAX_WAIT_MS) {
+                    android.util.Log.d("VideoActivity", "waitForPlayingAndResumeDanmu: 等待超时，强制恢复弹幕");
+                    restoreDanmu();
+                    return;
+                }
+                if (mPlayers.isPlaying()) {
+                    android.util.Log.d("VideoActivity", "waitForPlayingAndResumeDanmu: 视频已开始播放，恢复弹幕");
+                    restoreDanmu();
+                } else {
+                    android.util.Log.d("VideoActivity", "waitForPlayingAndResumeDanmu: 等待视频播放... (" + elapsed + "ms)");
+                    // 继续等待
+                    mBinding.danmaku.postDelayed(this, CHECK_INTERVAL_MS);
+                }
+            }
+        };
+        // 开始检查
+        mBinding.danmaku.postDelayed(checkRunnable, CHECK_INTERVAL_MS);
+    }
+
+    /**
+     * 恢复弹幕显示和播放
+     */
+    private void restoreDanmu() {
+        android.util.Log.d("VideoActivity", "restoreDanmu: 开始恢复弹幕显示");
+        mBinding.danmaku.setVisibility(View.VISIBLE);
+        mBinding.danmaku.show();
+        // 确保弹幕从当前位置开始播放
+        long position = mPlayers.getPosition();
+        android.util.Log.d("VideoActivity", "restoreDanmu: 从位置 " + position + " 重新启动弹幕");
+        mBinding.danmaku.start(position);
     }
 
     private void onDanmuAdd() {
@@ -2251,6 +2321,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mKeyDown.resetTime();
         showProgress();
         onPlay();
+        // 恢复弹幕显示，解决滑动快进后弹幕消失的问题
+        resumeDanmuAfterSeek();
     }
 
     @Override

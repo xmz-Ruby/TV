@@ -9,9 +9,19 @@ import master.flame.danmaku.danmaku.model.AbsDanmakuSync;
 public class VideoPlayerSync extends AbsDanmakuSync {
 
     private Players player;
+    private long lastSeekTime = 0;
+    private static final long SEEK_GRACE_PERIOD_MS = 500; // seek后500ms内保持播放状态
 
     public VideoPlayerSync(Players player) {
         this.player = player;
+    }
+
+    /**
+     * 标记发生了seek操作，在seek后的一段时间内保持弹幕播放状态
+     * 解决拖动进度条后弹幕消失的问题
+     */
+    public void markSeek() {
+        this.lastSeekTime = System.currentTimeMillis();
     }
 
     /**
@@ -30,11 +40,17 @@ public class VideoPlayerSync extends AbsDanmakuSync {
      * 获取播放器的同步状态
      * SYNC_STATE_PLAYING: 正在播放，弹幕应该继续
      * SYNC_STATE_HALT: 暂停状态，弹幕应该暂停
+     *
+     * 在seek后的短时间内，返回SYNC_STATE_PLAYING以避免弹幕被暂停
      */
     @Override
     public int getSyncState() {
         if (player == null) {
             return SYNC_STATE_HALT;
+        }
+        // 如果在seek后的宽限期内，返回播放状态以保持弹幕显示
+        if (System.currentTimeMillis() - lastSeekTime < SEEK_GRACE_PERIOD_MS) {
+            return SYNC_STATE_PLAYING;
         }
         return player.isPlaying() ? SYNC_STATE_PLAYING : SYNC_STATE_HALT;
     }
