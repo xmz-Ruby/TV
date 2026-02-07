@@ -18,11 +18,16 @@
     <androidx.media3.ui.DefaultTimeBar
         android:id="@+id/timeBar"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="48dp"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:layout_weight="1"
-        app:bar_height="2dp" />
+        android:paddingTop="22dp"
+        android:paddingBottom="22dp"
+        app:bar_height="3dp"
+        app:scrubber_color="@color/white"
+        app:played_color="@color/white"
+        app:unplayed_color="#40FFFFFF" />
 
     <TextView
         android:id="@+id/duration"

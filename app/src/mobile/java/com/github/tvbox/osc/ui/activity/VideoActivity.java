@@ -1553,8 +1553,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                     Notify.show("正在投屏下一集...");
                     // 直接调用投屏方法，不要先显示投屏UI（否则会隐藏本地播放器）
                     // castCurrentVideo() 成功后会显示投屏UI
-                    // 延迟 2 秒，与手动换集的延迟保持一致，确保视频完全准备好
-                    App.post(() -> castCurrentVideo(), 2000);
+                    // 优化：减少延迟时间，让切换更快速
+                    App.post(() -> castCurrentVideo(), 500);
                 }
                 break;
             case Player.STATE_ENDED:
@@ -2590,24 +2590,23 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         android.util.Log.d("VideoActivity", "[CAST] Transformed cast URL: " + url);
         android.util.Log.d("VideoActivity", "[CAST] Has headers: " + (castVideo.getHeaders() != null && !castVideo.getHeaders().isEmpty()));
 
-        android.util.Log.d("VideoActivity", "[CAST] Starting cast sequence for: " + title);
+        android.util.Log.d("VideoActivity", "[CAST] Starting smooth cast sequence for: " + title);
 
-        // 关键修复：确保本地播放器正在播放
-        // 这样本地播放器会建立数据流，cast_proxy 可以向 DLNA 设备提供数据
+        // 优化：在切换过程中隐藏本地视频视图，避免画面闪烁
+        // 切换完成后会在 showCastingUI() 中显示投屏界面
+        mBinding.display.getRoot().setVisibility(View.GONE);
+
+        // 优化：简化播放器启动逻辑
+        // 如果播放器未播放，静音启动以确保数据流建立，避免音频突兀
         android.util.Log.d("VideoActivity", "[CAST] Current playing state: " + mPlayers.isPlaying());
         if (!mPlayers.isPlaying()) {
-            android.util.Log.d("VideoActivity", "[CAST] Local player not playing, starting playback first");
+            android.util.Log.d("VideoActivity", "[CAST] Starting playback to establish stream");
             mPlayers.play();
-            // 短暂延迟，确保播放器开始建立数据流
-            App.post(() -> {
-                android.util.Log.d("VideoActivity", "[CAST] Playback started, now pausing and casting");
-                doCastAfterPlayStarted(castVideo, url, title);
-            }, 500);
-            return;
+            // 立即执行投屏，不需要等待
+            // cast_proxy 会处理并发请求
         }
 
-        // 如果已经在播放，直接投屏
-        android.util.Log.d("VideoActivity", "[CAST] Local player already playing, proceeding with cast");
+        // 直接执行投屏，不做额外延迟
         doCastAfterPlayStarted(castVideo, url, title);
     }
 
@@ -2615,19 +2614,18 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
      * 在确保本地播放器开始播放后执行投屏
      */
     private void doCastAfterPlayStarted(com.github.tvbox.osc.bean.CastVideo castVideo, String url, String title) {
-        // 暂停本地播放（避免手机和投屏设备同时播放）
-        android.util.Log.d("VideoActivity", "[CAST] Pausing local playback");
-        mPlayers.pause();
+        // 优化：不立即暂停，让数据流继续建立
+        // 视频视图已隐藏，用户看不到画面
+        android.util.Log.d("VideoActivity", "[CAST] Initiating smooth transition");
 
-        // 停止当前投屏设备的播放
+        // 停止当前投屏设备的播放并立即设置新URL
         mCastControl.stop(new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
             @Override
             public void onSuccess(kotlin.Unit result) {
-                android.util.Log.d("VideoActivity", "[CAST] Previous cast stopped, setting new URL");
-                // 延迟后设置新的播放URL
-                App.post(() -> {
-                    android.util.Log.d("VideoActivity", "[CAST] Calling setAVTransportURI with URL: " + url);
-                    mCastControl.setAVTransportURI(url, title, new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                android.util.Log.d("VideoActivity", "[CAST] Previous cast stopped, setting new URL immediately");
+                // 立即设置新的播放URL，无需额外延迟
+                android.util.Log.d("VideoActivity", "[CAST] Calling setAVTransportURI with URL: " + url);
+                mCastControl.setAVTransportURI(url, title, new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
                         @Override
                         public void onSuccess(kotlin.Unit result) {
                             android.util.Log.d("VideoActivity", "[CAST] URL set successfully, starting playback");
@@ -2636,6 +2634,12 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                                 @Override
                                 public void onSuccess(kotlin.Unit result) {
                                     android.util.Log.d("VideoActivity", "[CAST] Cast playback started successfully");
+
+                                    // 投屏成功后暂停本地播放器，释放资源
+                                    if (mPlayers.isPlaying()) {
+                                        mPlayers.pause();
+                                        android.util.Log.d("VideoActivity", "[CAST] Local player paused after cast success");
+                                    }
 
                                     // 重置标志（投屏成功后才重置）
                                     mReEnteringCastState = false;
@@ -2670,9 +2674,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                                 @Override
                                 public void onFailure(@androidx.annotation.NonNull String error) {
                                     android.util.Log.e("VideoActivity", "[CAST] Failed to start cast playback: " + error);
-                                    // 投屏失败，恢复本地播放
+                                    // 投屏失败，恢复本地播放和视频视图
                                     mReEnteringCastState = false;
                                     mCastSwitchingNext = false;
+                                    mBinding.display.getRoot().setVisibility(View.VISIBLE);
                                     Notify.show("投屏播放失败: " + error);
                                 }
                             });
@@ -2681,21 +2686,22 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                         @Override
                         public void onFailure(@androidx.annotation.NonNull String error) {
                             android.util.Log.e("VideoActivity", "[CAST] Failed to set cast URL: " + error);
-                            // 投屏失败，恢复本地播放
+                            // 投屏失败，恢复本地播放和视频视图
                             mReEnteringCastState = false;
                             mCastSwitchingNext = false;
+                            mBinding.display.getRoot().setVisibility(View.VISIBLE);
                             Notify.show("投屏设置失败: " + error);
                         }
                     });
-                }, 500);
             }
 
             @Override
             public void onFailure(@androidx.annotation.NonNull String error) {
                 android.util.Log.e("VideoActivity", "[CAST] Failed to stop cast: " + error);
-                // 投屏失败，恢复本地播放
+                // 投屏失败，恢复本地播放和视频视图
                 mReEnteringCastState = false;
                 mCastSwitchingNext = false;
+                mBinding.display.getRoot().setVisibility(View.VISIBLE);
             }
         });
     }

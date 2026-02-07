@@ -831,8 +831,16 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     }
 
     private void onExoCheck(ErrorEvent event) {
-        if (event.getCode() == PlaybackException.ERROR_CODE_IO_UNSPECIFIED || event.getCode() >= PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED && event.getCode() <= PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED) mPlayers.setFormat(ExoUtil.getMimeType(event.getCode()));
-        mPlayers.setMediaSource();
+        // IO 错误（包括 HTTP 602 等网络错误）直接切换线路，不要重试相同 URL
+        if (event.getCode() >= 2000 && event.getCode() <= 2999) {
+            android.util.Log.d("LiveActivity", "IO error detected (code: " + event.getCode() + "), switching line");
+            fetch();
+        } else if (event.getCode() == PlaybackException.ERROR_CODE_IO_UNSPECIFIED || event.getCode() >= PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED && event.getCode() <= PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED) {
+            mPlayers.setFormat(ExoUtil.getMimeType(event.getCode()));
+            mPlayers.setMediaSource();
+        } else {
+            mPlayers.setMediaSource();
+        }
     }
 
     private void checkError(ErrorEvent event) {
@@ -870,19 +878,10 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     private void startFlow() {
         if (!Setting.isChange()) return;
         // 尝试切换到下一个线路
-        if (mChannel.tryNextLine()) {
-            // 成功切换到下一个线路
-            showInfo();
-            fetch();
-        } else {
-            // 已尝试完所有线路，重置线路并切换频道
-            mChannel.setLine(0);
-            if (isGone(mBinding.recycler)) {
-                nextChannel();
-            } else {
-                nextPlayer();
-            }
-        }
+        // tryNextLine() 现在会循环重试所有线路，不会返回 false
+        mChannel.tryNextLine();
+        showInfo();
+        fetch();
     }
 
     private void prevChannel() {

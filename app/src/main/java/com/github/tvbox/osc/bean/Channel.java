@@ -297,15 +297,18 @@ public class Channel {
     }
 
     /**
-     * 尝试下一个线路，如果已尝试完所有线路则返回false
-     * @return true表示成功切换到下一个线路，false表示已尝试完所有线路
+     * 尝试下一个线路，循环重试所有线路
+     * 当尝试完所有线路后，重置到第一个线路继续尝试
+     * @return 始终返回true，表示可以继续尝试
      */
     public boolean tryNextLine() {
         if (getLine() < getUrls().size() - 1) {
             setLine(getLine() + 1);
-            return true;
+        } else {
+            // 已尝试完所有线路，重置到第一个线路
+            setLine(0);
         }
-        return false;
+        return true;
     }
 
     public String getCurrent() {
