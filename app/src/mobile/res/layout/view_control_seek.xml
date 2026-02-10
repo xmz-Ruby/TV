@@ -25,6 +25,7 @@
         android:paddingTop="22dp"
         android:paddingBottom="22dp"
         app:bar_height="3dp"
+        app:buffered_color="#FFD54F"
         app:scrubber_color="@color/white"
         app:played_color="@color/white"
         app:unplayed_color="#40FFFFFF" />

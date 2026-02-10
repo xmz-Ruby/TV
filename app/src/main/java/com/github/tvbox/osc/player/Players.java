@@ -156,7 +156,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         exoPlayer.setAudioAttributes(AudioAttributes.DEFAULT, !Setting.isPlayWithOthers());
         exoPlayer.addAnalyticsListener(new EventLogger());
         exoPlayer.setHandleAudioBecomingNoisy(true);
-        view.setRender(Setting.getRender());
+        // Note: Media3 1.9.2 no longer supports dynamic surface type switching at runtime
+        // Surface type is now set via XML attribute or during view creation
         exoPlayer.setPlayWhenReady(true);
         exoPlayer.addListener(this);
         view.setPlayer(exoPlayer);

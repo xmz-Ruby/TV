@@ -41,23 +41,18 @@ include ':jianpian'
 include ':forcetech'
 include ':ijkplayer'
 
-// Include media3 modules
+// Include media3 modules (version 1.9.2)
+// Core modules
 include ':lib-common'
 project(':lib-common').projectDir = new File('../media/libraries/common')
+include ':lib-common-ktx'
+project(':lib-common-ktx').projectDir = new File('../media/libraries/common_ktx')
 include ':lib-container'
 project(':lib-container').projectDir = new File('../media/libraries/container')
 include ':lib-database'
 project(':lib-database').projectDir = new File('../media/libraries/database')
-include ':lib-datasource'
-project(':lib-datasource').projectDir = new File('../media/libraries/datasource')
-include ':lib-datasource-okhttp'
-project(':lib-datasource-okhttp').projectDir = new File('../media/libraries/datasource_okhttp')
-include ':lib-datasource-rtmp'
-project(':lib-datasource-rtmp').projectDir = new File('../media/libraries/datasource_rtmp')
-include ':lib-decoder'
-project(':lib-decoder').projectDir = new File('../media/libraries/decoder')
-include ':lib-decoder-av1'
-project(':lib-decoder-av1').projectDir = new File('../media/libraries/decoder_av1')
+
+// Exoplayer modules
 include ':lib-exoplayer'
 project(':lib-exoplayer').projectDir = new File('../media/libraries/exoplayer')
 include ':lib-exoplayer-dash'
@@ -68,21 +63,71 @@ include ':lib-exoplayer-rtsp'
 project(':lib-exoplayer-rtsp').projectDir = new File('../media/libraries/exoplayer_rtsp')
 include ':lib-exoplayer-smoothstreaming'
 project(':lib-exoplayer-smoothstreaming').projectDir = new File('../media/libraries/exoplayer_smoothstreaming')
+include ':lib-exoplayer-ima'
+project(':lib-exoplayer-ima').projectDir = new File('../media/libraries/exoplayer_ima')
+include ':lib-exoplayer-workmanager'
+project(':lib-exoplayer-workmanager').projectDir = new File('../media/libraries/exoplayer_workmanager')
+
+// Datasource modules
+include ':lib-datasource'
+project(':lib-datasource').projectDir = new File('../media/libraries/datasource')
+include ':lib-datasource-okhttp'
+project(':lib-datasource-okhttp').projectDir = new File('../media/libraries/datasource_okhttp')
+include ':lib-datasource-rtmp'
+project(':lib-datasource-rtmp').projectDir = new File('../media/libraries/datasource_rtmp')
+include ':lib-datasource-cronet'
+project(':lib-datasource-cronet').projectDir = new File('../media/libraries/datasource_cronet')
+
+// Decoder modules
+include ':lib-decoder'
+project(':lib-decoder').projectDir = new File('../media/libraries/decoder')
+include ':lib-decoder-av1'
+project(':lib-decoder-av1').projectDir = new File('../media/libraries/decoder_av1')
+include ':lib-decoder-ffmpeg'
+project(':lib-decoder-ffmpeg').projectDir = new File('../media/libraries/decoder_ffmpeg')
+include ':lib-decoder-flac'
+project(':lib-decoder-flac').projectDir = new File('../media/libraries/decoder_flac')
+include ':lib-decoder-iamf'
+project(':lib-decoder-iamf').projectDir = new File('../media/libraries/decoder_iamf')
+include ':lib-decoder-midi'
+project(':lib-decoder-midi').projectDir = new File('../media/libraries/decoder_midi')
+include ':lib-decoder-mpegh'
+project(':lib-decoder-mpegh').projectDir = new File('../media/libraries/decoder_mpegh')
+include ':lib-decoder-opus'
+project(':lib-decoder-opus').projectDir = new File('../media/libraries/decoder_opus')
+include ':lib-decoder-vp9'
+project(':lib-decoder-vp9').projectDir = new File('../media/libraries/decoder_vp9')
+
+// Other modules
 include ':lib-extractor'
 project(':lib-extractor').projectDir = new File('../media/libraries/extractor')
 include ':lib-ui'
 project(':lib-ui').projectDir = new File('../media/libraries/ui')
+include ':lib-ui-leanback'
+project(':lib-ui-leanback').projectDir = new File('../media/libraries/ui_leanback')
+include ':lib-ui-compose'
+project(':lib-ui-compose').projectDir = new File('../media/libraries/ui_compose')
+include ':lib-ui-compose-material3'
+project(':lib-ui-compose-material3').projectDir = new File('../media/libraries/ui_compose_material3')
+include ':lib-session'
+project(':lib-session').projectDir = new File('../media/libraries/session')
+include ':lib-cast'
+project(':lib-cast').projectDir = new File('../media/libraries/cast')
+include ':lib-effect'
+project(':lib-effect').projectDir = new File('../media/libraries/effect')
+include ':lib-inspector'
+project(':lib-inspector').projectDir = new File('../media/libraries/inspector')
+include ':lib-transformer'
+project(':lib-transformer').projectDir = new File('../media/libraries/transformer')
+include ':lib-muxer'
+project(':lib-muxer').projectDir = new File('../media/libraries/muxer')
+
+// Test modules
 include ':test-utils'
 project(':test-utils').projectDir = new File('../media/libraries/test_utils')
 include ':test-data'
 project(':test-data').projectDir = new File('../media/libraries/test_data')
 include ':test-utils-robolectric'
 project(':test-utils-robolectric').projectDir = new File('../media/libraries/test_utils_robolectric')
-include ':lib-transformer'
-project(':lib-transformer').projectDir = new File('../media/libraries/transformer')
-include ':lib-effect'
-project(':lib-effect').projectDir = new File('../media/libraries/effect')
-include ':lib-muxer'
-project(':lib-muxer').projectDir = new File('../media/libraries/muxer')
 
 rootProject.name = "TV"

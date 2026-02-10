@@ -79,13 +79,19 @@ public final class SubtitleDialog extends BaseDialog {
     }
 
     private void onLarge(View view) {
-        subtitleView.addTextSize(0.002f);
-        Setting.putSubtitleTextSize(subtitleView.getTextSize());
+        // Note: SubtitleView API changed in Media3 1.9.2 - no more addTextSize/subTextSize
+        float currentSize = Setting.getSubtitleTextSize();
+        float newSize = currentSize == 0 ? SubtitleView.DEFAULT_TEXT_SIZE_FRACTION + 0.002f : currentSize + 0.002f;
+        subtitleView.setFractionalTextSize(newSize);
+        Setting.putSubtitleTextSize(newSize);
     }
 
     private void onSmall(View view) {
-        subtitleView.subTextSize(0.002f);
-        Setting.putSubtitleTextSize(subtitleView.getTextSize());
+        // Note: SubtitleView API changed in Media3 1.9.2 - no more addTextSize/subTextSize
+        float currentSize = Setting.getSubtitleTextSize();
+        float newSize = currentSize == 0 ? SubtitleView.DEFAULT_TEXT_SIZE_FRACTION - 0.002f : Math.max(currentSize - 0.002f, 0.01f);
+        subtitleView.setFractionalTextSize(newSize);
+        Setting.putSubtitleTextSize(newSize);
     }
 
     private void onReset(View view) {

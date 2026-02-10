@@ -12,7 +12,7 @@
         style="@style/Player.Vod"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:surface_type="none" />
+        app:surface_type="surface_view" />
 
     <tv.danmaku.ijk.media.player.ui.IjkVideoView
         android:id="@+id/ijk"

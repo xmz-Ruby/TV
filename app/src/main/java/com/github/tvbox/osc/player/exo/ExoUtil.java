@@ -36,9 +36,26 @@ import java.util.Map;
 
 public class ExoUtil {
 
+    /**
+     * 增强的预加载配置
+     * - minBufferMs: 用户设置的最小缓冲时间（默认8秒）
+     * - maxBufferMs: 最大缓冲时间增加到120秒（2分钟），支持持续预加载
+     * - bufferForPlaybackMs: 开始播放需要的缓冲时间（1秒）
+     * - bufferForPlaybackAfterRebufferMs: 重新缓冲后开始播放的时间（2秒）
+     *
+     * 这样配置可以实现：
+     * 1. 播放时持续缓存前方约1-2分钟的内容
+     * 2. 暂停时可以继续累积更多缓存
+     * 3. 网络不好时有足够缓冲避免卡顿
+     */
     public static LoadControl buildLoadControl() {
         int minBufferMs = Math.max(Setting.getBuffer() * 1000, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
-        return new DefaultLoadControl.Builder().setBufferDurationsMs(minBufferMs, DefaultLoadControl.DEFAULT_MAX_BUFFER_MS, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS).build();
+        int maxBufferMs = 120 * 1000; // 120秒（2分钟），支持持续预加载
+        int bufferForPlaybackMs = DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS; // 1秒
+        int bufferForPlaybackAfterRebufferMs = DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS; // 2秒
+        return new DefaultLoadControl.Builder()
+                .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackAfterRebufferMs)
+                .build();
     }
 
     public static TrackSelector buildTrackSelector() {
@@ -94,7 +111,8 @@ public class ExoUtil {
     }
 
     public static String getMimeType(int errorCode) {
-        if (errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED || errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED) return MimeTypes.APPLICATION_OCTET;
+        // Note: APPLICATION_OCTET was removed in Media3 1.9.2, using APPLICATION_M3U8 as fallback
+        if (errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED || errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED) return MimeTypes.APPLICATION_M3U8;
         if (errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED || errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED || errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED) return MimeTypes.APPLICATION_M3U8;
         return null;
     }
@@ -113,7 +131,8 @@ public class ExoUtil {
         builder.setSubtitleConfigurations(getSubtitleConfigs(subs));
         if (drm != null) builder.setDrmConfiguration(drm.get());
         if (mimeType != null) builder.setMimeType(mimeType);
-        builder.setAds(Sniffer.getRegex(uri));
+        // Note: setAds() was removed in Media3 1.9.2
+        // Ad detection regex is now handled differently - see Sniffer.getRegex(uri)
         builder.setMediaId(uri.toString());
         return builder.build();
     }

@@ -452,6 +452,17 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         mArtworkView.setVisibility(VISIBLE);
     }
 
+    /**
+     * 增强的预加载配置
+     * - max-buffer-size: 增加到60MB，支持约2-4分钟的视频预加载（取决于码率）
+     * - min-frames: 最小缓冲帧数，确保播放流畅
+     * - max-fps: 最大帧率，避免过度缓冲
+     *
+     * 缓冲大小参考：
+     * - 15MB (旧值): 约30-60秒视频（5-10 Mbps码率）
+     * - 60MB (新值): 约2-4分钟视频（5-10 Mbps码率）
+     * - 120MB: 约4-8分钟视频（5-10 Mbps码率）
+     */
     private void setOptions(Uri uri) {
         String url = uri.toString();
         mPlayer.setOption(codec, "skip_loop_filter", 48);
@@ -461,7 +472,10 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         mPlayer.setOption(format, "http-detect-range-support", 0);
         mPlayer.setOption(player, "enable-accurate-seek", 0);
         mPlayer.setOption(player, "framedrop", 1);
-        mPlayer.setOption(player, "max-buffer-size", 15 * 1024 * 1024);
+        // 增加最大缓冲大小到60MB，支持持续预加载
+        mPlayer.setOption(player, "max-buffer-size", 60 * 1024 * 1024);
+        // 设置最小缓冲帧数，确保播放流畅
+        mPlayer.setOption(player, "min-frames", 25);
         mPlayer.setOption(player, "mediacodec", mCurrentDecode);
         mPlayer.setOption(player, "mediacodec-hevc", mCurrentDecode);
         mPlayer.setOption(player, "mediacodec-all-videos", mCurrentDecode);
