@@ -159,6 +159,7 @@ public class VodConfig {
 
     private void parseConfig(JsonObject object, Callback callback) {
         try {
+            android.util.Log.d("VodConfig", "parseConfig 开始");
             initSite(object);
             initParse(object);
             initOther(object);
@@ -166,9 +167,16 @@ public class VodConfig {
             if (loadLive && object.has("lives")) initLive(object);
             String notice = Json.safeString(object, "notice");
             config.logo(Json.safeString(object, "logo"));
+            android.util.Log.d("VodConfig", "准备调用 callback.success(notice)");
             App.post(() -> callback.success(notice));
             config.json(object.toString()).update();
+            android.util.Log.d("VodConfig", "准备调用 callback.success()");
             App.post(callback::success);
+            android.util.Log.d("VodConfig", "parseConfig 完成");
+
+            // 在配置解析完成后，直接预加载 Python 站点
+            android.util.Log.d("VodConfig", "parseConfig 完成后，准备预加载 Python 站点");
+            preloadPythonSites();
         } catch (Throwable e) {
             e.printStackTrace();
             App.post(() -> callback.error(Notify.getError(R.string.error_config_parse, e)));
@@ -357,6 +365,68 @@ public class VodConfig {
     private void setDanmuHost(String danmuHost) {
         if (!TextUtils.isEmpty(danmuHost)) {
             com.github.tvbox.osc.Setting.putDanmuHost(danmuHost);
+        }
+    }
+
+    // 标记是否已经预加载过 Python 站点
+    private static volatile boolean pythonSitesPreloaded = false;
+
+    /**
+     * 预加载所有 Python 站点的 init 方法
+     * 在首页加载完成后调用，提前初始化 Python 站点，提升用户体验
+     * 使用多线程并行加载，只在应用启动时加载一次
+     */
+    public void preloadPythonSites() {
+        // 如果已经预加载过，直接返回
+        if (pythonSitesPreloaded) {
+            android.util.Log.d("VodConfig", "Python 站点已预加载过，跳过本次预加载");
+            return;
+        }
+
+        // 标记为已预加载
+        pythonSitesPreloaded = true;
+
+        android.util.Log.d("VodConfig", "开始预加载 Python 站点，总站点数: " + sites.size());
+
+        // 收集所有需要预加载的 Python 站点
+        List<Site> pythonSites = new ArrayList<>();
+        for (Site site : sites) {
+            if (site.getType() == 3 && site.getApi().endsWith(".py")) {
+                pythonSites.add(site);
+            }
+        }
+
+        if (pythonSites.isEmpty()) {
+            android.util.Log.d("VodConfig", "没有需要预加载的 Python 站点");
+            return;
+        }
+
+        android.util.Log.d("VodConfig", "找到 " + pythonSites.size() + " 个 Python 站点，开始并行预加载");
+
+        // 使用多线程并行加载
+        final int totalCount = pythonSites.size();
+        final java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        final java.util.concurrent.atomic.AtomicInteger failCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        for (Site site : pythonSites) {
+            App.execute(() -> {
+                try {
+                    android.util.Log.d("VodConfig", "预加载 Python 站点: " + site.getName() + " (" + site.getKey() + ")");
+                    BaseLoader.get().getSpider(site.getKey(), site.getApi(), site.getExt(), site.getJar());
+                    android.util.Log.d("VodConfig", "成功预加载: " + site.getName());
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    android.util.Log.e("VodConfig", "预加载失败: " + site.getName() + " - " + e.getMessage());
+                    failCount.incrementAndGet();
+                    e.printStackTrace();
+                } finally {
+                    // 检查是否所有站点都已处理完成
+                    int completed = successCount.get() + failCount.get();
+                    if (completed == totalCount) {
+                        android.util.Log.d("VodConfig", "Python 站点预加载完成，成功: " + successCount.get() + "，失败: " + failCount.get());
+                    }
+                }
+            });
         }
     }
 }
