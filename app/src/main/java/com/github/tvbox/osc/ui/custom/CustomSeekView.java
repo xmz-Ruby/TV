@@ -15,15 +15,21 @@ import androidx.media3.ui.TimeBar;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.player.Players;
 
+import java.text.DecimalFormat;
 import java.util.concurrent.TimeUnit;
 
 public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListener {
 
     private static final int MAX_UPDATE_INTERVAL_MS = 1000;
     private static final int MIN_UPDATE_INTERVAL_MS = 200;
+    // 估算视频码率用于计算内存使用（默认5Mbps，会根据实际情况调整）
+    private static final int DEFAULT_BITRATE_KBPS = 5000;
+    // 音频码率约128Kbps
+    private static final int AUDIO_BITRATE_KBPS = 128;
 
     private TextView positionView;
     private TextView durationView;
+    private TextView bufferedView;
     private DefaultTimeBar timeBar;
 
     private Runnable refresh;
@@ -58,6 +64,7 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
     private void init() {
         positionView = findViewById(R.id.position);
         durationView = findViewById(R.id.duration);
+        bufferedView = findViewById(R.id.buffered);
         timeBar = findViewById(R.id.timeBar);
         timeBar.addListener(this);
         refresh = this::refresh;
@@ -76,6 +83,40 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
         post(refresh);
     }
 
+    private String formatBufferSize(long cachedBytes) {
+        if (cachedBytes <= 0) {
+            // 如果无法获取实际缓存字节数，返回估算值
+            return "";
+        }
+        if (cachedBytes < 1024 * 1024) {
+            return (cachedBytes / 1024) + "KB";
+        } else if (cachedBytes < 1024 * 1024 * 1024) {
+            return (cachedBytes / (1024 * 1024)) + "MB";
+        } else {
+            DecimalFormat df = new DecimalFormat("#.#");
+            return df.format(cachedBytes / (1024.0 * 1024 * 1024)) + "GB";
+        }
+    }
+
+    private String formatBufferSizeEstimate(long bufferedMs, long durationMs) {
+        if (bufferedMs <= 0 || durationMs <= 0) {
+            return "";
+        }
+        // 估算缓冲大小（视频+音频）- 仅用于无法获取实际缓存字节数时
+        int avgBitrateKbps = DEFAULT_BITRATE_KBPS + AUDIO_BITRATE_KBPS;
+        long bufferedSeconds = bufferedMs / 1000;
+        long bufferSizeBytes = bufferedSeconds * avgBitrateKbps * 1024 / 8;
+
+        if (bufferSizeBytes < 1024 * 1024) {
+            return (bufferSizeBytes / 1024) + "KB";
+        } else if (bufferSizeBytes < 1024 * 1024 * 1024) {
+            return (bufferSizeBytes / (1024 * 1024)) + "MB";
+        } else {
+            DecimalFormat df = new DecimalFormat("#.#");
+            return df.format(bufferSizeBytes / (1024.0 * 1024 * 1024)) + "GB";
+        }
+    }
+
     private void refresh() {
         if (player.isRelease()) return;
         long duration = player.getDuration();
@@ -87,6 +128,7 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
         currentDuration = duration;
         currentPosition = position;
         currentBuffered = buffered;
+
         if (durationChanged) {
             setKeyTimeIncrement(duration);
             timeBar.setDuration(duration);
@@ -96,12 +138,34 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
             timeBar.setPosition(position);
             positionView.setText(player.stringToTime(position < 0 ? 0 : position));
         }
-        if (bufferedChanged) {
-            timeBar.setBufferedPosition(buffered);
+        // 始终更新缓冲显示（不只是变化时），确保暂停时也能看到缓冲状态
+        timeBar.setBufferedPosition(buffered);
+        // 更新缓冲时间和内存显示
+        if (buffered > position && buffered > 0) {
+            String bufferedTime = player.stringToTime(buffered);
+            // 优先使用实际缓存字节数（IjkPlayer）
+            long cachedBytes = player.getCachedBytes();
+            String bufferSize;
+            if (cachedBytes > 0) {
+                bufferSize = formatBufferSize(cachedBytes);
+            } else {
+                // 降级到估算值（ExoPlayer或其他）
+                bufferSize = formatBufferSizeEstimate(buffered - position, duration);
+            }
+            if (!bufferSize.isEmpty()) {
+                bufferedView.setText(bufferedTime + " " + bufferSize);
+                bufferedView.setVisibility(VISIBLE);
+            } else {
+                bufferedView.setText(bufferedTime);
+                bufferedView.setVisibility(VISIBLE);
+            }
+        } else {
+            bufferedView.setVisibility(INVISIBLE);
         }
         if (player.isEmpty()) {
             positionView.setText("00:00");
             durationView.setText("00:00");
+            bufferedView.setVisibility(INVISIBLE);
             timeBar.setPosition(currentDuration = 0);
             timeBar.setDuration(currentDuration = 0);
         }

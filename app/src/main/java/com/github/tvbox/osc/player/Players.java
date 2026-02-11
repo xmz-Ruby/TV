@@ -297,6 +297,11 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         return 0;
     }
 
+    public long getCachedBytes() {
+        if (isIjk() && ijkPlayer != null) return ijkPlayer.getCachedBytes();
+        return 0;
+    }
+
     private boolean haveDanmu() {
         return danmuView != null && danmuView.isPrepared();
     }

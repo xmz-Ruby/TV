@@ -7,13 +7,30 @@
     android:gravity="center_vertical"
     android:orientation="horizontal">
 
-    <TextView
-        android:id="@+id/position"
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/white"
-        android:textSize="14sp"
-        tools:text="00:00:00" />
+        android:orientation="vertical"
+        android:gravity="end">
+
+        <TextView
+            android:id="@+id/buffered"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFD54F"
+            android:textSize="12sp"
+            android:maxLines="1"
+            tools:text="缓存: 00:10:00 50MB" />
+
+        <TextView
+            android:id="@+id/position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            tools:text="00:05:00" />
+
+    </LinearLayout>
 
     <androidx.media3.ui.DefaultTimeBar
         android:id="@+id/timeBar"
@@ -36,6 +53,6 @@
         android:layout_height="wrap_content"
         android:textColor="@color/white"
         android:textSize="14sp"
-        tools:text="00:00:00" />
+        tools:text="00:30:00" />
 
 </LinearLayout>

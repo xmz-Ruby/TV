@@ -37,24 +37,21 @@ import java.util.Map;
 public class ExoUtil {
 
     /**
-     * 增强的预加载配置
-     * - minBufferMs: 用户设置的最小缓冲时间（默认8秒）
-     * - maxBufferMs: 最大缓冲时间增加到120秒（2分钟），支持持续预加载
-     * - bufferForPlaybackMs: 开始播放需要的缓冲时间（1秒）
-     * - bufferForPlaybackAfterRebufferMs: 重新缓冲后开始播放的时间（2秒）
+     * 简化的缓冲配置 - 仅按时间控制
      *
-     * 这样配置可以实现：
-     * 1. 播放时持续缓存前方约1-2分钟的内容
-     * 2. 暂停时可以继续累积更多缓存
-     * 3. 网络不好时有足够缓冲避免卡顿
+     * - 点播视频：永远保持前方 1 分钟的缓冲
+     * - 播放时：持续维持 1 分钟缓冲
+     * - 暂停时：继续缓存直到 1 分钟满
+     * - 不按字节限制，仅按时间控制
      */
     public static LoadControl buildLoadControl() {
-        int minBufferMs = Math.max(Setting.getBuffer() * 1000, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
-        int maxBufferMs = 120 * 1000; // 120秒（2分钟），支持持续预加载
-        int bufferForPlaybackMs = DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS; // 1秒
-        int bufferForPlaybackAfterRebufferMs = DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS; // 2秒
         return new DefaultLoadControl.Builder()
-                .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackAfterRebufferMs)
+                .setBufferDurationsMs(
+                        15000,  // minBufferMs: 最小缓冲15秒
+                        60000,  // maxBufferMs: 最大缓冲60秒（1分钟）
+                        1500,   // bufferForPlaybackMs: 播放开始需要1.5秒
+                        5000    // bufferForPlaybackAfterRebufferMs: 重新缓冲后需要5秒
+                )
                 .build();
     }
 

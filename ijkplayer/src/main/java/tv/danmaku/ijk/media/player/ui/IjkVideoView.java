@@ -328,7 +328,33 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
     }
 
     public long getBufferedPosition() {
-        if (mPlayer != null) return mCurrentBufferPosition;
+        if (mPlayer == null) return 0;
+        // 首先尝试从 IjkMediaPlayer 获取准确的缓存时长
+        if (mPlayer instanceof IjkMediaPlayer) {
+            IjkMediaPlayer ijkPlayer = (IjkMediaPlayer) mPlayer;
+            long videoCachedDuration = ijkPlayer.getVideoCachedDuration();
+            long audioCachedDuration = ijkPlayer.getAudioCachedDuration();
+            // 使用较大的缓存时长（视频或音频）
+            long maxCachedDuration = Math.max(videoCachedDuration, audioCachedDuration);
+            if (maxCachedDuration > 0) {
+                // 当前位置 + 缓存时长 = 缓冲到的位置
+                return getCurrentPosition() + maxCachedDuration;
+            }
+        }
+        // 降级到使用回调更新的缓冲位置
+        return mCurrentBufferPosition > 0 ? mCurrentBufferPosition : getCurrentPosition();
+    }
+
+    /**
+     * 获取当前缓存的字节数（用于显示内存使用）
+     */
+    public long getCachedBytes() {
+        if (mPlayer instanceof IjkMediaPlayer) {
+            IjkMediaPlayer ijkPlayer = (IjkMediaPlayer) mPlayer;
+            long videoBytes = ijkPlayer.getVideoCachedBytes();
+            long audioBytes = ijkPlayer.getAudioCachedBytes();
+            return videoBytes + audioBytes;
+        }
         return 0;
     }
 
@@ -453,15 +479,15 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
     }
 
     /**
-     * 增强的预加载配置
-     * - max-buffer-size: 增加到60MB，支持约2-4分钟的视频预加载（取决于码率）
+     * 增强的预加载配置 - 针对 4K 高码率视频优化
+     * - max-buffer-size: 增加到200MB，支持约30-40秒的4K视频（50 Mbps码率）
      * - min-frames: 最小缓冲帧数，确保播放流畅
-     * - max-fps: 最大帧率，避免过度缓冲
+     * - max-duration: 最大缓冲时长（秒）
      *
-     * 缓冲大小参考：
-     * - 15MB (旧值): 约30-60秒视频（5-10 Mbps码率）
-     * - 60MB (新值): 约2-4分钟视频（5-10 Mbps码率）
-     * - 120MB: 约4-8分钟视频（5-10 Mbps码率）
+     * 缓冲大小参考（4K 视频，码率约 50 Mbps = 6.25 MB/s）：
+     * - 60MB (旧值): 约10秒视频
+     * - 200MB (新值): 约32秒视频
+     * - 500MB: 约80秒视频
      */
     private void setOptions(Uri uri) {
         String url = uri.toString();
@@ -472,10 +498,13 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         mPlayer.setOption(format, "http-detect-range-support", 0);
         mPlayer.setOption(player, "enable-accurate-seek", 0);
         mPlayer.setOption(player, "framedrop", 1);
-        // 增加最大缓冲大小到60MB，支持持续预加载
-        mPlayer.setOption(player, "max-buffer-size", 60 * 1024 * 1024);
-        // 设置最小缓冲帧数，确保播放流畅
-        mPlayer.setOption(player, "min-frames", 25);
+        // 缓冲配置 - 基于 GSYVideoPlayer 的最佳实践
+        // 关键：packet-buffering 必须设为 0，否则会出现播放一段时间后卡顿
+        mPlayer.setOption(player, "packet-buffering", 0); // 关闭 packet buffering，避免卡顿
+        mPlayer.setOption(player, "max-buffer-size", 1024 * 1024 * 1024); // 1GB 内存上限
+        mPlayer.setOption(player, "min-frames", 2); // 最小帧数，GSYVideoPlayer 推荐值
+        mPlayer.setOption(player, "max_cached_duration", 60000); // 最大缓存时长 60 秒
+        mPlayer.setOption(player, "infbuf", 1); // 无限读，不限制输入缓存
         mPlayer.setOption(player, "mediacodec", mCurrentDecode);
         mPlayer.setOption(player, "mediacodec-hevc", mCurrentDecode);
         mPlayer.setOption(player, "mediacodec-all-videos", mCurrentDecode);
@@ -488,12 +517,18 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         mPlayer.setOption(player, "start-on-prepared", 1);
         mPlayer.setOption(player, "subtitle", 1);
         mPlayer.setOption(format, "protocol_whitelist", "async,cache,crypto,file,http,https,pipe,rtmp,rtp,tcp,tls,udp,data,ijkinject,ijklongurl,ijksegment,ijkhttphook,ijklivehook,ijktcphook,ijkurlhook,ijkmediadatasource");
+        // 启用无限缓冲 - 绕过 min-frames 的包数量限制
+        // 当 infbuf=1 时，read_thread 不会因为包数量达到 min-frames 而停止
+        // 缓冲将主要由 max-buffer-size 控制
         if (url.contains("rtsp") || url.contains("udp") || url.contains("rtp")) {
             mPlayer.setOption(format, "infbuf", 1);
             mPlayer.setOption(format, "rtsp_transport", "tcp");
             mPlayer.setOption(format, "rtsp_flags", "prefer_tcp");
             mPlayer.setOption(format, "probesize", 512 * 1000);
             mPlayer.setOption(format, "analyzeduration", 2 * 1000 * 1000);
+        } else {
+            // HTTP流也启用 infbuf，实现持续缓冲直到达到 max-buffer-size
+            mPlayer.setOption(player, "infbuf", 1);
         }
     }
 
