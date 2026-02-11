@@ -284,7 +284,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private int getPlayer() {
-        return mHistory != null && mHistory.getPlayer() != -1 ? mHistory.getPlayer() : getSite().getPlayerType() != -1 ? getSite().getPlayerType() : Setting.getPlayer();
+        // 所有影视资源优先使用 EXO 播放器，忽略历史记录中的播放器设置
+        return getSite().getPlayerType() != -1 ? getSite().getPlayerType() : Players.EXO;
     }
 
     private int getScale() {

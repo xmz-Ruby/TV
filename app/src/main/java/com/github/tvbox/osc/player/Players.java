@@ -226,7 +226,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public int getDecode(int player) {
-        return Setting.getDecode(player);
+        // 所有播放器优先使用硬解
+        return HARD;
     }
 
     public void setDecode(int player, int decode) {
@@ -398,7 +399,30 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void nextPlayer() {
-        setPlayer(isExo() ? IJK : EXO);
+        // 播放器优先级顺序：EXO硬解 -> EXO软解 -> IJK硬解 -> IJK软解 -> 系统
+        if (player == EXO && decode == HARD) {
+            // EXO硬解 -> EXO软解
+            player = EXO;
+            decode = SOFT;
+        } else if (player == EXO && decode == SOFT) {
+            // EXO软解 -> IJK硬解
+            player = IJK;
+            decode = HARD;
+        } else if (player == IJK && decode == HARD) {
+            // IJK硬解 -> IJK软解
+            player = IJK;
+            decode = SOFT;
+        } else if (player == IJK && decode == SOFT) {
+            // IJK软解 -> 系统
+            player = SYS;
+            decode = SOFT;
+        } else {
+            // 系统 或 其他情况 -> 重置为 EXO硬解
+            player = EXO;
+            decode = HARD;
+        }
+        setPlayer(player);
+        this.decode = decode;
     }
 
     public void toggleDecode(boolean save) {
