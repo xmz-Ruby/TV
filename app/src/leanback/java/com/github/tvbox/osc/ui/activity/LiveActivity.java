@@ -100,6 +100,8 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     private int errorCount;
     private int count;
     private int mInitialLine; // 记录开始播放时的线路索引，用于判断是否已尝试所有线路
+    private int mInitialPlayer; // 记录开始播放时的播放器类型
+    private int mInitialDecode; // 记录开始播放时的解码方式
 
     public static void start(Context context) {
         if (!LiveConfig.isEmpty()) context.startActivity(new Intent(context, LiveActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("empty", false));
@@ -644,12 +646,26 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     }
 
     private void setChannel(Channel item) {
-        mPlayers.setPlayer(getPlayerType(item.getPlayerType()));
+        // 每次切换频道时，重置线路到第一个
+        item.setLine(0);
+
+        // 每次切换频道时，重置播放器到EXO硬解
+        int playerType = getPlayerType(item.getPlayerType());
+        if (playerType == -1) {
+            playerType = Players.EXO; // 默认使用EXO
+        }
+        mPlayers.setPlayer(playerType);
+        mPlayers.setDecode(playerType, Players.HARD); // 设置为硬解
+
         setArtwork(item.getLogo());
         App.post(mR0, 100);
         mChannel = item;
-        // 记录当前频道的初始线路索引
+
+        // 记录当前频道的初始线路索引和播放器状态
         mInitialLine = item.getLine();
+        mInitialPlayer = mPlayers.getPlayer();
+        mInitialDecode = mPlayers.getDecode(mInitialPlayer);
+
         setPlayerView();
         showInfo();
     }
@@ -823,24 +839,60 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onErrorEvent(ErrorEvent event) {
-        if (addErrorCount() > 20) onErrorEnd(event);
-        else if (mPlayers.addRetry() > event.getRetry()) checkError(event);
-        else if (event.isDecode() && mPlayers.canToggleDecode()) onDecode(false);
-        else if (event.isExo() && mPlayers.isExo()) onExoCheck(event);
-        else fetch();
+        if (addErrorCount() > 20) {
+            onErrorEnd(event);
+        } else if (mPlayers.addRetry() > event.getRetry()) {
+            checkErrorWithPlayerSwitch(event);
+        } else {
+            fetch();
+        }
     }
 
     private void onExoCheck(ErrorEvent event) {
-        // IO 错误（包括 HTTP 602 等网络错误）直接切换线路，不要重试相同 URL
         if (event.getCode() >= 2000 && event.getCode() <= 2999) {
-            android.util.Log.d("LiveActivity", "IO error detected (code: " + event.getCode() + "), switching line");
-            fetch();
+            startFlow();
         } else if (event.getCode() == PlaybackException.ERROR_CODE_IO_UNSPECIFIED || event.getCode() >= PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED && event.getCode() <= PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED) {
-            mPlayers.setFormat(ExoUtil.getMimeType(event.getCode()));
-            mPlayers.setMediaSource();
+            startFlow();
         } else {
             mPlayers.setMediaSource();
         }
+    }
+
+    private void checkErrorWithPlayerSwitch(ErrorEvent event) {
+        if (mChannel == null) {
+            fetch();
+            return;
+        }
+
+        boolean triedAllPlayers = hasTriedAllPlayers();
+
+        if (!triedAllPlayers) {
+            nextPlayer();
+        } else {
+            resetToInitialPlayer();
+            startFlow();
+        }
+    }
+
+    private boolean hasTriedAllPlayers() {
+        int currentPlayer = mPlayers.getPlayer();
+        int currentDecode = mPlayers.getDecode(currentPlayer);
+
+        if (currentPlayer == Players.SYS) {
+            return true;
+        }
+
+        if (currentPlayer == mInitialPlayer && currentDecode == mInitialDecode) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private void resetToInitialPlayer() {
+        mPlayers.setPlayer(mInitialPlayer);
+        mPlayers.setDecode(mInitialPlayer, mInitialDecode);
+        setPlayerView();
     }
 
     private void checkError(ErrorEvent event) {
@@ -877,9 +929,18 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
 
     private void startFlow() {
         if (!Setting.isChange()) return;
-        // 尝试切换到下一个线路
-        // tryNextLine() 现在会循环重试所有线路，不会返回 false
-        mChannel.tryNextLine();
+
+        int nextLine = mChannel.getLine() + 1;
+        if (nextLine >= mChannel.getUrls().size()) {
+            nextLine = 0;
+        }
+
+        if (nextLine == mInitialLine) {
+            showError("所有线路均播放失败");
+            return;
+        }
+
+        mChannel.setLine(nextLine);
         showInfo();
         fetch();
     }
@@ -906,7 +967,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
         int position = mChannel.getData().getSelected() + 1;
         boolean limit = position > mEpgDataAdapter.size() - 1;
         if (!limit) onItemClick(mChannel.getData().getList().get(position));
-        else nextChannel();
+        else startFlow();
     }
 
     private void prevLine() {
