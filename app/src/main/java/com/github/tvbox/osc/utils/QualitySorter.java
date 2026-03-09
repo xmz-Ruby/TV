@@ -1,5 +1,7 @@
 package com.github.tvbox.osc.utils;
 
+import android.os.Build;
+
 import com.github.tvbox.osc.bean.Value;
 
 import java.util.ArrayList;
@@ -15,49 +17,95 @@ import java.util.Map;
  */
 public class QualitySorter {
 
-    // 画质优先级映射表（数字越小排序后越靠前）
-    // 排序规则：高清 -> 流畅/标清 -> 超清 -> 4K -> 原画/蓝光
-    private static final Map<String, Integer> QUALITY_PRIORITY = new HashMap<>();
+    // x86/arm64 架构的画质优先级映射表
+    private static final Map<String, Integer> QUALITY_PRIORITY_HIGH_PERFORMANCE = new HashMap<>();
+
+    // arm 架构的画质优先级映射表
+    private static final Map<String, Integer> QUALITY_PRIORITY_LOW_PERFORMANCE = new HashMap<>();
 
     static {
-        // 优先级1：高清（最常用，排第一）
-        QUALITY_PRIORITY.put("高清", 1);
-        QUALITY_PRIORITY.put("high", 1);
-        QUALITY_PRIORITY.put("HD", 1);
-        QUALITY_PRIORITY.put("hd", 1);
+        // x86/arm64: 原画/蓝光 -> 4K -> 超清 -> 高清 -> 流畅/标清
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("原画", 1);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("蓝光", 1);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("Blu-ray", 1);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("BluRay", 1);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("BD", 1);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("bd", 1);
 
-        // 优先级2：流畅/标清（低画质，排第二）
-        QUALITY_PRIORITY.put("流畅", 2);
-        QUALITY_PRIORITY.put("low", 2);
-        QUALITY_PRIORITY.put("标清", 2);
-        QUALITY_PRIORITY.put("普清", 2);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("4K", 2);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("4k", 2);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("UHD", 2);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("uhd", 2);
 
-        // 优先级3：超清（高画质，排第三）
-        QUALITY_PRIORITY.put("超清", 3);
-        QUALITY_PRIORITY.put("super", 3);
-        QUALITY_PRIORITY.put("FHD", 3);
-        QUALITY_PRIORITY.put("fhd", 3);
-        QUALITY_PRIORITY.put("全高清", 3);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("超清", 3);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("super", 3);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("FHD", 3);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("fhd", 3);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("全高清", 3);
 
-        // 优先级4：4K（超高画质，排第四）
-        QUALITY_PRIORITY.put("4K", 4);
-        QUALITY_PRIORITY.put("4k", 4);
-        QUALITY_PRIORITY.put("UHD", 4);
-        QUALITY_PRIORITY.put("uhd", 4);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("高清", 4);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("high", 4);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("HD", 4);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("hd", 4);
 
-        // 优先级5：原画/蓝光（最高画质，排最后）
-        QUALITY_PRIORITY.put("原画", 5);
-        QUALITY_PRIORITY.put("蓝光", 5);
-        QUALITY_PRIORITY.put("Blu-ray", 5);
-        QUALITY_PRIORITY.put("BluRay", 5);
-        QUALITY_PRIORITY.put("BD", 5);
-        QUALITY_PRIORITY.put("bd", 5);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("流畅", 5);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("low", 5);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("标清", 5);
+        QUALITY_PRIORITY_HIGH_PERFORMANCE.put("普清", 5);
+
+        // arm: 超清 -> 高清 -> 流畅/标清 -> 4K -> 原画/蓝光
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("超清", 1);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("super", 1);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("FHD", 1);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("fhd", 1);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("全高清", 1);
+
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("高清", 2);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("high", 2);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("HD", 2);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("hd", 2);
+
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("流畅", 3);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("low", 3);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("标清", 3);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("普清", 3);
+
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("4K", 4);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("4k", 4);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("UHD", 4);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("uhd", 4);
+
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("原画", 5);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("蓝光", 5);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("Blu-ray", 5);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("BluRay", 5);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("BD", 5);
+        QUALITY_PRIORITY_LOW_PERFORMANCE.put("bd", 5);
     }
 
-    // 需要过滤掉的无效画质名称
     private static final String[] INVALID_QUALITY_NAMES = {
         "原代服", "原代本", "代服", "代本"
     };
+
+    /**
+     * 检测是否为高性能架构 (x86 或 arm64)
+     */
+    private static boolean isHighPerformanceArch() {
+        String[] abis = Build.SUPPORTED_ABIS;
+        for (String abi : abis) {
+            if (abi.contains("x86") || abi.contains("arm64")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 获取当前架构对应的优先级映射表
+     */
+    private static Map<String, Integer> getQualityPriorityMap() {
+        return isHighPerformanceArch() ? QUALITY_PRIORITY_HIGH_PERFORMANCE : QUALITY_PRIORITY_LOW_PERFORMANCE;
+    }
 
     /**
      * 对画质列表进行过滤和排序
@@ -69,7 +117,6 @@ public class QualitySorter {
             return values;
         }
 
-        // 过滤无效画质
         List<Value> filtered = new ArrayList<>();
         for (Value value : values) {
             if (!isInvalidQuality(value.getN())) {
@@ -77,12 +124,10 @@ public class QualitySorter {
             }
         }
 
-        // 如果过滤后为空，返回原列表
         if (filtered.isEmpty()) {
             return values;
         }
 
-        // 按画质优先级排序（从低到高）
         Collections.sort(filtered, new Comparator<Value>() {
             @Override
             public int compare(Value v1, Value v2) {
@@ -115,27 +160,26 @@ public class QualitySorter {
     /**
      * 获取画质优先级
      * @param qualityName 画质名称
-     * @return 优先级数字（越小优先级越低）
+     * @return 优先级数字（越小优先级越高）
      */
     private static int getQualityPriority(String qualityName) {
         if (qualityName == null || qualityName.trim().isEmpty()) {
-            return 0;
+            return 999;
         }
 
-        // 精确匹配
-        if (QUALITY_PRIORITY.containsKey(qualityName)) {
-            return QUALITY_PRIORITY.get(qualityName);
+        Map<String, Integer> priorityMap = getQualityPriorityMap();
+
+        if (priorityMap.containsKey(qualityName)) {
+            return priorityMap.get(qualityName);
         }
 
-        // 模糊匹配（包含关键词）
-        for (Map.Entry<String, Integer> entry : QUALITY_PRIORITY.entrySet()) {
+        for (Map.Entry<String, Integer> entry : priorityMap.entrySet()) {
             if (qualityName.contains(entry.getKey())) {
                 return entry.getValue();
             }
         }
 
-        // 未知画质，默认放在高清之后
-        return 1;
+        return 999;
     }
 
     /**
