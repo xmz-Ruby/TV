@@ -1969,7 +1969,30 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (isInitTrack()) {
             setInitTrack(false);
             mPlayers.prepared();
-            mPlayers.setTrack(Track.find(getHistoryKey()));
+            List<Track> savedTracks = Track.find(getHistoryKey());
+            if (savedTracks.isEmpty()) selectAACTrack();
+            mPlayers.setTrack(savedTracks);
+        }
+    }
+
+    private void selectAACTrack() {
+        if (!mPlayers.isExo() || !mPlayers.haveTrack(C.TRACK_TYPE_AUDIO)) return;
+        androidx.media3.common.Tracks tracks = mPlayers.exo().getCurrentTracks();
+        for (int i = 0; i < tracks.getGroups().size(); i++) {
+            androidx.media3.common.Tracks.Group group = tracks.getGroups().get(i);
+            if (group.getType() != C.TRACK_TYPE_AUDIO) continue;
+            for (int j = 0; j < group.length; j++) {
+                String mime = group.getTrackFormat(j).sampleMimeType;
+                if (androidx.media3.common.MimeTypes.AUDIO_AAC.equals(mime)) {
+                    Track track = new Track(C.TRACK_TYPE_AUDIO, "AAC");
+                    track.setPlayer(mPlayers.getPlayer());
+                    track.setGroup(i);
+                    track.setTrack(j);
+                    track.setSelected(true);
+                    mPlayers.setTrack(java.util.Arrays.asList(track));
+                    return;
+                }
+            }
         }
     }
 
