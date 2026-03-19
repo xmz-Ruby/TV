@@ -128,6 +128,7 @@
     <string name="player_background">后台播放</string>
     <string name="player_flag">线路播放</string>
     <string name="player_episode">选集样式</string>
+    <string name="player_default_audio_channel">默认声道数</string>
     <string name="player_exo_tunnel">隧道模式</string>
     <string name="player_exo_http">连线方式</string>
     <string name="player_exo_buffer">缓冲时间</string>

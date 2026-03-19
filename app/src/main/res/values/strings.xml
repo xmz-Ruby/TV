@@ -143,6 +143,7 @@
     <string name="player_background">Background play</string>
     <string name="player_flag">Flag play</string>
     <string name="player_episode">Episode style</string>
+    <string name="player_default_audio_channel">Default audio channels</string>
     <string name="player_exo_tunnel">Tunnel mode</string>
     <string name="player_exo_http">HTTP method</string>
     <string name="player_exo_buffer">Buffer time</string>

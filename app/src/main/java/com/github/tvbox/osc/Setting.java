@@ -58,6 +58,19 @@ public class Setting {
         Prefers.put("ua", ua);
     }
 
+    public static int getDefaultAudioChannel() {
+        int value = Prefers.getInt("default_audio_channel", getDefaultAudioChannelFallback());
+        return value == 2 || value == 4 || value == 6 || value == 8 || value == 16 ? value : getDefaultAudioChannelFallback();
+    }
+
+    public static void putDefaultAudioChannel(int channel) {
+        Prefers.put("default_audio_channel", channel);
+    }
+
+    private static int getDefaultAudioChannelFallback() {
+        return "mobile".equals(BuildConfig.FLAVOR_mode) ? 8 : 2;
+    }
+
     public static String getDanmuHost() {
         return Prefers.getString("danmu_host", "");
     }

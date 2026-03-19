@@ -1970,46 +1970,44 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             setInitTrack(false);
             mPlayers.prepared();
             List<Track> savedTracks = Track.find(getHistoryKey());
-            if (savedTracks.isEmpty()) selectAACTrack();
+            if (savedTracks.isEmpty()) selectDefaultAudioTrack();
             mPlayers.setTrack(savedTracks);
         }
     }
 
-    private void selectAACTrack() {
+    private void selectDefaultAudioTrack() {
         if (!mPlayers.isExo() || !mPlayers.haveTrack(C.TRACK_TYPE_AUDIO)) return;
+        int preferredChannelCount = Setting.getDefaultAudioChannel();
         androidx.media3.common.Tracks tracks = mPlayers.exo().getCurrentTracks();
-        Track stereoAAC = null, anyAAC = null, stereo = null;
+        Track exact = null, closest = null, fallback = null;
+        int closestDistance = Integer.MAX_VALUE;
         for (int i = 0; i < tracks.getGroups().size(); i++) {
             androidx.media3.common.Tracks.Group group = tracks.getGroups().get(i);
             if (group.getType() != C.TRACK_TYPE_AUDIO) continue;
             for (int j = 0; j < group.length; j++) {
                 androidx.media3.common.Format format = group.getTrackFormat(j);
-                boolean isAAC = androidx.media3.common.MimeTypes.AUDIO_AAC.equals(format.sampleMimeType);
-                boolean isStereo = format.channelCount == 2;
-                if (isAAC && isStereo && stereoAAC == null) {
-                    stereoAAC = new Track(C.TRACK_TYPE_AUDIO, "AAC");
-                    stereoAAC.setPlayer(mPlayers.getPlayer());
-                    stereoAAC.setGroup(i);
-                    stereoAAC.setTrack(j);
-                    stereoAAC.setSelected(true);
+                Track item = new Track(C.TRACK_TYPE_AUDIO, "Audio");
+                item.setPlayer(mPlayers.getPlayer());
+                item.setGroup(i);
+                item.setTrack(j);
+                item.setSelected(true);
+                if (fallback == null) {
+                    fallback = item;
                 }
-                if (isAAC && anyAAC == null) {
-                    anyAAC = new Track(C.TRACK_TYPE_AUDIO, "AAC");
-                    anyAAC.setPlayer(mPlayers.getPlayer());
-                    anyAAC.setGroup(i);
-                    anyAAC.setTrack(j);
-                    anyAAC.setSelected(true);
+                if (format.channelCount == preferredChannelCount && exact == null) {
+                    exact = item;
+                    continue;
                 }
-                if (isStereo && stereo == null) {
-                    stereo = new Track(C.TRACK_TYPE_AUDIO, "Stereo");
-                    stereo.setPlayer(mPlayers.getPlayer());
-                    stereo.setGroup(i);
-                    stereo.setTrack(j);
-                    stereo.setSelected(true);
+                if (format.channelCount > 0) {
+                    int distance = Math.abs(format.channelCount - preferredChannelCount);
+                    if (closest == null || distance < closestDistance || (distance == closestDistance && format.channelCount < preferredChannelCount)) {
+                        closest = item;
+                        closestDistance = distance;
+                    }
                 }
             }
         }
-        Track selected = stereoAAC != null ? stereoAAC : (anyAAC != null ? anyAAC : stereo);
+        Track selected = exact != null ? exact : (closest != null ? closest : fallback);
         if (selected != null) mPlayers.setTrack(java.util.Arrays.asList(selected));
     }
 

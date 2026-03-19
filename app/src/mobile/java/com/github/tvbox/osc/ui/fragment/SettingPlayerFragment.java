@@ -34,6 +34,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
     private String[] http;
     private String[] flag;
     private String[] rtsp;
+    private final String[] audioChannels = {"2", "4", "6", "8", "16"};
 
     public static SettingPlayerFragment newInstance() {
         return new SettingPlayerFragment();
@@ -55,6 +56,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
         mBinding.tunnelText.setText(getSwitch(Setting.isTunnel()));
         mBinding.captionText.setText(getSwitch(Setting.isCaption()));
         mBinding.bufferText.setText(String.valueOf(Setting.getBuffer()));
+        mBinding.audioChannelText.setText(String.valueOf(Setting.getDefaultAudioChannel()));
         mBinding.playWithOthersText.setText(getSwitch(Setting.isPlayWithOthers()));
         mBinding.danmuLoadText.setText(getSwitch(Setting.isDanmuLoad()));
         mBinding.rtspText.setText((rtsp = ResUtil.getStringArray(R.array.select_rtsp))[Setting.getRtsp()]);
@@ -76,6 +78,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
         mBinding.flag.setOnClickListener(this::setFlag);
         mBinding.scale.setOnClickListener(this::onScale);
         mBinding.buffer.setOnClickListener(this::onBuffer);
+        mBinding.audioChannel.setOnClickListener(this::onAudioChannel);
         mBinding.player.setOnClickListener(this::setPlayer);
         mBinding.decode.setOnClickListener(this::setDecode);
         mBinding.render.setOnClickListener(this::setRender);
@@ -91,6 +94,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
         mBinding.caption.setVisibility(Setting.hasCaption() ? View.VISIBLE : View.GONE);
         mBinding.http.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.buffer.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
+        mBinding.audioChannel.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.tunnel.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.playWithOthers.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
     }
@@ -133,6 +137,23 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
 
     private void onBuffer(View view) {
         BufferDialog.create(this).show();
+    }
+
+    private void onAudioChannel(View view) {
+        new MaterialAlertDialogBuilder(getActivity()).setTitle(R.string.player_default_audio_channel).setNegativeButton(R.string.dialog_negative, null).setSingleChoiceItems(audioChannels, getDefaultAudioChannelIndex(), (dialog, which) -> {
+            int channel = Integer.parseInt(audioChannels[which]);
+            mBinding.audioChannelText.setText(audioChannels[which]);
+            Setting.putDefaultAudioChannel(channel);
+            dialog.dismiss();
+        }).show();
+    }
+
+    private int getDefaultAudioChannelIndex() {
+        int current = Setting.getDefaultAudioChannel();
+        for (int i = 0; i < audioChannels.length; i++) {
+            if (Integer.parseInt(audioChannels[i]) == current) return i;
+        }
+        return 0;
     }
 
     @Override

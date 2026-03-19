@@ -10,15 +10,17 @@ import androidx.viewbinding.ViewBinding;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.databinding.ActivitySettingPlayerBinding;
+import com.github.tvbox.osc.impl.AudioChannelCallback;
 import com.github.tvbox.osc.impl.BufferCallback;
 import com.github.tvbox.osc.impl.UaCallback;
 import com.github.tvbox.osc.player.Players;
+import com.github.tvbox.osc.ui.dialog.AudioChannelDialog;
 import com.github.tvbox.osc.ui.base.BaseActivity;
 import com.github.tvbox.osc.ui.dialog.BufferDialog;
 import com.github.tvbox.osc.ui.dialog.UaDialog;
 import com.github.tvbox.osc.utils.ResUtil;
 
-public class SettingPlayerActivity extends BaseActivity implements UaCallback, BufferCallback {
+public class SettingPlayerActivity extends BaseActivity implements UaCallback, BufferCallback, AudioChannelCallback {
 
     private ActivitySettingPlayerBinding mBinding;
     private String[] caption;
@@ -50,6 +52,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaCallback, B
         mBinding.uaText.setText(Setting.getUa());
         mBinding.tunnelText.setText(getSwitch(Setting.isTunnel()));
         mBinding.bufferText.setText(String.valueOf(Setting.getBuffer()));
+        mBinding.audioChannelText.setText(String.valueOf(Setting.getDefaultAudioChannel()));
         mBinding.rtspText.setText((rtsp = ResUtil.getStringArray(R.array.select_rtsp))[Setting.getRtsp()]);
         mBinding.flagText.setText((flag = ResUtil.getStringArray(R.array.select_flag))[Setting.getFlag()]);
         mBinding.httpText.setText((http = ResUtil.getStringArray(R.array.select_exo_http))[Setting.getHttp()]);
@@ -68,6 +71,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaCallback, B
         mBinding.flag.setOnClickListener(this::setFlag);
         mBinding.scale.setOnClickListener(this::setScale);
         mBinding.buffer.setOnClickListener(this::onBuffer);
+        mBinding.audioChannel.setOnClickListener(this::onAudioChannel);
         mBinding.player.setOnClickListener(this::setPlayer);
         mBinding.decode.setOnClickListener(this::setDecode);
         mBinding.render.setOnClickListener(this::setRender);
@@ -80,6 +84,7 @@ public class SettingPlayerActivity extends BaseActivity implements UaCallback, B
         mBinding.caption.setVisibility(Setting.hasCaption() ? View.VISIBLE : View.GONE);
         mBinding.http.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.buffer.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
+        mBinding.audioChannel.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.tunnel.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
     }
 
@@ -121,10 +126,28 @@ public class SettingPlayerActivity extends BaseActivity implements UaCallback, B
         BufferDialog.create(this).show();
     }
 
+    private void onAudioChannel(View view) {
+        AudioChannelDialog.create(this).index(getDefaultAudioChannelIndex()).show();
+    }
+
+    private int getDefaultAudioChannelIndex() {
+        int[] values = {2, 4, 6, 8, 16};
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] == Setting.getDefaultAudioChannel()) return i;
+        }
+        return 0;
+    }
+
     @Override
     public void setBuffer(int times) {
         mBinding.bufferText.setText(String.valueOf(times));
         Setting.putBuffer(times);
+    }
+
+    @Override
+    public void setDefaultAudioChannel(int channelCount) {
+        mBinding.audioChannelText.setText(String.valueOf(channelCount));
+        Setting.putDefaultAudioChannel(channelCount);
     }
 
     private void setPlayer(View view) {

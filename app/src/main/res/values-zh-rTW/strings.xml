@@ -126,6 +126,7 @@
     <string name="player_background">背景播放</string>
     <string name="player_flag">線路播放</string>
     <string name="player_episode">選集樣式</string>
+    <string name="player_default_audio_channel">預設聲道數</string>
     <string name="player_exo_tunnel">隧道模式</string>
     <string name="player_exo_http">連線方式</string>
     <string name="player_exo_buffer">緩衝時間</string>
