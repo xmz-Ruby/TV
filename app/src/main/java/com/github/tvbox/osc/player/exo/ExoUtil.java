@@ -33,25 +33,35 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class ExoUtil {
 
+    public static final int MAX_BUFFER_MS = (int) TimeUnit.MINUTES.toMillis(5);
+    public static final int MAX_TARGET_BUFFER_BYTES = 500 * 1024 * 1024;
+    private static final int MIN_BUFFER_FLOOR_MS = 15_000;
+    private static final int MIN_REBUFFER_FLOOR_MS = 3_000;
+
     /**
-     * 简化的缓冲配置 - 仅按时间控制
+     * Exo 缓冲策略:
      *
-     * - 点播视频：永远保持前方 1 分钟的缓冲
-     * - 播放时：持续维持 1 分钟缓冲
-     * - 暂停时：继续缓存直到 1 分钟满
-     * - 不按字节限制，仅按时间控制
+     * - 起播/重缓冲门槛继续沿用用户设置的秒数
+     * - 持续缓冲的总时长上限固定为 5 分钟
+     * - 总缓冲字节上限固定为 500MB
      */
     public static LoadControl buildLoadControl() {
+        int playbackBufferMs = Setting.getBuffer() * 1000;
+        int minBufferMs = Math.max(MIN_BUFFER_FLOOR_MS, playbackBufferMs * 2);
+        int bufferForPlaybackAfterRebufferMs = Math.max(MIN_REBUFFER_FLOOR_MS, playbackBufferMs);
         return new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                        15000,  // minBufferMs: 最小缓冲15秒
-                        60000,  // maxBufferMs: 最大缓冲60秒（1分钟）
-                        1500,   // bufferForPlaybackMs: 播放开始需要1.5秒
-                        5000    // bufferForPlaybackAfterRebufferMs: 重新缓冲后需要5秒
+                        minBufferMs,
+                        MAX_BUFFER_MS,
+                        playbackBufferMs,
+                        bufferForPlaybackAfterRebufferMs
                 )
+                .setTargetBufferBytes(MAX_TARGET_BUFFER_BYTES)
+                .setPrioritizeTimeOverSizeThresholds(false)
                 .build();
     }
 

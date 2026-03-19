@@ -282,16 +282,13 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     public void onDestroyView() {
         super.onDestroyView();
 
-        // 注意：不在这里断开 DLNA 连接和清除投屏状态
-        // 因为投屏控制页面还在运行，需要保持连接
-        // 连接和状态将在 CastControlActivity 中管理
+        // 注意：不在这里断开 DLNA 连接和清除投屏状态。
+        // VideoActivity 的内嵌投屏控制仍然需要保持连接和状态。
 
-        // 只取消注册监听器
         DLNACastManager.INSTANCE.unregisterListener(this);
-        // 不要 unbind service，因为 CastControlActivity 还需要使用
 
-        // 如果没有成功投屏（control 为 null），清除 token
-        // 如果已经成功投屏，token 将在 CastControlActivity 销毁时清除
+        // 如果没有成功投屏（control 为 null），清除 token。
+        // 已成功投屏时，后续由页面内的投屏控制流程负责清理状态。
         if (control == null) {
             Server.get().setCasting(false, null);
             android.util.Log.d("CastDialog", "Cast dialog closed without casting, token cleared");

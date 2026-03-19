@@ -4,10 +4,10 @@
     android:layout_height="match_parent"
     android:background="@color/black"
     android:orientation="vertical"
-    android:paddingStart="32dp"
-    android:paddingEnd="32dp"
-    android:paddingTop="24dp"
-    android:paddingBottom="24dp">
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp">
 
     <!-- 设备信息区域 -->
     <LinearLayout
@@ -15,7 +15,7 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingBottom="16dp">
+        android:paddingBottom="8dp">
 
         <TextView
             android:id="@+id/cast_device_name_display"
@@ -31,10 +31,10 @@
         <!-- 更换设备按钮 -->
         <ImageView
             android:id="@+id/cast_change_device"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="8dp"
+            android:padding="7dp"
             android:src="@drawable/ic_control_cast"
             android:tint="@color/white" />
 
@@ -50,21 +50,21 @@
         <!-- 播放/暂停 -->
         <ImageView
             android:id="@+id/cast_play_pause"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="12dp"
+            android:padding="10dp"
             android:src="@drawable/ic_notify_pause"
             android:tint="@color/white" />
 
         <!-- 停止投屏 -->
         <ImageView
             android:id="@+id/cast_stop"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginStart="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="24dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="12dp"
+            android:padding="10dp"
             android:src="@drawable/ic_notify_stop"
             android:tint="@color/white" />
 
@@ -74,7 +74,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="12dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -84,7 +84,7 @@
             android:layout_height="wrap_content"
             android:text="00:00"
             android:textColor="@color/white"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:fontFamily="sans-serif-medium" />
 
         <Space
@@ -98,7 +98,7 @@
             android:layout_height="wrap_content"
             android:text="00:00"
             android:textColor="@color/white_60"
-            android:textSize="15sp" />
+            android:textSize="14sp" />
 
     </LinearLayout>
 
@@ -106,14 +106,18 @@
     <SeekBar
         android:id="@+id/cast_seek_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="6dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:minHeight="6dp"
+        android:maxHeight="8dp"
         android:max="100"
         android:progress="0"
+        android:progressBackgroundTint="#66FFFFFF"
         android:progressTint="@color/accent"
-        android:thumbTint="@color/accent" />
+        android:splitTrack="false"
+        android:thumb="@drawable/seekbar_cast_thumb" />
 
     <!-- 隐藏的视图用于保持兼容性 -->
     <ImageView

@@ -14,6 +14,7 @@ import androidx.media3.ui.TimeBar;
 
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.player.Players;
+import com.github.tvbox.osc.player.exo.ExoUtil;
 
 import java.text.DecimalFormat;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +27,7 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
     private static final int DEFAULT_BITRATE_KBPS = 5000;
     // 音频码率约128Kbps
     private static final int AUDIO_BITRATE_KBPS = 128;
+    private static final long MAX_ESTIMATED_BUFFER_BYTES = ExoUtil.MAX_TARGET_BUFFER_BYTES;
 
     private TextView positionView;
     private TextView durationView;
@@ -98,14 +100,14 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
         }
     }
 
-    private String formatBufferSizeEstimate(long bufferedMs, long durationMs) {
-        if (bufferedMs <= 0 || durationMs <= 0) {
+    private String formatBufferSizeEstimate(long bufferedMs) {
+        if (bufferedMs <= 0) {
             return "";
         }
         // 估算缓冲大小（视频+音频）- 仅用于无法获取实际缓存字节数时
         int avgBitrateKbps = DEFAULT_BITRATE_KBPS + AUDIO_BITRATE_KBPS;
         long bufferedSeconds = bufferedMs / 1000;
-        long bufferSizeBytes = bufferedSeconds * avgBitrateKbps * 1024 / 8;
+        long bufferSizeBytes = Math.min(MAX_ESTIMATED_BUFFER_BYTES, bufferedSeconds * avgBitrateKbps * 1024L / 8);
 
         if (bufferSizeBytes < 1024 * 1024) {
             return (bufferSizeBytes / 1024) + "KB";
@@ -124,7 +126,6 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
         long buffered = player.getBuffered();
         boolean positionChanged = position != currentPosition;
         boolean durationChanged = duration != currentDuration;
-        boolean bufferedChanged = buffered != currentBuffered;
         currentDuration = duration;
         currentPosition = position;
         currentBuffered = buffered;
@@ -138,19 +139,20 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
             timeBar.setPosition(position);
             positionView.setText(player.stringToTime(position < 0 ? 0 : position));
         }
-        // 始终更新缓冲显示（不只是变化时），确保暂停时也能看到缓冲状态
-        timeBar.setBufferedPosition(buffered);
-        // 更新缓冲时间和内存显示
-        if (buffered > position && buffered > 0) {
-            String bufferedTime = player.stringToTime(buffered);
+        long bufferedPosition = duration > 0 ? Math.min(buffered, duration) : buffered;
+        long bufferedAhead = Math.max(0, bufferedPosition - Math.max(position, 0));
+        // 始终更新缓冲显示，确保暂停时也能看到缓冲状态
+        timeBar.setBufferedPosition(bufferedPosition);
+        if (bufferedAhead > 0) {
+            String bufferedTime = player.stringToTime(bufferedAhead);
             // 优先使用实际缓存字节数（IjkPlayer）
             long cachedBytes = player.getCachedBytes();
             String bufferSize;
             if (cachedBytes > 0) {
                 bufferSize = formatBufferSize(cachedBytes);
             } else {
-                // 降级到估算值（ExoPlayer或其他）
-                bufferSize = formatBufferSizeEstimate(buffered - position, duration);
+                // Exo 只能近似估算当前向前缓冲的数据量。
+                bufferSize = formatBufferSizeEstimate(bufferedAhead);
             }
             if (!bufferSize.isEmpty()) {
                 bufferedView.setText(bufferedTime + " " + bufferSize);
@@ -168,6 +170,7 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
             bufferedView.setVisibility(INVISIBLE);
             timeBar.setPosition(currentDuration = 0);
             timeBar.setDuration(currentDuration = 0);
+            timeBar.setBufferedPosition(0);
         }
         removeCallbacks(refresh);
         if (player.isPlaying()) {
