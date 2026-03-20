@@ -147,10 +147,10 @@ public class SafeSpiderWrapper extends Spider {
      */
     @Override
     public String action(String action) throws Exception {
-        if (enableSafeMode) {
-            Logger.i("SafeSpiderWrapper: 安全模式：禁止外部 spider 使用 action");
-            return null;
-        }
+        // if (enableSafeMode) {
+        //     Logger.i("SafeSpiderWrapper: 安全模式：禁止外部 spider 使用 action");
+        //     return null;
+        // }
         return wrappedSpider.action(action);
     }
 
