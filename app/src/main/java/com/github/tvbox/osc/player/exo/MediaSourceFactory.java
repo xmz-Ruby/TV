@@ -5,6 +5,7 @@ import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MimeTypes;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.HttpDataSource;
@@ -26,44 +27,54 @@ import com.github.tvbox.osc.App;
 import com.github.catvod.net.OkHttp;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class MediaSourceFactory implements MediaSource.Factory {
 
-    private final DefaultMediaSourceFactory defaultMediaSourceFactory;
+    private final DefaultMediaSourceFactory cacheMediaSourceFactory;
+    private final DefaultMediaSourceFactory directMediaSourceFactory;
     private HttpDataSource.Factory httpDataSourceFactory;
-    private DataSource.Factory dataSourceFactory;
+    private DataSource.Factory cacheDataSourceFactory;
+    private DataSource.Factory directDataSourceFactory;
     private ExtractorsFactory extractorsFactory;
 
     public MediaSourceFactory() {
-        defaultMediaSourceFactory = new DefaultMediaSourceFactory(getDataSourceFactory(), getExtractorsFactory());
+        cacheMediaSourceFactory = new DefaultMediaSourceFactory(getCacheDataSourceFactory(), getExtractorsFactory());
+        directMediaSourceFactory = new DefaultMediaSourceFactory(getDirectDataSourceFactory(), getExtractorsFactory());
     }
 
     @NonNull
     @Override
     public MediaSource.Factory setDrmSessionManagerProvider(@NonNull DrmSessionManagerProvider drmSessionManagerProvider) {
-        return defaultMediaSourceFactory.setDrmSessionManagerProvider(drmSessionManagerProvider);
+        cacheMediaSourceFactory.setDrmSessionManagerProvider(drmSessionManagerProvider);
+        directMediaSourceFactory.setDrmSessionManagerProvider(drmSessionManagerProvider);
+        return this;
     }
 
     @NonNull
     @Override
     public MediaSource.Factory setLoadErrorHandlingPolicy(@NonNull LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
-        return defaultMediaSourceFactory.setLoadErrorHandlingPolicy(loadErrorHandlingPolicy);
+        cacheMediaSourceFactory.setLoadErrorHandlingPolicy(loadErrorHandlingPolicy);
+        directMediaSourceFactory.setLoadErrorHandlingPolicy(loadErrorHandlingPolicy);
+        return this;
     }
 
     @NonNull
     @Override
     public @C.ContentType int[] getSupportedTypes() {
-        return defaultMediaSourceFactory.getSupportedTypes();
+        return cacheMediaSourceFactory.getSupportedTypes();
     }
 
     @NonNull
     @Override
     public MediaSource createMediaSource(@NonNull MediaItem mediaItem) {
+        mediaItem = setHeader(mediaItem);
+        DefaultMediaSourceFactory mediaSourceFactory = shouldBypassCache(mediaItem) ? directMediaSourceFactory : cacheMediaSourceFactory;
         if (mediaItem.mediaId.contains("***") && mediaItem.mediaId.contains("|||")) {
-            return createConcatenatingMediaSource(setHeader(mediaItem));
+            return createConcatenatingMediaSource(mediaSourceFactory, mediaItem);
         } else {
-            return defaultMediaSourceFactory.createMediaSource(setHeader(mediaItem));
+            return mediaSourceFactory.createMediaSource(mediaItem);
         }
     }
 
@@ -74,11 +85,11 @@ public class MediaSourceFactory implements MediaSource.Factory {
         return mediaItem;
     }
 
-    private MediaSource createConcatenatingMediaSource(MediaItem mediaItem) {
+    private MediaSource createConcatenatingMediaSource(DefaultMediaSourceFactory mediaSourceFactory, MediaItem mediaItem) {
         ConcatenatingMediaSource2.Builder builder = new ConcatenatingMediaSource2.Builder();
         for (String split : mediaItem.mediaId.split("\\*\\*\\*")) {
             String[] info = split.split("\\|\\|\\|");
-            if (info.length >= 2) builder.add(defaultMediaSourceFactory.createMediaSource(mediaItem.buildUpon().setUri(Uri.parse(info[0])).build()), Long.parseLong(info[1]));
+            if (info.length >= 2) builder.add(mediaSourceFactory.createMediaSource(mediaItem.buildUpon().setUri(Uri.parse(info[0])).build()), Long.parseLong(info[1]));
         }
         return builder.build();
     }
@@ -88,9 +99,14 @@ public class MediaSourceFactory implements MediaSource.Factory {
         return extractorsFactory;
     }
 
-    private DataSource.Factory getDataSourceFactory() {
-        if (dataSourceFactory == null) dataSourceFactory = buildCacheDataSource(new DefaultDataSource.Factory(App.get(), getHttpDataSourceFactory()));
-        return dataSourceFactory;
+    private DataSource.Factory getCacheDataSourceFactory() {
+        if (cacheDataSourceFactory == null) cacheDataSourceFactory = buildCacheDataSource(getDirectDataSourceFactory());
+        return cacheDataSourceFactory;
+    }
+
+    private DataSource.Factory getDirectDataSourceFactory() {
+        if (directDataSourceFactory == null) directDataSourceFactory = new DefaultDataSource.Factory(App.get(), getHttpDataSourceFactory());
+        return directDataSourceFactory;
     }
 
     private CacheDataSource.Factory buildCacheDataSource(DataSource.Factory upstreamFactory) {
@@ -105,5 +121,21 @@ public class MediaSourceFactory implements MediaSource.Factory {
     private HttpDataSource.Factory getHttpDataSourceFactory() {
         if (httpDataSourceFactory == null) httpDataSourceFactory = new OkHttpDataSource.Factory(OkHttp.client());
         return httpDataSourceFactory;
+    }
+
+    private boolean shouldBypassCache(MediaItem mediaItem) {
+        return MimeTypes.APPLICATION_M3U8.equals(getMimeType(mediaItem)) || isM3u8Uri(mediaItem);
+    }
+
+    private String getMimeType(MediaItem mediaItem) {
+        return mediaItem.localConfiguration == null ? null : mediaItem.localConfiguration.mimeType;
+    }
+
+    private boolean isM3u8Uri(MediaItem mediaItem) {
+        Uri uri = mediaItem.requestMetadata.mediaUri;
+        String raw = uri == null ? mediaItem.mediaId : uri.toString();
+        if (raw == null || raw.isEmpty()) return false;
+        String decoded = Uri.decode(raw).toLowerCase(Locale.US);
+        return decoded.contains(".m3u8");
     }
 }
