@@ -10,7 +10,7 @@ import com.github.catvod.utils.Path;
 
 public class CacheManager {
 
-    private static final long MAX_CACHE_BYTES = ExoUtil.MAX_TARGET_BUFFER_BYTES;
+    private static final long MAX_CACHE_BYTES = ExoUtil.MAX_DISK_CACHE_BYTES;
     private SimpleCache cache;
 
     private static class Loader {

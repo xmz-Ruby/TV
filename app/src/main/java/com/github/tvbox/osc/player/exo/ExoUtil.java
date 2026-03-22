@@ -1,5 +1,6 @@
 package com.github.tvbox.osc.player.exo;
 
+import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Color;
 import android.net.Uri;
@@ -37,32 +38,58 @@ import java.util.concurrent.TimeUnit;
 
 public class ExoUtil {
 
-    public static final int MAX_BUFFER_MS = (int) TimeUnit.MINUTES.toMillis(5);
-    public static final int MAX_TARGET_BUFFER_BYTES = 500 * 1024 * 1024;
+    public static final int MIN_TARGET_BUFFER_BYTES = 32 * 1024 * 1024;
+    public static final int MAX_TARGET_BUFFER_BYTES = 128 * 1024 * 1024;
+    public static final long MAX_DISK_CACHE_BYTES = 256L * 1024 * 1024;
     private static final int MIN_BUFFER_FLOOR_MS = 15_000;
     private static final int MIN_REBUFFER_FLOOR_MS = 3_000;
+    private static final int LOW_MEMORY_CLASS_MB = 128;
+    private static final int MID_MEMORY_CLASS_MB = 192;
+    private static final int HIGH_MEMORY_CLASS_MB = 256;
 
     /**
      * Exo 缓冲策略:
      *
      * - 起播/重缓冲门槛继续沿用用户设置的秒数
-     * - 持续缓冲的总时长上限固定为 5 分钟
-     * - 总缓冲字节上限固定为 500MB
+     * - 持续缓冲的总时长上限按设备内存限制在 45~90 秒
+     * - 内存缓冲字节上限按设备内存分档限制在 32~128MB
      */
     public static LoadControl buildLoadControl() {
         int playbackBufferMs = Setting.getBuffer() * 1000;
         int minBufferMs = Math.max(MIN_BUFFER_FLOOR_MS, playbackBufferMs * 2);
         int bufferForPlaybackAfterRebufferMs = Math.max(MIN_REBUFFER_FLOOR_MS, playbackBufferMs);
+        int memoryClassMb = getMemoryClassMb();
+        int maxBufferMs = Math.max(getTieredMaxBufferMs(memoryClassMb), minBufferMs);
         return new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
                         minBufferMs,
-                        MAX_BUFFER_MS,
+                        maxBufferMs,
                         playbackBufferMs,
                         bufferForPlaybackAfterRebufferMs
                 )
-                .setTargetBufferBytes(MAX_TARGET_BUFFER_BYTES)
+                .setTargetBufferBytes(getTargetBufferBytes())
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .build();
+    }
+
+    public static int getTargetBufferBytes() {
+        int memoryClassMb = getMemoryClassMb();
+        if (memoryClassMb <= LOW_MEMORY_CLASS_MB) return 32 * 1024 * 1024;
+        if (memoryClassMb <= MID_MEMORY_CLASS_MB) return 64 * 1024 * 1024;
+        if (memoryClassMb <= HIGH_MEMORY_CLASS_MB) return 96 * 1024 * 1024;
+        return MAX_TARGET_BUFFER_BYTES;
+    }
+
+    private static int getMemoryClassMb() {
+        ActivityManager manager = (ActivityManager) App.get().getSystemService(Context.ACTIVITY_SERVICE);
+        return manager == null ? HIGH_MEMORY_CLASS_MB : manager.getMemoryClass();
+    }
+
+    private static int getTieredMaxBufferMs(int memoryClassMb) {
+        if (memoryClassMb <= LOW_MEMORY_CLASS_MB) return (int) TimeUnit.SECONDS.toMillis(45);
+        if (memoryClassMb <= MID_MEMORY_CLASS_MB) return (int) TimeUnit.MINUTES.toMillis(1);
+        if (memoryClassMb <= HIGH_MEMORY_CLASS_MB) return (int) TimeUnit.SECONDS.toMillis(75);
+        return (int) TimeUnit.SECONDS.toMillis(90);
     }
 
     public static TrackSelector buildTrackSelector() {

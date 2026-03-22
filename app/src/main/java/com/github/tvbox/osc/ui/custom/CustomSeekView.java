@@ -27,8 +27,6 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
     private static final int DEFAULT_BITRATE_KBPS = 5000;
     // 音频码率约128Kbps
     private static final int AUDIO_BITRATE_KBPS = 128;
-    private static final long MAX_ESTIMATED_BUFFER_BYTES = ExoUtil.MAX_TARGET_BUFFER_BYTES;
-
     private TextView positionView;
     private TextView durationView;
     private TextView bufferedView;
@@ -107,7 +105,7 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
         // 估算缓冲大小（视频+音频）- 仅用于无法获取实际缓存字节数时
         int avgBitrateKbps = DEFAULT_BITRATE_KBPS + AUDIO_BITRATE_KBPS;
         long bufferedSeconds = bufferedMs / 1000;
-        long bufferSizeBytes = Math.min(MAX_ESTIMATED_BUFFER_BYTES, bufferedSeconds * avgBitrateKbps * 1024L / 8);
+        long bufferSizeBytes = Math.min(ExoUtil.getTargetBufferBytes(), bufferedSeconds * avgBitrateKbps * 1024L / 8);
 
         if (bufferSizeBytes < 1024 * 1024) {
             return (bufferSizeBytes / 1024) + "KB";
