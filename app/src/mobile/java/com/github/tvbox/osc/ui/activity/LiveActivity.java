@@ -146,7 +146,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     }
 
     private int getPlayerType(int playerType) {
-        return playerType != -1 ? playerType : Setting.getLivePlayer();
+        return playerType != -1 ? playerType : Setting.getPlayer();
     }
 
     private int getTimeout() {
@@ -305,7 +305,8 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
 
     private void getLive() {
         mBinding.control.action.home.setText(getHome().getName());
-        mPlayers.setPlayer(Setting.getLivePlayer());
+        mPlayers.setPlayer(Setting.getPlayer());
+        mPlayers.applyDecode(Setting.getDecode(mPlayers.getPlayer()), false);
         mViewModel.getLive(getHome());
         setPlayerView();
         setDecodeView();
@@ -645,13 +646,10 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
             // 每次切换频道时，重置线路到第一个
             item.setLine(0);
 
-            // 每次切换频道时，重置播放器到EXO硬解
+            // 每次切换频道时，从站点配置或 App 设置重新开始尝试
             int playerType = getPlayerType(item.getPlayerType());
-            if (playerType == -1) {
-                playerType = Players.EXO; // 默认使用EXO
-            }
             mPlayers.setPlayer(playerType);
-            mPlayers.setDecode(playerType, Players.HARD); // 设置为硬解
+            mPlayers.applyDecode(Setting.getDecode(playerType), false);
 
             setArtwork(item.getLogo());
             mChannel = item;
@@ -659,7 +657,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
             // 记录当前频道的初始线路索引和播放器状态
             mInitialLine = item.getLine();
             mInitialPlayer = mPlayers.getPlayer();
-            mInitialDecode = mPlayers.getDecode(mInitialPlayer);
+            mInitialDecode = mPlayers.getDecode();
 
             setPlayerView();
             showInfo();
@@ -938,7 +936,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
 
     private boolean hasTriedAllPlayers() {
         int currentPlayer = mPlayers.getPlayer();
-        int currentDecode = mPlayers.getDecode(currentPlayer);
+        int currentDecode = mPlayers.getDecode();
 
         if (currentPlayer == Players.SYS) {
             return true;
@@ -953,8 +951,9 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
 
     private void resetToInitialPlayer() {
         mPlayers.setPlayer(mInitialPlayer);
-        mPlayers.setDecode(mInitialPlayer, mInitialDecode);
+        mPlayers.applyDecode(mInitialDecode, false);
         setPlayerView();
+        setDecodeView();
     }
 
     private void checkError(ErrorEvent event) {
@@ -1260,7 +1259,6 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     @Override
     public void onPlayerClick(Integer item) {
         mPlayers.setPlayer(item);
-        Setting.putLivePlayer(mPlayers.getPlayer());
         setPlayerView();
         setR1Callback();
         fetch();

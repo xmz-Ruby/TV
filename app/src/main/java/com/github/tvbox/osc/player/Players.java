@@ -222,16 +222,24 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         if (this.player != player) reset();
         if (this.player != player) stop();
         this.player = player;
-        this.decode = getDecode(player);
+        this.decode = Setting.getDecode(player);
     }
 
     public int getDecode(int player) {
-        // 所有播放器优先使用硬解
-        return HARD;
+        return Setting.getDecode(player);
+    }
+
+    public int getDecode() {
+        return decode;
     }
 
     public void setDecode(int player, int decode) {
         Setting.putDecode(player, decode);
+    }
+
+    public void applyDecode(int decode, boolean save) {
+        this.decode = decode;
+        if (save) setDecode(player, decode);
     }
 
     public void setPosition(long position) {
@@ -426,8 +434,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void toggleDecode(boolean save) {
-        decode = isHard() ? SOFT : HARD;
-        if (save) setDecode(player, decode);
+        applyDecode(isHard() ? SOFT : HARD, save);
     }
 
     public String getPositionTime(long time) {

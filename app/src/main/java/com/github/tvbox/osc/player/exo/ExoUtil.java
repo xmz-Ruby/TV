@@ -8,6 +8,8 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.accessibility.CaptioningManager;
 
+import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
@@ -27,6 +29,7 @@ import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.bean.Drm;
 import com.github.tvbox.osc.bean.Sub;
+import com.github.tvbox.osc.bean.Track;
 import com.github.tvbox.osc.player.Players;
 import com.github.tvbox.osc.utils.Sniffer;
 
@@ -46,6 +49,12 @@ public class ExoUtil {
     private static final int LOW_MEMORY_CLASS_MB = 128;
     private static final int MID_MEMORY_CLASS_MB = 192;
     private static final int HIGH_MEMORY_CLASS_MB = 256;
+    private static final String[] CHINESE_AUDIO_KEYWORDS = {
+            "zh", "chi", "zho", "cmn", "yue",
+            "中文", "汉语", "国语", "国配", "普通话", "华语",
+            "粤语", "粤配", "台配", "台语",
+            "mandarin", "chinese", "cantonese"
+    };
 
     /**
      * Exo 缓冲策略:
@@ -122,6 +131,37 @@ public class ExoUtil {
         setTrackParameters(player, group, trackIndices);
     }
 
+    public static Track findDefaultAudioTrack(Tracks tracks, int player, int preferredChannelCount) {
+        int targetChannelCount = getTargetAudioChannelCount(tracks, preferredChannelCount);
+        AudioCandidate bestChinese = null;
+        AudioCandidate bestFallback = null;
+        AudioCandidate bestOther = null;
+        for (int i = 0; i < tracks.getGroups().size(); i++) {
+            Tracks.Group group = tracks.getGroups().get(i);
+            if (group.getType() != C.TRACK_TYPE_AUDIO) continue;
+            for (int j = 0; j < group.length; j++) {
+                Format format = group.getTrackFormat(j);
+                Track track = new Track(C.TRACK_TYPE_AUDIO, "Audio");
+                track.setPlayer(player);
+                track.setGroup(i);
+                track.setTrack(j);
+                track.setSelected(true);
+                AudioCandidate candidate = new AudioCandidate(track, format, i, j);
+                if (isTargetChannelCandidate(format, targetChannelCount)) {
+                    if (isChineseAudioTrack(format)) {
+                        if (isBetterAudioCandidate(candidate, bestChinese)) bestChinese = candidate;
+                    } else if (isBetterAudioCandidate(candidate, bestFallback)) {
+                        bestFallback = candidate;
+                    }
+                } else if (isBetterAudioCandidate(candidate, bestOther)) {
+                    bestOther = candidate;
+                }
+            }
+        }
+        AudioCandidate selected = bestChinese != null ? bestChinese : (bestFallback != null ? bestFallback : bestOther);
+        return selected == null ? null : selected.track;
+    }
+
     public static void deselectTrack(ExoPlayer player, int group, int track) {
         List<Integer> trackIndices = new ArrayList<>();
         deselectTrack(player, group, track, trackIndices);
@@ -188,6 +228,72 @@ public class ExoUtil {
         Tracks.Group trackGroup = player.getCurrentTracks().getGroups().get(group);
         for (int i = 0; i < trackGroup.length; i++) {
             if (i == track || trackGroup.isTrackSelected(i)) trackIndices.add(i);
+        }
+    }
+
+    private static boolean isChineseAudioTrack(Format format) {
+        String text = ((format.language == null ? "" : format.language) + " " + (format.label == null ? "" : format.label))
+                .toLowerCase(Locale.US);
+        for (String keyword : CHINESE_AUDIO_KEYWORDS) if (text.contains(keyword)) return true;
+        return false;
+    }
+
+    private static int getTargetAudioChannelCount(Tracks tracks, int preferredChannelCount) {
+        int maxAllowedChannelCount = Integer.MIN_VALUE;
+        int minAboveChannelCount = Integer.MAX_VALUE;
+        for (int i = 0; i < tracks.getGroups().size(); i++) {
+            Tracks.Group group = tracks.getGroups().get(i);
+            if (group.getType() != C.TRACK_TYPE_AUDIO) continue;
+            for (int j = 0; j < group.length; j++) {
+                int channelCount = group.getTrackFormat(j).channelCount;
+                if (channelCount == Format.NO_VALUE || channelCount <= 0) continue;
+                if (channelCount <= preferredChannelCount) {
+                    maxAllowedChannelCount = Math.max(maxAllowedChannelCount, channelCount);
+                } else {
+                    minAboveChannelCount = Math.min(minAboveChannelCount, channelCount);
+                }
+            }
+        }
+        if (maxAllowedChannelCount != Integer.MIN_VALUE) return maxAllowedChannelCount;
+        if (minAboveChannelCount != Integer.MAX_VALUE) return minAboveChannelCount;
+        return Format.NO_VALUE;
+    }
+
+    private static boolean isTargetChannelCandidate(Format format, int targetChannelCount) {
+        if (targetChannelCount == Format.NO_VALUE) return true;
+        return format.channelCount == targetChannelCount;
+    }
+
+    private static boolean isBetterAudioCandidate(AudioCandidate candidate, AudioCandidate currentBest) {
+        if (candidate == null) return false;
+        if (currentBest == null) return true;
+
+        int candidateFlagScore = getTrackFlagScore(candidate.format);
+        int currentFlagScore = getTrackFlagScore(currentBest.format);
+        if (candidateFlagScore != currentFlagScore) return candidateFlagScore > currentFlagScore;
+
+        return candidate.groupIndex < currentBest.groupIndex || (candidate.groupIndex == currentBest.groupIndex && candidate.trackIndex < currentBest.trackIndex);
+    }
+
+    private static int getTrackFlagScore(Format format) {
+        int score = 0;
+        if ((format.selectionFlags & C.SELECTION_FLAG_DEFAULT) != 0) score += 8;
+        if ((format.roleFlags & C.ROLE_FLAG_MAIN) != 0) score += 4;
+        if ((format.selectionFlags & C.SELECTION_FLAG_AUTOSELECT) != 0) score += 2;
+        return score;
+    }
+
+    private static final class AudioCandidate {
+        private final Track track;
+        private final Format format;
+        private final int groupIndex;
+        private final int trackIndex;
+
+        private AudioCandidate(Track track, Format format, int groupIndex, int trackIndex) {
+            this.track = track;
+            this.format = format;
+            this.groupIndex = groupIndex;
+            this.trackIndex = trackIndex;
         }
     }
 

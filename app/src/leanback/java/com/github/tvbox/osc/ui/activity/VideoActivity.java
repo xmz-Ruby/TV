@@ -284,8 +284,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private int getPlayer() {
-        // 所有影视资源优先使用 EXO 播放器，忽略历史记录中的播放器设置
-        return getSite().getPlayerType() != -1 ? getSite().getPlayerType() : Players.EXO;
+        return getSite().getPlayerType() != -1 ? getSite().getPlayerType() : Setting.getPlayer();
     }
 
     private int getScale() {
@@ -1977,37 +1976,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void selectDefaultAudioTrack() {
         if (!mPlayers.isExo() || !mPlayers.haveTrack(C.TRACK_TYPE_AUDIO)) return;
-        int preferredChannelCount = Setting.getDefaultAudioChannel();
-        androidx.media3.common.Tracks tracks = mPlayers.exo().getCurrentTracks();
-        Track exact = null, closest = null, fallback = null;
-        int closestDistance = Integer.MAX_VALUE;
-        for (int i = 0; i < tracks.getGroups().size(); i++) {
-            androidx.media3.common.Tracks.Group group = tracks.getGroups().get(i);
-            if (group.getType() != C.TRACK_TYPE_AUDIO) continue;
-            for (int j = 0; j < group.length; j++) {
-                androidx.media3.common.Format format = group.getTrackFormat(j);
-                Track item = new Track(C.TRACK_TYPE_AUDIO, "Audio");
-                item.setPlayer(mPlayers.getPlayer());
-                item.setGroup(i);
-                item.setTrack(j);
-                item.setSelected(true);
-                if (fallback == null) {
-                    fallback = item;
-                }
-                if (format.channelCount == preferredChannelCount && exact == null) {
-                    exact = item;
-                    continue;
-                }
-                if (format.channelCount > 0) {
-                    int distance = Math.abs(format.channelCount - preferredChannelCount);
-                    if (closest == null || distance < closestDistance || (distance == closestDistance && format.channelCount < preferredChannelCount)) {
-                        closest = item;
-                        closestDistance = distance;
-                    }
-                }
-            }
-        }
-        Track selected = exact != null ? exact : (closest != null ? closest : fallback);
+        Track selected = ExoUtil.findDefaultAudioTrack(mPlayers.exo().getCurrentTracks(), mPlayers.getPlayer(), Setting.getDefaultAudioChannel());
         if (selected != null) mPlayers.setTrack(java.util.Arrays.asList(selected));
     }
 
