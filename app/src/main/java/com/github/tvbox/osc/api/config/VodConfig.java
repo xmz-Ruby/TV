@@ -23,6 +23,9 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class VodConfig {
 
@@ -398,18 +401,22 @@ public class VodConfig {
 
         if (pythonSites.isEmpty()) {
             android.util.Log.d("VodConfig", "没有需要预加载的 Python 站点");
+            PythonPreload.hide();
             return;
         }
 
         android.util.Log.d("VodConfig", "找到 " + pythonSites.size() + " 个 Python 站点，开始并行预加载");
 
-        // 使用多线程并行加载
         final int totalCount = pythonSites.size();
-        final java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
-        final java.util.concurrent.atomic.AtomicInteger failCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        final int token = PythonPreload.start(totalCount);
+        final int parallelism = Math.max(1, Math.min(2, Runtime.getRuntime().availableProcessors()));
+        final ExecutorService preloadExecutor = Executors.newFixedThreadPool(parallelism);
+        final AtomicInteger successCount = new AtomicInteger(0);
+        final AtomicInteger failCount = new AtomicInteger(0);
+        final AtomicInteger completedCount = new AtomicInteger(0);
 
         for (Site site : pythonSites) {
-            App.execute(() -> {
+            preloadExecutor.execute(() -> {
                 try {
                     android.util.Log.d("VodConfig", "预加载 Python 站点: " + site.getName() + " (" + site.getKey() + ")");
                     BaseLoader.get().getSpider(site.getKey(), site.getApi(), site.getExt(), site.getJar());
@@ -420,10 +427,12 @@ public class VodConfig {
                     failCount.incrementAndGet();
                     e.printStackTrace();
                 } finally {
-                    // 检查是否所有站点都已处理完成
-                    int completed = successCount.get() + failCount.get();
+                    int completed = completedCount.incrementAndGet();
+                    PythonPreload.progress(token, totalCount, completed, successCount.get(), failCount.get(), site.getName());
                     if (completed == totalCount) {
                         android.util.Log.d("VodConfig", "Python 站点预加载完成，成功: " + successCount.get() + "，失败: " + failCount.get());
+                        PythonPreload.finish(token, totalCount, completed, successCount.get(), failCount.get());
+                        preloadExecutor.shutdown();
                     }
                 }
             });

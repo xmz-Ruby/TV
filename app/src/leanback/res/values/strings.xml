@@ -19,4 +19,11 @@
     <string name="push_clip">Push clipboard content</string>
     <string name="push_info">Scan QR Code or enter the URL in browser\n<xliff:g name="name">%s</xliff:g></string>
 
+    <!-- Python preload -->
+    <string name="python_preload_title">Python Sources</string>
+    <string name="python_preload_done_title">Python Ready</string>
+    <string name="python_preload_status">%1$d/%2$d  OK %3$d  Fail %4$d</string>
+    <string name="python_preload_status_site">%1$d/%2$d  OK %3$d  Fail %4$d\nCurrent: %5$s</string>
+    <string name="python_preload_done_status">Finished  OK %1$d  Fail %2$d</string>
+
 </resources>

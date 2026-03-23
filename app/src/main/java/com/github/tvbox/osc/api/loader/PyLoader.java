@@ -14,11 +14,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PyLoader {
 
     private final ConcurrentHashMap<String, Spider> spiders;
+    private final ConcurrentHashMap<String, Object> loadingLocks;
     private Object loader;
     private String recent;
 
     public PyLoader() {
         this.spiders = new ConcurrentHashMap<>();
+        this.loadingLocks = new ConcurrentHashMap<>();
         init();
     }
 
@@ -37,6 +39,7 @@ public class PyLoader {
     public void clear() {
         for (Spider spider : spiders.values()) App.execute(spider::destroy);
         spiders.clear();
+        loadingLocks.clear();
     }
 
     public void setRecent(String recent) {
@@ -49,24 +52,33 @@ public class PyLoader {
                 Logger.e("PyLoader: Loader not initialized");
                 return new SpiderNull();
             }
-            // 使用 api + ext 作为组合键，确保相同脚本不同配置独立
-            // 例如：多个站点使用 ./python/emby.py，但 ext 配置不同，需要独立实例
             String compositeKey = api + "|" + ext;
-            if (spiders.containsKey(compositeKey)) {
-                Spider spider = spiders.get(compositeKey);
+            Spider cachedSpider = spiders.get(compositeKey);
+            if (cachedSpider != null) {
                 Logger.d("PyLoader: Reusing cached spider - key=" + key + ", compositeKey=" + compositeKey.hashCode());
+                return cachedSpider;
+            }
+            Object loadingLock = loadingLocks.computeIfAbsent(compositeKey, k -> new Object());
+            synchronized (loadingLock) {
+                cachedSpider = spiders.get(compositeKey);
+                if (cachedSpider != null) {
+                    Logger.d("PyLoader: Reusing cached spider after lock - key=" + key + ", compositeKey=" + compositeKey.hashCode());
+                    return cachedSpider;
+                }
+                Logger.i("PyLoader: Loading Python spider - key=" + key + ", api=" + api + ", extHash=" + ext.hashCode());
+                Method method = loader.getClass().getMethod("spider", Context.class, String.class);
+                Spider spider = (Spider) method.invoke(loader, App.get(), api);
+                spider.init(App.get(), ext);
+                spiders.put(compositeKey, spider);
+                Logger.i("PyLoader: Python spider loaded successfully - key=" + key + ", compositeKey=" + compositeKey.hashCode());
                 return spider;
             }
-            Logger.i("PyLoader: Loading Python spider - key=" + key + ", api=" + api + ", extHash=" + ext.hashCode());
-            Method method = loader.getClass().getMethod("spider", Context.class, String.class);
-            Spider spider = (Spider) method.invoke(loader, App.get(), api);
-            spider.init(App.get(), ext);
-            spiders.put(compositeKey, spider);
-            Logger.i("PyLoader: Python spider loaded successfully - key=" + key + ", compositeKey=" + compositeKey.hashCode());
-            return spider;
         } catch (Throwable e) {
             Logger.e("PyLoader: Failed to load Python spider - " + key, e);
             return new SpiderNull();
+        } finally {
+            String compositeKey = api + "|" + ext;
+            loadingLocks.remove(compositeKey);
         }
     }
 

@@ -10,9 +10,13 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.ToNumberPolicy;
 import com.google.gson.internal.LazilyParsedNumber;
 import com.google.gson.reflect.TypeToken;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class Prefers {
 
@@ -89,6 +93,43 @@ public class Prefers {
         getPrefers().edit().remove(key).apply();
     }
 
+    public static int cleanupExpiredCache() {
+        long nowSeconds = System.currentTimeMillis() / 1000;
+        SharedPreferences prefers = getPrefers();
+        Map<String, ?> all = prefers.getAll();
+        if (all == null || all.isEmpty()) return 0;
+
+        Set<String> expiredKeys = new HashSet<>();
+        for (Map.Entry<String, ?> entry : all.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (key == null || !key.startsWith("cache_")) continue;
+
+            if (key.endsWith("_expire")) {
+                long expiresAt = parseExpires(value);
+                if (expiresAt > 0 && expiresAt <= nowSeconds) {
+                    expiredKeys.add(key);
+                    String baseKey = key.substring(0, key.length() - "_expire".length());
+                    expiredKeys.add(baseKey);
+                    expiredKeys.add(baseKey + "_Token");
+                }
+                continue;
+            }
+
+            long expiresAt = parseExpiresFromJson(value);
+            if (expiresAt > 0 && expiresAt <= nowSeconds) {
+                expiredKeys.add(key);
+            }
+        }
+
+        if (expiredKeys.isEmpty()) return 0;
+
+        SharedPreferences.Editor editor = prefers.edit();
+        for (String key : expiredKeys) editor.remove(key);
+        editor.apply();
+        return expiredKeys.size();
+    }
+
     public static void backup(File file) {
         Path.write(file, new Gson().toJson(getPrefers().getAll()).getBytes());
     }
@@ -109,5 +150,30 @@ public class Prefers {
         } else {
             return entry.getValue();
         }
+    }
+
+    private static long parseExpires(Object value) {
+        if (value == null) return -1;
+        try {
+            return (long) Double.parseDouble(String.valueOf(value));
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private static long parseExpiresFromJson(Object value) {
+        if (!(value instanceof String)) return -1;
+        String text = ((String) value).trim();
+        if (!text.startsWith("{") || !text.contains("expires")) return -1;
+        try {
+            JsonObject object = JsonParser.parseString(text).getAsJsonObject();
+            if (object.has("expiresAt")) return parseExpires(object.get("expiresAt").getAsString());
+            if (object.has("expire")) return parseExpires(object.get("expire").getAsString());
+            if (object.has("expireAt")) return parseExpires(object.get("expireAt").getAsString());
+            if (object.has("expires_at")) return parseExpires(object.get("expires_at").getAsString());
+        } catch (Exception e) {
+            return -1;
+        }
+        return -1;
     }
 }

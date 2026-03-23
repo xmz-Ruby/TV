@@ -191,6 +191,13 @@
     <string name="backed">备份成功</string>
     <string name="config_refreshed">接口已刷新</string>
 
+    <!-- Python preload -->
+    <string name="python_preload_title">Python 源初始化中</string>
+    <string name="python_preload_done_title">Python 源已就绪</string>
+    <string name="python_preload_status">%1$d/%2$d  成功 %3$d  失败 %4$d</string>
+    <string name="python_preload_status_site">%1$d/%2$d  成功 %3$d  失败 %4$d\n当前: %5$s</string>
+    <string name="python_preload_done_status">初始化完成  成功 %1$d  失败 %2$d</string>
+
     <!-- UNIT -->
     <string name="all">全部</string>
     <string name="times">倍</string>

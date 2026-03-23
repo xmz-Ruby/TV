@@ -123,6 +123,10 @@ public class App extends Application {
         Logger.addLogAdapter(getLogAdapter());
         OkHttp.get().setProxy(Setting.getProxy());
         OkHttp.get().setDoh(Doh.objectFrom(Setting.getDoh()));
+        execute(() -> {
+            int removed = com.github.catvod.utils.Prefers.cleanupExpiredCache();
+            if (removed > 0) Logger.i("Startup cache cleanup removed " + removed + " expired entries.");
+        });
         CaocConfig.Builder.create().backgroundMode(CaocConfig.BACKGROUND_MODE_SILENT).errorActivity(CrashActivity.class).apply();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override

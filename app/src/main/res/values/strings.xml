@@ -206,6 +206,13 @@
     <string name="backed">Backup successful</string>
     <string name="config_refreshed">Config rereshed</string>
 
+    <!-- Python preload -->
+    <string name="python_preload_title">Python Sources</string>
+    <string name="python_preload_done_title">Python Ready</string>
+    <string name="python_preload_status">%1$d/%2$d  OK %3$d  Fail %4$d</string>
+    <string name="python_preload_status_site">%1$d/%2$d  OK %3$d  Fail %4$d\nCurrent: %5$s</string>
+    <string name="python_preload_done_status">Finished  OK %1$d  Fail %2$d</string>
+
     <!-- UNIT -->
     <string name="all">All</string>
     <string name="times">times</string>

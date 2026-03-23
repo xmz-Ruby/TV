@@ -32,6 +32,7 @@ import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.Updater;
 import com.github.tvbox.osc.api.config.LiveConfig;
+import com.github.tvbox.osc.api.config.PythonPreload;
 import com.github.tvbox.osc.api.config.VodConfig;
 import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Button;
@@ -90,6 +91,10 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     private boolean confirm;
     private Clock mClock;
     private View mFocus;
+    private final Runnable hidePythonPreload = () -> {
+        mBinding.pythonInitOverlay.setVisibility(View.GONE);
+        PythonPreload.hide();
+    };
 
     private Site getHome() {
         return VodConfig.get().getHome();
@@ -135,6 +140,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         setTitleView();
         setRecyclerView();
         setViewModel();
+        observePythonPreload();
         setHomeType();
         setPager();
         initConfig();
@@ -197,6 +203,39 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mViewModel.result.observe(this, result -> {
             setTypes(mResult = result);
         });
+    }
+
+    private void observePythonPreload() {
+        PythonPreload.observe().observe(this, this::renderPythonPreload);
+    }
+
+    private void renderPythonPreload(PythonPreload.State state) {
+        if (state == null || !state.isVisible()) {
+            App.removeCallbacks(hidePythonPreload);
+            mBinding.pythonInitOverlay.setVisibility(View.GONE);
+            return;
+        }
+
+        App.removeCallbacks(hidePythonPreload);
+        mBinding.pythonInitOverlay.setVisibility(View.VISIBLE);
+        int progress = state.getTotal() > 0 ? Math.max(1, (int) ((state.getCompleted() * 100f) / state.getTotal())) : 0;
+        mBinding.pythonInitProgress.setProgress(progress);
+
+        if (state.isCompletedAll()) {
+            mBinding.pythonInitTitle.setText(R.string.python_preload_done_title);
+            mBinding.pythonInitStatus.setText(getString(R.string.python_preload_done_status, state.getSuccess(), state.getFail()));
+            long elapsed = Math.max(0, System.currentTimeMillis() - state.getStartedAt());
+            long delay = Math.max(2500, 4000 - elapsed);
+            App.post(hidePythonPreload, delay);
+            return;
+        }
+
+        mBinding.pythonInitTitle.setText(R.string.python_preload_title);
+        if (TextUtils.isEmpty(state.getSiteName())) {
+            mBinding.pythonInitStatus.setText(getString(R.string.python_preload_status, state.getCompleted(), state.getTotal(), state.getSuccess(), state.getFail()));
+        } else {
+            mBinding.pythonInitStatus.setText(getString(R.string.python_preload_status_site, state.getCompleted(), state.getTotal(), state.getSuccess(), state.getFail(), state.getSiteName()));
+        }
     }
 
     private List<Class> getTypes(Result result) {
