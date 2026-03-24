@@ -5,6 +5,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.text.TextUtils;
 import android.view.accessibility.CaptioningManager;
 
@@ -46,6 +47,8 @@ public class ExoUtil {
     public static final long MAX_DISK_CACHE_BYTES = 256L * 1024 * 1024;
     private static final int MIN_BUFFER_FLOOR_MS = 15_000;
     private static final int MIN_REBUFFER_FLOOR_MS = 3_000;
+    private static final int LOW_PERF_STARTUP_BUFFER_CAP_MS = 2_500;
+    private static final int LOW_PERF_REBUFFER_CAP_MS = 2_000;
     private static final int LOW_MEMORY_CLASS_MB = 128;
     private static final int MID_MEMORY_CLASS_MB = 192;
     private static final int HIGH_MEMORY_CLASS_MB = 256;
@@ -65,8 +68,10 @@ public class ExoUtil {
      */
     public static LoadControl buildLoadControl() {
         int playbackBufferMs = Setting.getBuffer() * 1000;
+        if (isArmeabiV7aOnly()) playbackBufferMs = Math.min(playbackBufferMs, LOW_PERF_STARTUP_BUFFER_CAP_MS);
         int minBufferMs = Math.max(MIN_BUFFER_FLOOR_MS, playbackBufferMs * 2);
         int bufferForPlaybackAfterRebufferMs = Math.max(MIN_REBUFFER_FLOOR_MS, playbackBufferMs);
+        if (isArmeabiV7aOnly()) bufferForPlaybackAfterRebufferMs = Math.min(bufferForPlaybackAfterRebufferMs, LOW_PERF_REBUFFER_CAP_MS);
         int memoryClassMb = getMemoryClassMb();
         int maxBufferMs = Math.max(getTieredMaxBufferMs(memoryClassMb), minBufferMs);
         return new DefaultLoadControl.Builder()
@@ -103,8 +108,19 @@ public class ExoUtil {
 
     public static TrackSelector buildTrackSelector() {
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(App.get());
-        trackSelector.setParameters(trackSelector.buildUponParameters().setPreferredTextLanguage(Locale.getDefault().getISO3Language()).setForceHighestSupportedBitrate(true).setTunnelingEnabled(Setting.isTunnel()));
+        trackSelector.setParameters(trackSelector.buildUponParameters()
+                .setPreferredTextLanguage(Locale.getDefault().getISO3Language())
+                .setForceHighestSupportedBitrate(!isArmeabiV7aOnly())
+                .setTunnelingEnabled(Setting.isTunnel() && !isArmeabiV7aOnly()));
         return trackSelector;
+    }
+
+    public static boolean isArmeabiV7aOnly() {
+        if (Build.SUPPORTED_64_BIT_ABIS.length > 0) return false;
+        for (String abi : Build.SUPPORTED_ABIS) {
+            if ("armeabi-v7a".equals(abi)) return true;
+        }
+        return false;
     }
 
     public static RenderersFactory buildRenderersFactory(int decode) {

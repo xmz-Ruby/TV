@@ -124,7 +124,16 @@ public class MediaSourceFactory implements MediaSource.Factory {
     }
 
     private boolean shouldBypassCache(MediaItem mediaItem) {
-        return MimeTypes.APPLICATION_M3U8.equals(getMimeType(mediaItem)) || isM3u8Uri(mediaItem);
+        if (MimeTypes.APPLICATION_M3U8.equals(getMimeType(mediaItem)) || isM3u8Uri(mediaItem)) return true;
+        Uri uri = mediaItem.localConfiguration != null ? mediaItem.localConfiguration.uri : null;
+        if (uri == null) uri = mediaItem.requestMetadata.mediaUri;
+        if (ExoUtil.isArmeabiV7aOnly()) {
+            if (uri != null) {
+                String scheme = uri.getScheme();
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) return true;
+            }
+        }
+        return false;
     }
 
     private String getMimeType(MediaItem mediaItem) {

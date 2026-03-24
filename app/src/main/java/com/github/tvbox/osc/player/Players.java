@@ -91,6 +91,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private Sub sub;
 
     private long position;
+    private long prepareStartedAt;
     private int decode;
     private int count;
     private int player;
@@ -252,6 +253,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     public void reset() {
         position = C.TIME_UNSET;
+        prepareStartedAt = 0;
         removeTimeoutCheck();
         stopParse();
         count = 0;
@@ -611,12 +613,28 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     private void setMediaSource(Map<String, String> headers, String url, String format, Drm drm, List<Sub> subs, int timeout) {
-        if (isIjk() && ijkPlayer != null) ijkPlayer.setMediaSource(IjkUtil.getSource(this.headers = checkUa(headers), this.url = url), position);
-        if (isExo() && exoPlayer != null) exoPlayer.setMediaItem(ExoUtil.getMediaItem(this.headers = checkUa(headers), UrlUtil.uri(this.url = url), this.format = format, this.drm = drm, checkSub(this.subs = subs), decode), position);
+        prepareStartedAt = System.currentTimeMillis();
+        long startPosition = position == C.TIME_UNSET ? 0 : position;
+        if (isIjk() && ijkPlayer != null) ijkPlayer.setMediaSource(IjkUtil.getSource(this.headers = checkUa(headers), this.url = url), startPosition);
+        if (isExo() && exoPlayer != null) exoPlayer.setMediaItem(ExoUtil.getMediaItem(this.headers = checkUa(headers), UrlUtil.uri(this.url = url), this.format = format, this.drm = drm, checkSub(this.subs = subs), decode), startPosition);
         if (isExo() && exoPlayer != null) exoPlayer.prepare();
-        App.post(runnable, timeout);
+        App.post(runnable, getPrepareTimeout(timeout));
         PlayerEvent.prepare();
         Logger.t(TAG).d(url);
+    }
+
+    private long getPrepareTimeout(int timeout) {
+        long prepareTimeout = timeout;
+        if (isExo() && ExoUtil.isArmeabiV7aOnly()) {
+            prepareTimeout = Math.max(timeout, 30_000L);
+        }
+        return prepareTimeout;
+    }
+
+    private void logPrepareElapsed(String phase) {
+        if (prepareStartedAt <= 0) return;
+        long elapsed = System.currentTimeMillis() - prepareStartedAt;
+        Logger.t(TAG).i("prepare " + phase + " elapsed=" + elapsed + "ms, player=" + player + ", decode=" + decode + ", armv7=" + ExoUtil.isArmeabiV7aOnly());
     }
 
     private void removeTimeoutCheck() {
@@ -792,12 +810,18 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     @Override
     public void onPlayerError(@NonNull PlaybackException error) {
+        logPrepareElapsed("error");
+        removeTimeoutCheck();
         Logger.t(TAG).e(error.errorCode + "," + url);
         ErrorEvent.url(ExoUtil.getRetry(error.errorCode), error.errorCode);
     }
 
     @Override
     public void onPlaybackStateChanged(int state) {
+        if (state == Player.STATE_READY) {
+            logPrepareElapsed("ready");
+            removeTimeoutCheck();
+        }
         PlayerEvent.state(state);
     }
 
@@ -817,6 +841,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     @Override
     public boolean onError(IMediaPlayer mp, int what, int extra) {
+        logPrepareElapsed("ijk_error");
+        removeTimeoutCheck();
         setPlaybackState(PlaybackStateCompat.STATE_ERROR);
         ErrorEvent.url(1);
         return true;
@@ -824,6 +850,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     @Override
     public void onPrepared(IMediaPlayer mp) {
+        logPrepareElapsed("ijk_ready");
+        removeTimeoutCheck();
         PlayerEvent.state(Player.STATE_READY);
     }
 
