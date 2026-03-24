@@ -4,5 +4,9 @@
     <color name="primaryDark">@color/blue_700</color>
     <color name="accent">@color/blue_500</color>
     <color name="indicator">@color/white_80</color>
+    <color name="search_badge_red_bg">#D5423A</color>
+    <color name="search_badge_red_text">@color/white</color>
+    <color name="search_badge_gray_bg">#AEBBC5</color>
+    <color name="search_badge_gray_text">@color/dark_blue</color>
 
 </resources>

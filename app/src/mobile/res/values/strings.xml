@@ -20,6 +20,7 @@
     <string name="detail_quality">Quality</string>
     <string name="detail_content">Summary</string>
     <string name="detail_search">Searching <xliff:g name="name">%s</xliff:g></string>
+    <string name="search_progress">OK %1$d  Fail %2$d  All %3$d</string>
 
     <!-- Device -->
     <string name="device_select">Select devices</string>

@@ -219,19 +219,26 @@ public class SiteViewModel extends ViewModel {
     }
 
     public void searchContent(Site site, String keyword, boolean quick) throws Throwable {
+        Result result = searchResult(site, keyword, quick);
+        if (!result.getList().isEmpty()) this.search.postValue(result);
+    }
+
+    public Result searchResult(Site site, String keyword, boolean quick) throws Throwable {
         if (site.getType() == 3) {
             String searchContent = site.spider().searchContent(Trans.t2s(keyword), quick);
             Result result = Result.fromJson(searchContent);
+            for (Vod vod : result.getList()) vod.setSite(site);
             SpiderDebug.log("搜索[" + site.getName() + "]返回" + result.getList().size() + "条结果");
-            post(site, result);
+            return result;
         } else {
             ArrayMap<String, String> params = new ArrayMap<>();
             params.put("wd", Trans.t2s(keyword));
             params.put("quick", String.valueOf(quick));
             String searchContent = call(site, params, true);
             Result result = fetchPic(site, Result.fromType(site.getType(), searchContent));
+            for (Vod vod : result.getList()) vod.setSite(site);
             SpiderDebug.log("搜索[" + site.getName() + "]返回" + result.getList().size() + "条结果");
-            post(site, result);
+            return result;
         }
     }
 
@@ -291,12 +298,6 @@ public class SiteViewModel extends ViewModel {
         String response = OkHttp.newCall(site.getApi(), site.getHeaders(), params).execute().body().string();
         result.setList(Result.fromType(site.getType(), response).getList());
         return result;
-    }
-
-    private void post(Site site, Result result) {
-        if (result.getList().isEmpty()) return;
-        for (Vod vod : result.getList()) vod.setSite(site);
-        this.search.postValue(result);
     }
 
     private void execute(MutableLiveData<Result> result, Callable<Result> callable) {

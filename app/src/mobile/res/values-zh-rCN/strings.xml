@@ -20,6 +20,7 @@
     <string name="detail_quality">画质</string>
     <string name="detail_content">简介</string>
     <string name="detail_search">快搜“<xliff:g name="name">%s</xliff:g>”</string>
+    <string name="search_progress">成功 %1$d  失败 %2$d  全部 %3$d</string>
 
     <!-- Device -->
     <string name="device_select">选择装置</string>

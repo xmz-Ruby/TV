@@ -15,6 +15,7 @@ public class Collect implements Parcelable {
     private List<Vod> list;
     private Site site;
     private int page;
+    private int exactMatchCount;
 
     public static Collect all() {
         Collect item = new Collect(Site.get("all", ResUtil.getString(R.string.all)), new ArrayList<>());
@@ -24,6 +25,12 @@ public class Collect implements Parcelable {
 
     public static Collect create(List<Vod> list) {
         return new Collect(list.get(0).getSite(), list);
+    }
+
+    public static Collect create(List<Vod> list, int exactMatchCount) {
+        Collect item = create(list);
+        item.setExactMatchCount(exactMatchCount);
+        return item;
     }
 
     public Collect() {
@@ -58,6 +65,22 @@ public class Collect implements Parcelable {
         this.page = page;
     }
 
+    public int getCount() {
+        return getList().size();
+    }
+
+    public int getExactMatchCount() {
+        return Math.max(0, exactMatchCount);
+    }
+
+    public void setExactMatchCount(int exactMatchCount) {
+        this.exactMatchCount = Math.max(0, exactMatchCount);
+    }
+
+    public boolean hasExactMatch() {
+        return getExactMatchCount() > 0;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -69,6 +92,7 @@ public class Collect implements Parcelable {
         dest.writeTypedList(this.list);
         dest.writeParcelable(this.site, flags);
         dest.writeInt(this.page);
+        dest.writeInt(this.exactMatchCount);
     }
 
     protected Collect(Parcel in) {
@@ -76,6 +100,7 @@ public class Collect implements Parcelable {
         this.list = in.createTypedArrayList(Vod.CREATOR);
         this.site = in.readParcelable(Site.class.getClassLoader());
         this.page = in.readInt();
+        this.exactMatchCount = in.readInt();
     }
 
     public static final Creator<Collect> CREATOR = new Creator<>() {

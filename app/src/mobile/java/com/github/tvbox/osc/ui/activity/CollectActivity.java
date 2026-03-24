@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import okhttp3.Call;
 import okhttp3.Response;
@@ -66,6 +67,10 @@ public class CollectActivity extends BaseActivity implements CustomScroller.Call
     private SiteViewModel mViewModel;
     private PauseExecutor mExecutor;
     private List<Site> mSites;
+    private int mSearchToken;
+    private int mSearchSuccessCount;
+    private int mSearchFailureCount;
+    private int mSearchTotalCount;
 
     public static void start(Activity activity) {
         start(activity, "");
@@ -142,22 +147,23 @@ public class CollectActivity extends BaseActivity implements CustomScroller.Call
     private void setViewType(int viewType) {
         int count = Product.getColumn(this) - 1;
         mSearchAdapter.setViewType(viewType, count);
-        mSearchAdapter.setSize(Product.getSpec(this, ResUtil.dp2px(128 + (count) * 16), count));
+        mSearchAdapter.setSize(Product.getSpec(this, ResUtil.dp2px(152 + (count) * 16), count));
         ((GridLayoutManager) mBinding.recycler.getLayoutManager()).setSpanCount(mSearchAdapter.isGrid() ? count : 1);
         mBinding.view.setImageResource(mSearchAdapter.isGrid() ? R.drawable.ic_action_list : R.drawable.ic_action_grid);
     }
 
     private void setViewModel() {
         mViewModel = new ViewModelProvider(this).get(SiteViewModel.class);
-        mViewModel.search.observe(this, result -> {
-            if (mCollectAdapter.getPosition() == 0) mSearchAdapter.addAll(result.getList());
-            mCollectAdapter.add(Collect.create(result.getList()));
-            mCollectAdapter.add(result.getList());
-        });
         mViewModel.result.observe(this, result -> {
             boolean same = result.getList().size() > 0 && mCollectAdapter.getActivated().getSite().equals(result.getList().get(0).getSite());
-            if (same) mCollectAdapter.getActivated().getList().addAll(result.getList());
-            if (same) mSearchAdapter.addAll(result.getList());
+            if (same) {
+                int exactMatchCount = countExactMatch(result.getList(), mBinding.keyword.getText().toString().trim());
+                mCollectAdapter.getActivated().getList().addAll(result.getList());
+                mCollectAdapter.getActivated().setExactMatchCount(mCollectAdapter.getActivated().getExactMatchCount() + exactMatchCount);
+                mCollectAdapter.addToAll(result.getList(), exactMatchCount);
+                mCollectAdapter.notifyItemChanged(mCollectAdapter.getPosition());
+                mSearchAdapter.addAll(result.getList());
+            }
             mScroller.endLoading(result);
         });
     }
@@ -184,23 +190,32 @@ public class CollectActivity extends BaseActivity implements CustomScroller.Call
         if (empty()) return;
         mSearchAdapter.clear();
         mCollectAdapter.clear();
+        startSearchProgress();
         Util.hideKeyboard(mBinding.keyword);
         mBinding.site.setVisibility(View.GONE);
         mBinding.agent.setVisibility(View.GONE);
         mBinding.view.setVisibility(View.VISIBLE);
+        mBinding.progress.setVisibility(View.VISIBLE);
         mBinding.result.setVisibility(View.VISIBLE);
-        if (mExecutor != null) mExecutor.shutdownNow();
+        stopSearch();
         mExecutor = new PauseExecutor(Constant.THREAD_POOL * 2);
         String keyword = mBinding.keyword.getText().toString().trim();
-        for (Site site : mSites) mExecutor.execute(() -> search(site, keyword));
+        int token = ++mSearchToken;
+        for (Site site : mSites) mExecutor.execute(() -> search(site, keyword, token));
         App.post(() -> mRecordAdapter.add(keyword), 250);
     }
 
-    private void search(Site site, String keyword) {
+    private void search(Site site, String keyword, int token) {
+        Result result = Result.empty();
+        boolean success = false;
         try {
-            mViewModel.searchContent(site, keyword, false);
+            result = mViewModel.searchResult(site, keyword, false);
+            success = true;
         } catch (Throwable ignored) {
         }
+        Result finalResult = result;
+        boolean finalSuccess = success;
+        App.post(() -> onSearchFinished(token, keyword, finalResult, finalSuccess));
     }
 
     private void getHot() {
@@ -243,10 +258,52 @@ public class CollectActivity extends BaseActivity implements CustomScroller.Call
         mSearchAdapter.clear();
         mCollectAdapter.clear();
         mBinding.view.setVisibility(View.GONE);
+        mBinding.progress.setVisibility(View.GONE);
         mBinding.result.setVisibility(View.GONE);
         mBinding.site.setVisibility(View.VISIBLE);
         mBinding.agent.setVisibility(View.VISIBLE);
+        stopSearch();
+    }
+
+    private void stopSearch() {
+        mSearchToken++;
         if (mExecutor != null) mExecutor.shutdownNow();
+        mExecutor = null;
+    }
+
+    private void startSearchProgress() {
+        mSearchSuccessCount = 0;
+        mSearchFailureCount = 0;
+        mSearchTotalCount = mSites.size();
+        updateSearchProgress();
+    }
+
+    private void onSearchFinished(int token, String keyword, Result result, boolean success) {
+        if (token != mSearchToken) return;
+        if (success) mSearchSuccessCount++;
+        else mSearchFailureCount++;
+        updateSearchProgress();
+        if (!success || result.getList().isEmpty()) return;
+        int exactMatchCount = countExactMatch(result.getList(), keyword);
+        if (mCollectAdapter.getPosition() == 0) mSearchAdapter.addAll(result.getList());
+        mCollectAdapter.add(Collect.create(result.getList(), exactMatchCount));
+        mCollectAdapter.addToAll(result.getList(), exactMatchCount);
+    }
+
+    private void updateSearchProgress() {
+        mBinding.progress.setText(getString(R.string.search_progress, mSearchSuccessCount, mSearchFailureCount, mSearchTotalCount));
+    }
+
+    private int countExactMatch(List<Vod> items, String keyword) {
+        int count = 0;
+        String target = normalizeKeyword(keyword);
+        if (target.isEmpty()) return 0;
+        for (Vod item : items) if (normalizeKeyword(item.getVodName()).equals(target)) count++;
+        return count;
+    }
+
+    private String normalizeKeyword(String text) {
+        return text == null ? "" : text.replaceAll("\\s+", "").trim().toLowerCase(Locale.ROOT);
     }
 
     @Override
@@ -310,6 +367,12 @@ public class CollectActivity extends BaseActivity implements CustomScroller.Call
     protected void onPause() {
         super.onPause();
         if (mExecutor != null) mExecutor.pause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        stopSearch();
     }
 
     @Override

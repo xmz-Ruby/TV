@@ -1,11 +1,15 @@
 package com.github.tvbox.osc.ui.adapter;
 
+import android.content.res.ColorStateList;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.bean.Collect;
 import com.github.tvbox.osc.bean.Vod;
 import com.github.tvbox.osc.databinding.AdapterCollectBinding;
@@ -39,8 +43,11 @@ public class CollectAdapter extends RecyclerView.Adapter<CollectAdapter.ViewHold
         notifyItemInserted(mItems.size() - 1);
     }
 
-    public void add(List<Vod> items) {
-        mItems.get(0).getList().addAll(items);
+    public void addToAll(List<Vod> items, int exactMatchCount) {
+        Collect all = mItems.get(0);
+        all.getList().addAll(items);
+        all.setExactMatchCount(all.getExactMatchCount() + exactMatchCount);
+        notifyItemChanged(0);
     }
 
     public int getPosition() {
@@ -71,9 +78,16 @@ public class CollectAdapter extends RecyclerView.Adapter<CollectAdapter.ViewHold
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Collect item = mItems.get(position);
+        holder.binding.getRoot().setActivated(item.isActivated());
         holder.binding.text.setActivated(item.isActivated());
         holder.binding.text.setText(item.getSite().getName());
-        holder.binding.text.setOnClickListener(v -> mListener.onItemClick(position, item));
+        holder.binding.badge.setVisibility(item.getCount() > 0 || position == 0 ? View.VISIBLE : View.GONE);
+        holder.binding.badge.setText(String.valueOf(item.getCount()));
+        int badgeBg = item.hasExactMatch() ? R.color.search_badge_red_bg : R.color.search_badge_gray_bg;
+        int badgeText = item.hasExactMatch() ? R.color.search_badge_red_text : R.color.search_badge_gray_text;
+        holder.binding.badge.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(holder.itemView.getContext(), badgeBg)));
+        holder.binding.badge.setTextColor(ContextCompat.getColor(holder.itemView.getContext(), badgeText));
+        holder.binding.getRoot().setOnClickListener(v -> mListener.onItemClick(position, item));
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
