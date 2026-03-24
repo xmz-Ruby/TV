@@ -221,15 +221,17 @@ public class SiteViewModel extends ViewModel {
     public void searchContent(Site site, String keyword, boolean quick) throws Throwable {
         if (site.getType() == 3) {
             String searchContent = site.spider().searchContent(Trans.t2s(keyword), quick);
-            SpiderDebug.log(site.getName() + "," + searchContent);
-            post(site, Result.fromJson(searchContent));
+            Result result = Result.fromJson(searchContent);
+            SpiderDebug.log("搜索[" + site.getName() + "]返回" + result.getList().size() + "条结果");
+            post(site, result);
         } else {
             ArrayMap<String, String> params = new ArrayMap<>();
             params.put("wd", Trans.t2s(keyword));
             params.put("quick", String.valueOf(quick));
             String searchContent = call(site, params, true);
-            SpiderDebug.log(site.getName() + "," + searchContent);
-            post(site, fetchPic(site, Result.fromType(site.getType(), searchContent)));
+            Result result = fetchPic(site, Result.fromType(site.getType(), searchContent));
+            SpiderDebug.log("搜索[" + site.getName() + "]返回" + result.getList().size() + "条结果");
+            post(site, result);
         }
     }
 
@@ -238,11 +240,9 @@ public class SiteViewModel extends ViewModel {
             if (site.getType() == 3) {
                 SpiderDebug.log("搜索[" + site.getName() + "] key=" + site.getKey() + " keyword=" + keyword + " page=" + page);
                 String searchContent = site.spider().searchContent(Trans.t2s(keyword), false, page);
-                SpiderDebug.log(site.getName() + "," + searchContent);
                 Result result = Result.fromJson(searchContent);
                 for (Vod vod : result.getList()) {
                     vod.setSite(site);
-                    SpiderDebug.log("结果绑定 siteKey=" + site.getKey() + " vodName=" + vod.getVodName());
                 }
                 SpiderDebug.log("搜索[" + site.getName() + "]完成，返回" + result.getList().size() + "条结果");
                 return result;
@@ -251,9 +251,9 @@ public class SiteViewModel extends ViewModel {
                 params.put("wd", Trans.t2s(keyword));
                 params.put("pg", page);
                 String searchContent = call(site, params, true);
-                SpiderDebug.log(site.getName() + "," + searchContent);
                 Result result = fetchPic(site, Result.fromType(site.getType(), searchContent));
                 for (Vod vod : result.getList()) vod.setSite(site);
+                SpiderDebug.log("搜索[" + site.getName() + "]完成，返回" + result.getList().size() + "条结果");
                 return result;
             }
         });
