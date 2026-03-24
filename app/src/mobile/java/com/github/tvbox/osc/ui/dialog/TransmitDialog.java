@@ -16,15 +16,10 @@ import com.github.tvbox.osc.bean.Device;
 import com.github.tvbox.osc.utils.ScanTask;
 import com.github.tvbox.osc.databinding.DialogDeviceBinding;
 import com.github.tvbox.osc.impl.Callback;
-import com.github.tvbox.osc.server.Server;
 import com.github.tvbox.osc.ui.adapter.DeviceAdapter;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.catvod.net.OkHttp;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,26 +69,6 @@ public class TransmitDialog extends BaseDialog implements DeviceAdapter.OnClickL
         return this;
     }
 
-    public TransmitDialog pushRetore(String path) {
-        type = "push_restore";
-        File file = new File(path);
-        MediaType mediaType = MediaType.parse("multipart/form-data");
-        MultipartBody.Builder body = new MultipartBody.Builder();
-        body.setType(MultipartBody.FORM);
-        body.addFormDataPart("name", file.getName());
-        body.addFormDataPart("files-0", file.getName(), RequestBody.create(mediaType, file));
-        requestBody = body.build();
-        return this;
-    }
-
-    public TransmitDialog pullRetore() {
-        type = "pull_restore";
-        FormBody.Builder body = new FormBody.Builder();
-        body.add("ip", Server.get().getAddress());
-        requestBody = body.build();
-        return this;
-    }
-
     public void show(Fragment fragment) {
         show(fragment.getActivity());
     }
@@ -110,7 +85,6 @@ public class TransmitDialog extends BaseDialog implements DeviceAdapter.OnClickL
 
     @Override
     protected void initView() {
-        EventBus.getDefault().register(this);
         setRecyclerView();
         getDevice();
     }
@@ -180,6 +154,5 @@ public class TransmitDialog extends BaseDialog implements DeviceAdapter.OnClickL
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        EventBus.getDefault().unregister(this);
     }
 }

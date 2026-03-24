@@ -29,10 +29,6 @@ import com.github.tvbox.osc.utils.ScanTask;
 import com.github.catvod.net.OkHttp;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
@@ -93,7 +89,6 @@ public class SyncDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     @Override
     protected void initView() {
         binding.mode.setVisibility(View.VISIBLE);
-        EventBus.getDefault().register(this);
         setRecyclerView();
         getDevice();
         setMode();
@@ -174,6 +169,5 @@ public class SyncDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        EventBus.getDefault().unregister(this);
     }
 }

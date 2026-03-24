@@ -44,8 +44,6 @@ public abstract class AppDatabase extends RoomDatabase {
     public static final int VERSION = 33;
     public static final String NAME = "tv";
     public static final String SYMBOL = "@@@";
-    public static final String BACKUP_SUFFIX = "tv.backup";
-
     private static volatile AppDatabase instance;
 
     public static synchronized AppDatabase get() {
