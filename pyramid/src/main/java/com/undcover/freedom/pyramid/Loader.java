@@ -36,9 +36,9 @@ public class Loader {
     }
 
     @Keep
-    public Spider spider(Context context, String api) {
+    public Spider spider(Context context, String api, String moduleKey) {
         if (!initialized) init(context);
-        PyObject obj = app.callAttr("spider", Path.py().getAbsolutePath(), api);
+        PyObject obj = app.callAttr("spider", Path.py().getAbsolutePath(), api, moduleKey);
         return new Spider(app, obj, api);
     }
 }

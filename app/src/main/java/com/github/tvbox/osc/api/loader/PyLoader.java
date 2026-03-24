@@ -6,6 +6,7 @@ import com.github.tvbox.osc.App;
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderNull;
 import com.github.catvod.utils.Logger;
+import com.github.catvod.utils.Util;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -31,7 +32,7 @@ public class PyLoader {
             Class<?> loaderClass = Class.forName("com.undcover.freedom.pyramid.Loader");
             loader = loaderClass.newInstance();
             warmupMethod = loaderClass.getMethod("warmup", Context.class);
-            spiderMethod = loaderClass.getMethod("spider", Context.class, String.class);
+            spiderMethod = loaderClass.getMethod("spider", Context.class, String.class, String.class);
             Logger.i("PyLoader: Pyramid loader initialized successfully");
         } catch (ClassNotFoundException e) {
             Logger.e("PyLoader: Loader class not found - pyramid module not included?", e);
@@ -72,6 +73,7 @@ public class PyLoader {
 
     public Spider getSpider(String key, String api, String ext) {
         String compositeKey = api + "|" + ext;
+        String moduleKey = Util.md5(key + "|" + compositeKey);
         try {
             if (loader == null) {
                 Logger.e("PyLoader: Loader not initialized");
@@ -94,7 +96,7 @@ public class PyLoader {
                     return cachedSpider;
                 }
                 Logger.i("PyLoader: Loading Python spider - key=" + key + ", api=" + api + ", extHash=" + ext.hashCode());
-                Spider spider = (Spider) spiderMethod.invoke(loader, App.get(), api);
+                Spider spider = (Spider) spiderMethod.invoke(loader, App.get(), api, moduleKey);
                 spider.init(App.get(), ext);
                 spiders.put(compositeKey, spider);
                 Logger.i("PyLoader: Python spider loaded successfully - key=" + key + ", compositeKey=" + compositeKey.hashCode());

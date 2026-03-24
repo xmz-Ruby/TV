@@ -1,15 +1,40 @@
 import os
+import hashlib
 import requests
+import sys
 from importlib.machinery import SourceFileLoader
 import json
 
 
-def spider(cache, api):
-    name = os.path.basename(api)
-    path = cache + '/' + name
-    download(path, api)
-    name = name.split('.')[0]
-    return SourceFileLoader(name, path).load_module().Spider()
+def spider(cache, api, module_key=None):
+    name, path = getModule(cache, api, module_key)
+    error = None
+    for _ in range(2):
+        try:
+            download(path, api)
+            clearModule(name)
+            module = SourceFileLoader(name, path).load_module()
+            spider_cls = module.Spider
+            abstract_methods = getattr(spider_cls, '__abstractmethods__', None)
+            if abstract_methods:
+                raise TypeError(f'Spider class is abstract: {sorted(list(abstract_methods))}')
+            return spider_cls()
+        except Exception as e:
+            error = e
+    raise error
+
+
+def getModule(cache, api, module_key=None):
+    source = api.split('#', 1)[0].split('?', 1)[0]
+    filename = os.path.basename(source) or 'spider.py'
+    root, ext = os.path.splitext(filename)
+    if not ext:
+        ext = '.py'
+    identity = str(module_key or api)
+    digest = hashlib.md5(identity.encode('utf-8')).hexdigest()
+    name = f'{root}_{digest}'
+    path = os.path.join(cache, f'{name}{ext}')
+    return name, path
 
 
 def download(path, api):
@@ -20,12 +45,21 @@ def download(path, api):
 
 
 def writeFile(path, content):
-    with open(path, 'wb') as f:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    temp = f'{path}.tmp'
+    with open(temp, 'wb') as f:
         f.write(content)
+    os.replace(temp, path)
+
+
+def clearModule(name):
+    if name in sys.modules:
+        del sys.modules[name]
 
 
 def redirect(url):
-    rsp = requests.get(url, allow_redirects=False, verify=False)
+    rsp = requests.get(url, allow_redirects=False, verify=False, timeout=10)
+    rsp.raise_for_status()
     if 'Location' in rsp.headers:
         return redirect(rsp.headers['Location'])
     else:
