@@ -37,7 +37,15 @@ public class PyLoader {
     }
 
     public void clear() {
-        for (Spider spider : spiders.values()) App.execute(spider::destroy);
+        for (Spider spider : spiders.values()) {
+            final Spider currentSpider = spider;
+            App.execute(new Runnable() {
+                @Override
+                public void run() {
+                    currentSpider.destroy();
+                }
+            });
+        }
         spiders.clear();
         loadingLocks.clear();
     }
@@ -47,18 +55,18 @@ public class PyLoader {
     }
 
     public Spider getSpider(String key, String api, String ext) {
+        String compositeKey = api + "|" + ext;
         try {
             if (loader == null) {
                 Logger.e("PyLoader: Loader not initialized");
                 return new SpiderNull();
             }
-            String compositeKey = api + "|" + ext;
             Spider cachedSpider = spiders.get(compositeKey);
             if (cachedSpider != null) {
                 Logger.d("PyLoader: Reusing cached spider - key=" + key + ", compositeKey=" + compositeKey.hashCode());
                 return cachedSpider;
             }
-            Object loadingLock = loadingLocks.computeIfAbsent(compositeKey, k -> new Object());
+            Object loadingLock = getLoadingLock(compositeKey);
             synchronized (loadingLock) {
                 cachedSpider = spiders.get(compositeKey);
                 if (cachedSpider != null) {
@@ -77,9 +85,16 @@ public class PyLoader {
             Logger.e("PyLoader: Failed to load Python spider - " + key, e);
             return new SpiderNull();
         } finally {
-            String compositeKey = api + "|" + ext;
             loadingLocks.remove(compositeKey);
         }
+    }
+
+    private Object getLoadingLock(String compositeKey) {
+        Object existingLock = loadingLocks.get(compositeKey);
+        if (existingLock != null) return existingLock;
+        Object newLock = new Object();
+        Object racingLock = loadingLocks.putIfAbsent(compositeKey, newLock);
+        return racingLock != null ? racingLock : newLock;
     }
 
     public Object[] proxyInvoke(Map<String, String> params) {

@@ -14,6 +14,8 @@ import com.github.tvbox.osc.bean.Site;
 import com.github.tvbox.osc.impl.Callback;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.tvbox.osc.utils.UrlUtil;
+import com.github.catvod.crawler.Spider;
+import com.github.catvod.crawler.SpiderNull;
 import com.github.catvod.bean.Doh;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Json;
@@ -419,10 +421,15 @@ public class VodConfig {
             preloadExecutor.execute(() -> {
                 try {
                     android.util.Log.d("VodConfig", "预加载 Python 站点: " + site.getName() + " (" + site.getKey() + ")");
-                    BaseLoader.get().getSpider(site.getKey(), site.getApi(), site.getExt(), site.getJar());
-                    android.util.Log.d("VodConfig", "成功预加载: " + site.getName());
-                    successCount.incrementAndGet();
-                } catch (Exception e) {
+                    Spider spider = BaseLoader.get().getSpider(site.getKey(), site.getApi(), site.getExt(), site.getJar());
+                    if (spider instanceof SpiderNull) {
+                        android.util.Log.e("VodConfig", "预加载失败: " + site.getName() + " - SpiderNull");
+                        failCount.incrementAndGet();
+                    } else {
+                        android.util.Log.d("VodConfig", "成功预加载: " + site.getName());
+                        successCount.incrementAndGet();
+                    }
+                } catch (Throwable e) {
                     android.util.Log.e("VodConfig", "预加载失败: " + site.getName() + " - " + e.getMessage());
                     failCount.incrementAndGet();
                     e.printStackTrace();
@@ -432,6 +439,11 @@ public class VodConfig {
                     if (completed == totalCount) {
                         android.util.Log.d("VodConfig", "Python 站点预加载完成，成功: " + successCount.get() + "，失败: " + failCount.get());
                         PythonPreload.finish(token, totalCount, completed, successCount.get(), failCount.get());
+                        if (successCount.get() == 0) {
+                            App.post(() -> Notify.show(R.string.python_preload_all_failed));
+                        } else if (failCount.get() > 0) {
+                            App.post(() -> Notify.show(App.get().getString(R.string.python_preload_partial_failed, failCount.get(), totalCount)));
+                        }
                         preloadExecutor.shutdown();
                     }
                 }

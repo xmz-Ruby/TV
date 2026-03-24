@@ -19,13 +19,15 @@ public final class PythonPreload {
 
     public static int start(int total) {
         int token = TOKEN.incrementAndGet();
-        STATE.postValue(State.running(token, total, 0, 0, 0, ""));
+        STATE.postValue(State.running(token, total, 0, 0, 0, "", System.currentTimeMillis()));
         return token;
     }
 
     public static void progress(int token, int total, int completed, int success, int fail, String siteName) {
         if (TOKEN.get() != token) return;
-        STATE.postValue(State.running(token, total, completed, success, fail, siteName));
+        State current = STATE.getValue();
+        long startedAt = current != null && current.token == token ? current.startedAt : System.currentTimeMillis();
+        STATE.postValue(State.running(token, total, completed, success, fail, siteName, startedAt));
     }
 
     public static void finish(int token, int total, int completed, int success, int fail) {
@@ -63,8 +65,8 @@ public final class PythonPreload {
             return new State(0, 0, 0, 0, 0, false, "", 0);
         }
 
-        public static State running(int token, int total, int completed, int success, int fail, String siteName) {
-            return new State(token, total, completed, success, fail, false, siteName, System.currentTimeMillis());
+        public static State running(int token, int total, int completed, int success, int fail, String siteName, long startedAt) {
+            return new State(token, total, completed, success, fail, false, siteName, startedAt);
         }
 
         public static State finished(int token, int total, int completed, int success, int fail) {
@@ -107,6 +109,18 @@ public final class PythonPreload {
 
         public boolean isVisible() {
             return total > 0 && (completed < total || completedAll);
+        }
+
+        public boolean isAllFailed() {
+            return completedAll && total > 0 && success <= 0 && fail >= total;
+        }
+
+        public boolean isPartialFailed() {
+            return completedAll && success > 0 && fail > 0;
+        }
+
+        public boolean isAllSuccess() {
+            return completedAll && total > 0 && fail == 0 && success == total;
         }
     }
 }

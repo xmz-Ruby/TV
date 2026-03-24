@@ -222,10 +222,18 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mBinding.pythonInitProgress.setProgress(progress);
 
         if (state.isCompletedAll()) {
-            mBinding.pythonInitTitle.setText(R.string.python_preload_done_title);
-            mBinding.pythonInitStatus.setText(getString(R.string.python_preload_done_status, state.getSuccess(), state.getFail()));
+            if (state.isAllFailed()) {
+                mBinding.pythonInitTitle.setText(R.string.python_preload_failed_title);
+                mBinding.pythonInitStatus.setText(getString(R.string.python_preload_failed_status, state.getFail(), state.getTotal()));
+            } else if (state.isPartialFailed()) {
+                mBinding.pythonInitTitle.setText(R.string.python_preload_partial_title);
+                mBinding.pythonInitStatus.setText(getString(R.string.python_preload_partial_status, state.getSuccess(), state.getFail(), state.getTotal()));
+            } else {
+                mBinding.pythonInitTitle.setText(R.string.python_preload_done_title);
+                mBinding.pythonInitStatus.setText(getString(R.string.python_preload_done_status, state.getSuccess(), state.getFail()));
+            }
             long elapsed = Math.max(0, System.currentTimeMillis() - state.getStartedAt());
-            long delay = Math.max(2500, 4000 - elapsed);
+            long delay = state.isAllFailed() ? Math.max(4500, 6000 - elapsed) : Math.max(2500, 4000 - elapsed);
             App.post(hidePythonPreload, delay);
             return;
         }

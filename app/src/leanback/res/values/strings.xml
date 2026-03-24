@@ -25,5 +25,9 @@
     <string name="python_preload_status">%1$d/%2$d  OK %3$d  Fail %4$d</string>
     <string name="python_preload_status_site">%1$d/%2$d  OK %3$d  Fail %4$d\nCurrent: %5$s</string>
     <string name="python_preload_done_status">Finished  OK %1$d  Fail %2$d</string>
+    <string name="python_preload_partial_title">Python Partial Failure</string>
+    <string name="python_preload_partial_status">Finished  OK %1$d  Fail %2$d / %3$d</string>
+    <string name="python_preload_failed_title">Python Failed</string>
+    <string name="python_preload_failed_status">All failed  %1$d / %2$d</string>
 
 </resources>

@@ -25,5 +25,9 @@
     <string name="python_preload_status">%1$d/%2$d  成功 %3$d  失败 %4$d</string>
     <string name="python_preload_status_site">%1$d/%2$d  成功 %3$d  失败 %4$d\n当前: %5$s</string>
     <string name="python_preload_done_status">初始化完成  成功 %1$d  失败 %2$d</string>
+    <string name="python_preload_partial_title">Python 源部分失败</string>
+    <string name="python_preload_partial_status">初始化结束  成功 %1$d  失败 %2$d / %3$d</string>
+    <string name="python_preload_failed_title">Python 源初始化失败</string>
+    <string name="python_preload_failed_status">全部失败  %1$d / %2$d</string>
 
 </resources>
