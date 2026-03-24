@@ -220,7 +220,7 @@ public class SiteViewModel extends ViewModel {
 
     public void searchContent(Site site, String keyword, boolean quick) throws Throwable {
         Result result = searchResult(site, keyword, quick);
-        if (!result.getList().isEmpty()) this.search.postValue(result);
+        if (!result.getList().isEmpty() || result.hasMsg()) this.search.postValue(result);
     }
 
     public Result searchResult(Site site, String keyword, boolean quick) throws Throwable {
