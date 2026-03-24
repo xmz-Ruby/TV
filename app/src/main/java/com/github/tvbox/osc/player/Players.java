@@ -457,6 +457,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void seekTo(long time) {
+        time = sanitizeSeekPosition(time);
         // 标记seek操作，让同步器在seek后保持弹幕播放状态
         if (danmuSync != null) {
             danmuSync.markSeek();
@@ -858,6 +859,12 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     @Override
     public void onCompletion(IMediaPlayer mp) {
         PlayerEvent.state(Player.STATE_ENDED);
+    }
+
+    private long sanitizeSeekPosition(long time) {
+        long duration = getDuration();
+        if (duration > 0 && time > duration) return duration;
+        return Math.max(0, time);
     }
 
     @Override
