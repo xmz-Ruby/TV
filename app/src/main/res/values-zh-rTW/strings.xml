@@ -77,7 +77,6 @@
     <!-- Setting -->
     <string name="setting_vod">點播</string>
     <string name="setting_live">直播</string>
-    <string name="setting_wall">壁紙</string>
     <string name="setting_player">播放設定</string>
     <string name="setting_danmu">彈幕設定</string>
     <string name="setting_custom">個性設定</string>
@@ -89,7 +88,6 @@
     <string name="setting_size">圖片尺寸</string>
     <string name="setting_aggregated_search">聚合搜索</string>
     <string name="setting_language">語言設置</string>
-    <string name="setting_parse_webview">嗅探內核</string>
     <string name="setting_fullscreen_menu_key">全屏選單鍵</string>
     <string name="setting_home_menu_key">首頁選單鍵</string>
     <string name="setting_home_site_lock">首頁源鎖定</string>
@@ -102,8 +100,6 @@
     <string name="setting_doh">DoH</string>
     <string name="setting_proxy">Proxy</string>
     <string name="setting_cache">暫存</string>
-    <string name="setting_backup">備份</string>
-    <string name="setting_restore">恢復</string>
     <string name="setting_version">版本</string>
     <string name="setting_about">關於</string>
     <string name="setting_storage">權限</string>
@@ -151,8 +147,6 @@
     <string name="dialog_delete_history">觀看紀錄將會全部刪除。</string>
     <string name="dialog_reset_app">重置App?</string>
     <string name="dialog_reset_app_data">所有數據將會被重置，App即將被關閉.</string>
-    <string name="dialog_restore">還原備份資料？</string>
-    <string name="dialog_restore_msg">將會還原配置、觀看紀錄及各項設定。</string>
 
 
     <!-- Error -->
@@ -172,11 +166,6 @@
     <string name="update_check">正在檢查更新…</string>
     <string name="update_confirm">更新</string>
 
-    <!-- X5 WebView -->
-    <string name="x5webview_title">X5 WebView</string>
-    <string name="x5webview_download_enable">解壓X5 WebView並啟用?</string>
-    <string name="x5webview_enabled">X5 WebView已啟用</string>
-    <string name="x5webview_parsing">X5 WebView嗅探中</string>
 
     <!-- Crash -->
     <string name="crash_info">發生意外錯誤\n抱歉給您帶來不便</string>
@@ -194,11 +183,6 @@
     <string name="all">全部</string>
     <string name="times">倍</string>
     <string name="lines">行</string>
-
-    <string-array name="select_backup">
-        <item>自動</item>
-        <item>手動</item>
-    </string-array>
 
     <string-array name="select_decode">
         <item>軟解</item>
@@ -285,11 +269,6 @@
         <item>英文</item>
         <item>簡體中文</item>
         <item>繁體中文</item>
-    </string-array>
-
-    <string-array name="select_parse_webview">
-        <item>系統</item>
-        <item>X5 WebView</item>
     </string-array>
 
     <string-array name="select_home_recommend">

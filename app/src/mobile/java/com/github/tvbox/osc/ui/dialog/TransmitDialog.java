@@ -74,18 +74,6 @@ public class TransmitDialog extends BaseDialog implements DeviceAdapter.OnClickL
         return this;
     }
 
-    public TransmitDialog wallConfig(String path) {
-        type = "wall_config";
-        File file = new File(path);
-        MediaType mediaType = MediaType.parse("multipart/form-data");
-        MultipartBody.Builder body = new MultipartBody.Builder();
-        body.setType(MultipartBody.FORM);
-        body.addFormDataPart("name", file.getName());
-        body.addFormDataPart("files-0", file.getName(), RequestBody.create(mediaType, file));
-        requestBody = body.build();
-        return this;
-    }
-
     public TransmitDialog pushRetore(String path) {
         type = "push_restore";
         File file = new File(path);

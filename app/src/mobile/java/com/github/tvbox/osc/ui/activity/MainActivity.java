@@ -21,7 +21,6 @@ import com.github.tvbox.osc.Updater;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.PythonPreload;
 import com.github.tvbox.osc.api.config.VodConfig;
-import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.databinding.ActivityMainBinding;
 import com.github.tvbox.osc.db.AppDatabase;
@@ -108,7 +107,6 @@ public class MainActivity extends BaseActivity implements NavigationBarView.OnIt
     }
 
     private void initConfig() {
-        WallConfig.get().init();
         LiveConfig.get().init().load();
         VodConfig.get().init().load(getCallback(), true);
     }
@@ -215,9 +213,8 @@ public class MainActivity extends BaseActivity implements NavigationBarView.OnIt
         mManager.change(position);
     }
 
-    @Override
+    @Subscribe(threadMode = ThreadMode.MAIN)
     public void onRefreshEvent(RefreshEvent event) {
-        super.onRefreshEvent(event);
         if (event.getType().equals(RefreshEvent.Type.CONFIG)) setNavigation();
     }
 
@@ -265,7 +262,6 @@ public class MainActivity extends BaseActivity implements NavigationBarView.OnIt
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        WallConfig.get().clear();
         LiveConfig.get().clear();
         VodConfig.get().clear();
         Source.get().exit();

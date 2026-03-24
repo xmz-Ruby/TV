@@ -94,9 +94,3 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
-
-# x5
--dontwarn dalvik.**
--dontwarn com.tencent.smtt.**
--keep class com.tencent.smtt.** { *; }
--keep class com.tencent.tbs.** { *; }

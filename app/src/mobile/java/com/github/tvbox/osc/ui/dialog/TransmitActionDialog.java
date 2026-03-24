@@ -35,7 +35,6 @@ public class TransmitActionDialog {
     private void initEvent() {
         this.binding.apk.setOnClickListener(v-> pushApk());
         this.binding.vodConfig.setOnClickListener(v-> pushVodConfig());
-        this.binding.wallConfig.setOnClickListener(v-> pushWallConfig());
     }
 
     public void show() {
@@ -54,11 +53,6 @@ public class TransmitActionDialog {
 
     private void pushVodConfig() {
         TransmitDialog.create().vodConfig().show(fragment);
-        dialog.dismiss();
-    }
-
-    private void pushWallConfig() {
-        FileChooser.from(fragment).type(FileChooser.TYPE_PUSH_WALLPAPER).show();
         dialog.dismiss();
     }
 

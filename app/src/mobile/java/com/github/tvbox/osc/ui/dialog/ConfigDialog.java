@@ -12,7 +12,6 @@ import androidx.fragment.app.Fragment;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.VodConfig;
-import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.databinding.DialogConfigBinding;
 import com.github.tvbox.osc.impl.ConfigCallback;
@@ -60,7 +59,7 @@ public class ConfigDialog {
     }
 
     private void initDialog() {
-        dialog = new MaterialAlertDialogBuilder(binding.getRoot().getContext()).setTitle(type == 0 ? R.string.setting_vod : type == 1 ? R.string.setting_live : R.string.setting_wall).setView(binding.getRoot()).setPositiveButton(edit ? R.string.dialog_edit : R.string.dialog_positive, this::onPositive).setNegativeButton(R.string.dialog_negative, this::onNegative).create();
+        dialog = new MaterialAlertDialogBuilder(binding.getRoot().getContext()).setTitle(type == 0 ? R.string.setting_vod : R.string.setting_live).setView(binding.getRoot()).setPositiveButton(edit ? R.string.dialog_edit : R.string.dialog_positive, this::onPositive).setNegativeButton(R.string.dialog_negative, this::onNegative).create();
         dialog.getWindow().setDimAmount(0);
         dialog.show();
     }
@@ -87,16 +86,7 @@ public class ConfigDialog {
     }
 
     private Config getConfig() {
-        switch (type) {
-            case 0:
-                return VodConfig.get().getConfig();
-            case 1:
-                return LiveConfig.get().getConfig();
-            case 2:
-                return WallConfig.get().getConfig();
-            default:
-                return null;
-        }
+        return type == 0 ? VodConfig.get().getConfig() : LiveConfig.get().getConfig();
     }
 
     private void onChoose(View view) {

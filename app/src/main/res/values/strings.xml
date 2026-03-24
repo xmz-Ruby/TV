@@ -94,7 +94,6 @@
     <!-- Setting -->
     <string name="setting_vod">Vod</string>
     <string name="setting_live">Live</string>
-    <string name="setting_wall">Wallpaper</string>
     <string name="setting_player">Player setting</string>
     <string name="setting_danmu">Danmu setting</string>
     <string name="setting_custom">Custom setting</string>
@@ -106,7 +105,6 @@
     <string name="setting_size">Image size</string>
     <string name="setting_aggregated_search">Aggregated search</string>
     <string name="setting_language">Lanuage setting</string>
-    <string name="setting_parse_webview">Parse webview</string>
     <string name="setting_fullscreen_menu_key">Fullscreen menu key</string>
     <string name="setting_home_menu_key">Home menu key</string>
     <string name="setting_home_site_lock">Home site lock</string>
@@ -119,8 +117,6 @@
     <string name="setting_doh">DoH</string>
     <string name="setting_proxy">Proxy</string>
     <string name="setting_cache">Cache</string>
-    <string name="setting_backup">Backup</string>
-    <string name="setting_restore">Restore</string>
     <string name="setting_version">Version</string>
     <string name="setting_about">About</string>
     <string name="setting_storage">Permission</string>
@@ -168,8 +164,6 @@
     <string name="dialog_delete_history">All history records will be removed.</string>
     <string name="dialog_reset_app">Reset app?</string>
     <string name="dialog_reset_app_data">All app data will be reset, and app will be shutdown.</string>
-    <string name="dialog_restore">Restore backup data?</string>
-    <string name="dialog_restore_msg">Config, history and setting will be restored.</string>
 
     <!-- Error -->
     <string name="error_config_get">Configuration get failed</string>
@@ -188,11 +182,6 @@
     <string name="update_check">Checking for updates…</string>
     <string name="update_confirm">Update</string>
 
-    <!-- X5 WebView -->
-    <string name="x5webview_title">X5 WebView</string>
-    <string name="x5webview_download_enable">Unzip X5 WebView and Enable?</string>
-    <string name="x5webview_enabled">X5 WebView Enabled</string>
-    <string name="x5webview_parsing">X5 WebView Parsing</string>
 
     <!-- Crash -->
     <string name="crash_info">An unexpected error occurred.\nSorry for the inconvenience.</string>
@@ -223,11 +212,6 @@
     <string name="all">All</string>
     <string name="times">times</string>
     <string name="lines">lines</string>
-
-    <string-array name="select_backup">
-        <item>Auto</item>
-        <item>Manual</item>
-    </string-array>
 
     <string-array name="select_decode">
         <item>Soft</item>
@@ -314,11 +298,6 @@
         <item>English</item>
         <item>Simplified Chinese</item>
         <item>Traditional Chinese</item>
-    </string-array>
-
-    <string-array name="select_parse_webview">
-        <item>System</item>
-        <item>X5 WebView</item>
     </string-array>
 
     <string-array name="select_small_window_back_key">

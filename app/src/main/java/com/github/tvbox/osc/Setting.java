@@ -79,14 +79,6 @@ public class Setting {
         Prefers.put("danmu_host", danmuHost);
     }
 
-    public static int getWall() {
-        return Prefers.getInt("wall", 1);
-    }
-
-    public static void putWall(int wall) {
-        Prefers.put("wall", wall);
-    }
-
     public static int getReset() {
         return Prefers.getInt("reset", 0);
     }
@@ -351,14 +343,6 @@ public class Setting {
         Prefers.put("exo_tunnel", tunnel);
     }
 
-    public static int getBackupMode() {
-        return Prefers.getInt("backup_mode", 1);
-    }
-
-    public static void putBackupMode(int auto) {
-        Prefers.put("backup_mode", auto);
-    }
-
     public static boolean isZhuyin() {
         return Prefers.getBoolean("zhuyin");
     }
@@ -553,14 +537,6 @@ public class Setting {
 
     public static int getLanguage() {
         return Prefers.getInt("language", LanguageUtil.locale());
-    }
-
-    public static void putParseWebView(int key) {
-        Prefers.put("parse_webview", key);
-    }
-
-    public static int getParseWebView() {
-        return Prefers.getInt("parse_webview", 0);
     }
 
     public static boolean isSiteSearch() {

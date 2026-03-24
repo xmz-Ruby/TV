@@ -2,7 +2,6 @@ package com.github.tvbox.osc.ui.base;
 
 import android.app.Activity;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.DisplayCutout;
@@ -15,16 +14,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.github.tvbox.osc.R;
-import com.github.tvbox.osc.Setting;
-import com.github.tvbox.osc.event.RefreshEvent;
-import com.github.tvbox.osc.utils.FileUtil;
 import com.github.tvbox.osc.utils.ResUtil;
 
 import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
-
-import java.io.File;
 
 public abstract class BaseActivity extends AppCompatActivity {
 
@@ -44,7 +36,8 @@ public abstract class BaseActivity extends AppCompatActivity {
     @Override
     public void setContentView(View view) {
         super.setContentView(view);
-        refreshWall();
+        getWindow().setBackgroundDrawable(null);
+        getWindow().setBackgroundDrawableResource(R.color.dark_blue);
     }
 
     protected Activity getActivity() {
@@ -52,10 +45,6 @@ public abstract class BaseActivity extends AppCompatActivity {
     }
 
     protected boolean transparent() {
-        return true;
-    }
-
-    protected boolean customWall() {
         return true;
     }
 
@@ -114,22 +103,6 @@ public abstract class BaseActivity extends AppCompatActivity {
         activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         activity.getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         activity.getWindow().setStatusBarColor(Color.TRANSPARENT);
-    }
-
-    private void refreshWall() {
-        try {
-            if (!customWall()) return;
-            File file = FileUtil.getWall(Setting.getWall());
-            if (file.exists() && file.length() > 0) getWindow().setBackgroundDrawable(Drawable.createFromPath(file.getAbsolutePath()));
-            else getWindow().setBackgroundDrawableResource(ResUtil.getDrawable(file.getName()));
-        } catch (Exception e) {
-            getWindow().setBackgroundDrawableResource(R.drawable.wallpaper_1);
-        }
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onRefreshEvent(RefreshEvent event) {
-        if (event.getType() == RefreshEvent.Type.WALL) refreshWall();
     }
 
     @Override

@@ -14,7 +14,6 @@ import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.Updater;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.VodConfig;
-import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.bean.Live;
 import com.github.tvbox.osc.bean.Site;

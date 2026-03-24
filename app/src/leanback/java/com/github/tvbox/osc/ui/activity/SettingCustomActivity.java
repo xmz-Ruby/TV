@@ -15,24 +15,21 @@ import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.impl.CacheDirCallback;
 import com.github.tvbox.osc.impl.LanguageCallback;
 import com.github.tvbox.osc.impl.MenuKeyCallback;
-import com.github.tvbox.osc.impl.X5WebViewCallback;
 import com.github.tvbox.osc.ui.base.BaseActivity;
 import com.github.tvbox.osc.ui.dialog.ButtonsDialog;
 import com.github.tvbox.osc.ui.dialog.CacheDirDialog;
 import com.github.tvbox.osc.ui.dialog.DisplayDialog;
 import com.github.tvbox.osc.ui.dialog.LanguageDialog;
 import com.github.tvbox.osc.ui.dialog.MenuKeyDialog;
-import com.github.tvbox.osc.ui.dialog.X5WebViewDialog;
 import com.github.tvbox.osc.utils.LanguageUtil;
 import com.github.tvbox.osc.utils.ResUtil;
 import com.github.tvbox.osc.utils.Util;
 import com.github.catvod.utils.Shell;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.permissionx.guolindev.PermissionX;
-import com.tencent.smtt.sdk.QbSdk;
 import java.util.Locale;
 
-public class SettingCustomActivity extends BaseActivity implements MenuKeyCallback, X5WebViewCallback, LanguageCallback, CacheDirCallback {
+public class SettingCustomActivity extends BaseActivity implements MenuKeyCallback, LanguageCallback, CacheDirCallback {
 
     private ActivitySettingCustomBinding mBinding;
     private String[] quality;
@@ -41,7 +38,6 @@ public class SettingCustomActivity extends BaseActivity implements MenuKeyCallba
     private String[] fullscreenMenuKey;
     private String[] smallWindowBackKey;
     private String[] homeUI;
-    private String[] parseWebview;
     private String[] configCache;
 
     @Override
@@ -74,7 +70,6 @@ public class SettingCustomActivity extends BaseActivity implements MenuKeyCallba
         mBinding.homeHistoryText.setText(getSwitch(Setting.isHomeHistory()));
         mBinding.cacheDirText.setText(Setting.getThunderCacheDir());
         mBinding.languageText.setText((ResUtil.getStringArray(R.array.select_language))[Setting.getLanguage()]);
-        mBinding.parseWebviewText.setText((parseWebview = ResUtil.getStringArray(R.array.select_parse_webview))[Setting.getParseWebView()]);
         mBinding.configCacheText.setText((configCache = ResUtil.getStringArray(R.array.select_config_cache))[Setting.getConfigCache()]);
     }
 
@@ -96,7 +91,6 @@ public class SettingCustomActivity extends BaseActivity implements MenuKeyCallba
         mBinding.homeButtons.setOnClickListener(this::onHomeButtons);
         mBinding.homeHistory.setOnClickListener(this::setHomeHistory);
         mBinding.setLanguage.setOnClickListener(this::setLanguage);
-        mBinding.parseWebview.setOnClickListener(this::setParseWebview);
         mBinding.configCache.setOnClickListener(this::setConfigCache);
         mBinding.cacheDir.setOnClickListener(this::setCacheDir);
         mBinding.reset.setOnClickListener(this::onReset);
@@ -202,13 +196,6 @@ public class SettingCustomActivity extends BaseActivity implements MenuKeyCallba
         LanguageDialog.create(this).show();
     }
 
-    private void setParseWebview(View view) {
-        int index = Setting.getParseWebView();
-        Setting.putParseWebView(index = index == parseWebview.length - 1 ? 0 : ++index);
-        mBinding.parseWebviewText.setText(parseWebview[index]);
-        if (index == 1 && QbSdk.getTbsVersion(App.get()) <= 0) X5WebViewDialog.create(this).show();
-    }
-
     private void setConfigCache(View view) {
         int index = Setting.getConfigCache();
         Setting.putConfigCache(index = index == configCache.length - 1 ? 0 : ++index);
@@ -238,28 +225,6 @@ public class SettingCustomActivity extends BaseActivity implements MenuKeyCallba
         LanguageUtil.setLocale(LanguageUtil.getLocale(Setting.getLanguage()));
         mBinding.languageText.setText((ResUtil.getStringArray(R.array.select_language))[Setting.getLanguage()]);
         App.post(() -> Util.restartApp(this), 1000);
-    }
-
-    @Override
-    public void onX5Success() {
-        int index = 1;
-        Setting.putParseWebView(index);
-        mBinding.parseWebviewText.setText(parseWebview[index]);
-        App.post(() -> Util.restartApp(this), 500);
-    }
-
-    @Override
-    public void onX5Error() {
-        int index = 0;
-        Setting.putParseWebView(index);
-        mBinding.parseWebviewText.setText(parseWebview[index]);
-    }
-
-    @Override
-    public void onX5Cancel() {
-        int index = 0;
-        Setting.putParseWebView(index);
-        mBinding.parseWebviewText.setText(parseWebview[index]);
     }
 
     @Override

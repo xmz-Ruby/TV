@@ -154,11 +154,6 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     }
 
     @Override
-    protected boolean customWall() {
-        return false;
-    }
-
-    @Override
     protected ViewBinding getBinding() {
         return mBinding = ActivityLiveBinding.inflate(getLayoutInflater());
     }

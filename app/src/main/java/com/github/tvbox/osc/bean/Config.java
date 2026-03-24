@@ -10,8 +10,6 @@ import androidx.room.PrimaryKey;
 import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.db.AppDatabase;
-import com.github.tvbox.osc.utils.FileUtil;
-import com.github.catvod.utils.Path;
 import com.github.catvod.utils.Prefers;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.reflect.TypeToken;
@@ -199,9 +197,7 @@ public class Config {
     }
 
     public static void delete(String url, int type) {
-        if (type == 2) Path.clear(FileUtil.getWall(0));
-        if (type == 2) AppDatabase.get().getConfigDao().delete(type);
-        else AppDatabase.get().getConfigDao().delete(url, type);
+        AppDatabase.get().getConfigDao().delete(url, type);
     }
 
     public static Config vod() {
@@ -212,11 +208,6 @@ public class Config {
     public static Config live() {
         Config item = AppDatabase.get().getConfigDao().findOne(1);
         return item == null ? create(1) : item;
-    }
-
-    public static Config wall() {
-        Config item = AppDatabase.get().getConfigDao().findOne(2);
-        return item == null ? create(2) : item;
     }
 
     public static Config find(int id) {

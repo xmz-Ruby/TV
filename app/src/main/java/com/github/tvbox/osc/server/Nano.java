@@ -91,7 +91,6 @@ public class Nano extends NanoHTTPD {
         Map<String, String> files = new HashMap<>();
         if (session.getMethod() == Method.POST) parse(session, files);
         if (url.contains("?")) url = url.substring(0, url.indexOf('?'));
-        if (url.startsWith("/go")) return go();
         if (url.startsWith("/tvbus")) return success(LiveConfig.getResp());
         if (url.startsWith("/device")) return success(Device.get().toString());
         for (Process process : process) if (process.isRequest(session, url)) return process.doResponse(session, url, files);
@@ -152,11 +151,6 @@ public class Nano extends NanoHTTPD {
         }
     }
 
-    private Response go() {
-        Go.start();
-        return success();
-    }
-
     private Response getAssets(String path) {
         try {
             if (path.isEmpty()) path = "index.html";
@@ -170,12 +164,10 @@ public class Nano extends NanoHTTPD {
     @Override
     public void start() throws IOException {
         super.start();
-        Go.start();
     }
 
     @Override
     public void stop() {
         super.stop();
-        Go.stop();
     }
 }

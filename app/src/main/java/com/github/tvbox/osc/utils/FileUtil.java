@@ -26,10 +26,6 @@ import java.util.zip.ZipOutputStream;
 
 public class FileUtil {
 
-    public static File getWall(int index) {
-        return Path.files("wallpaper_" + index);
-    }
-
     public static void openFile(File file) {
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

@@ -18,7 +18,6 @@ import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.Updater;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.VodConfig;
-import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.bean.Live;
 import com.github.tvbox.osc.bean.Site;
@@ -96,7 +95,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
         EventBus.getDefault().register(this);
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
-        mBinding.wallUrl.setText(WallConfig.getDesc());
         mBinding.danmuServerUrl.setText(getDanmuServerDesc());
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         mBinding.versionText.setText(BuildConfig.VERSION_NAME);
@@ -118,7 +116,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
     protected void initEvent() {
         mBinding.vod.setOnClickListener(this::onVod);
         mBinding.live.setOnClickListener(this::onLive);
-        mBinding.wall.setOnClickListener(this::onWall);
         mBinding.danmuServer.setOnClickListener(this::onDanmuServer);
         mBinding.danmuServerHistory.setOnClickListener(this::onDanmuServerHistory);
         mBinding.proxy.setOnClickListener(this::onProxy);
@@ -130,12 +127,9 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
         mBinding.vodHome.setOnClickListener(this::onVodHome);
         mBinding.live.setOnLongClickListener(this::onLiveEdit);
         mBinding.liveHome.setOnClickListener(this::onLiveHome);
-        mBinding.wall.setOnLongClickListener(this::onWallEdit);
         mBinding.vodHistory.setOnClickListener(this::onVodHistory);
         mBinding.version.setOnLongClickListener(this::onVersionDev);
         mBinding.liveHistory.setOnClickListener(this::onLiveHistory);
-        mBinding.wallDefault.setOnClickListener(this::setWallDefault);
-        mBinding.wallRefresh.setOnClickListener(this::setWallRefresh);
         mBinding.doh.setOnClickListener(this::setDoh);
         mBinding.custom.setOnClickListener(this::onCustom);
         mBinding.about.setOnClickListener(this::onAbout);
@@ -157,11 +151,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
                 Notify.progress(getActivity());
                 LiveConfig.load(config, getCallback());
                 mBinding.liveUrl.setText(config.getDesc());
-                break;
-            case 2:
-                Notify.progress(getActivity());
-                WallConfig.load(config, getCallback());
-                mBinding.wallUrl.setText(config.getDesc());
                 break;
         }
     }
@@ -197,10 +186,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
                 Notify.dismiss();
                 RefreshEvent.config();
                 break;
-            case 2:
-                Notify.dismiss();
-                RefreshEvent.config();
-                break;
         }
     }
 
@@ -227,10 +212,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
         ConfigDialog.create(this).type(type = 1).show();
     }
 
-    private void onWall(View view) {
-        ConfigDialog.create(this).type(type = 2).show();
-    }
-
     private boolean onVodEdit(View view) {
         ConfigDialog.create(this).type(type = 0).edit().show();
         return true;
@@ -238,11 +219,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
 
     private boolean onLiveEdit(View view) {
         ConfigDialog.create(this).type(type = 1).edit().show();
-        return true;
-    }
-
-    private boolean onWallEdit(View view) {
-        ConfigDialog.create(this).type(type = 2).edit().show();
         return true;
     }
 
@@ -289,21 +265,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
     private boolean onVersionDev(View view) {
         Updater.get().force().dev().start(getActivity());
         return true;
-    }
-
-    private void setWallDefault(View view) {
-        WallConfig.refresh(Setting.getWall() == 4 ? 1 : Setting.getWall() + 1);
-    }
-
-    private void setWallRefresh(View view) {
-        Notify.progress(getActivity());
-        WallConfig.get().load(new Callback() {
-            @Override
-            public void success() {
-                Notify.dismiss();
-                setCacheText();
-            }
-        });
     }
 
     private void setDoh(View view) {
@@ -364,7 +325,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
         if (hidden) return;
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
-        mBinding.wallUrl.setText(WallConfig.getDesc());
         mBinding.danmuServerUrl.setText(getDanmuServerDesc());
         mBinding.dohText.setText(getDohList()[getDohIndex()]);
         setCacheText();
@@ -376,7 +336,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
         if (resultCode != Activity.RESULT_OK || requestCode != FileChooser.REQUEST_PICK_FILE) return;
         String path = FileChooser.getPathFromUri(getContext(), data.getData());
         if (FileChooser.type() == FileChooser.TYPE_APK) TransmitDialog.create().apk(path).show(getActivity());
-        else if (FileChooser.type() == FileChooser.TYPE_PUSH_WALLPAPER) TransmitDialog.create().wallConfig(path).show(getActivity());
         else setConfig(Config.find("file:/" + path.replace(Path.rootPath(), ""), type));
     }
 
@@ -387,7 +346,6 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
                 setCacheText();
                 mBinding.vodUrl.setText(VodConfig.getDesc());
                 mBinding.liveUrl.setText(LiveConfig.getDesc());
-                mBinding.wallUrl.setText(WallConfig.getDesc());
                 mBinding.danmuServerUrl.setText(getDanmuServerDesc());
                 break;
         }

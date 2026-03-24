@@ -14,7 +14,6 @@ import androidx.fragment.app.FragmentActivity;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.VodConfig;
-import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.databinding.DialogConfigBinding;
 import com.github.tvbox.osc.event.ServerEvent;
@@ -106,16 +105,7 @@ public class ConfigDialog implements DialogInterface.OnDismissListener {
     }
 
     private String getUrl() {
-        switch (type) {
-            case 0:
-                return VodConfig.getUrl();
-            case 1:
-                return LiveConfig.getUrl();
-            case 2:
-                return WallConfig.getUrl();
-            default:
-                return "";
-        }
+        return type == 0 ? VodConfig.getUrl() : LiveConfig.getUrl();
     }
 
     private void onStorage(View view) {

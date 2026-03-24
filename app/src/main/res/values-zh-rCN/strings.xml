@@ -79,7 +79,6 @@
     <!-- Setting -->
     <string name="setting_vod">点播</string>
     <string name="setting_live">直播</string>
-    <string name="setting_wall">壁纸</string>
     <string name="setting_player">播放设置</string>
     <string name="setting_danmu">弹幕设置</string>
     <string name="setting_custom">个性设置</string>
@@ -91,7 +90,6 @@
     <string name="setting_size">图片尺寸</string>
     <string name="setting_aggregated_search">聚合搜索</string>
     <string name="setting_language">语言设置</string>
-    <string name="setting_parse_webview">嗅探内核</string>
     <string name="setting_fullscreen_menu_key">全屏菜单键</string>
     <string name="setting_home_menu_key">首页菜单键</string>
     <string name="setting_home_site_lock">首页源锁定</string>
@@ -104,8 +102,6 @@
     <string name="setting_doh">DoH</string>
     <string name="setting_proxy">Proxy</string>
     <string name="setting_cache">缓存</string>
-    <string name="setting_backup">备份</string>
-    <string name="setting_restore">恢复</string>
     <string name="setting_version">版本</string>
     <string name="setting_about">关于</string>
     <string name="setting_storage">权限</string>
@@ -153,8 +149,6 @@
     <string name="dialog_delete_history">观看纪录将会全部删除。</string>
     <string name="dialog_reset_app">重置App?</string>
     <string name="dialog_reset_app_data">所有数据将会被重置，App即将被关闭.</string>
-    <string name="dialog_restore">还原备份数据？</string>
-    <string name="dialog_restore_msg">将会还原配置、观看纪录及各项设置。</string>
 
     <!-- Error -->
     <string name="error_config_get">配置取得失败</string>
@@ -173,11 +167,6 @@
     <string name="update_check">正在检测更新…</string>
     <string name="update_confirm">更新</string>
 
-    <!-- X5 WebView -->
-    <string name="x5webview_title">X5 WebView</string>
-    <string name="x5webview_download_enable">解压X5 WebView并启用?</string>
-    <string name="x5webview_enabled">X5 WebView已启用</string>
-    <string name="x5webview_parsing">X5 WebView嗅探中</string>
 
     <!-- Crash -->
     <string name="crash_info">发生意外错误\n抱歉给您带来不便</string>
@@ -208,11 +197,6 @@
     <string name="all">全部</string>
     <string name="times">倍</string>
     <string name="lines">行</string>
-
-    <string-array name="select_backup">
-        <item>自动</item>
-        <item>手动</item>
-    </string-array>
 
     <string-array name="select_decode">
         <item>软解</item>
@@ -299,11 +283,6 @@
         <item>英文</item>
         <item>简体中文</item>
         <item>繁体中文</item>
-    </string-array>
-
-    <string-array name="select_parse_webview">
-        <item>系统</item>
-        <item>X5 WebView</item>
     </string-array>
 
     <string-array name="select_home_recommend">

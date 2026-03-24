@@ -1,27 +1,22 @@
 package com.github.tvbox.osc.server.process;
 
-import android.os.Environment;
 import android.text.TextUtils;
 
 import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.Constant;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.VodConfig;
-import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Config;
 import com.github.tvbox.osc.bean.Device;
 import com.github.tvbox.osc.bean.History;
 import com.github.tvbox.osc.bean.Keep;
-import com.github.tvbox.osc.db.AppDatabase;
 import com.github.tvbox.osc.event.CastEvent;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.event.ServerEvent;
 import com.github.tvbox.osc.impl.Callback;
 import com.github.tvbox.osc.server.Nano;
-import com.github.tvbox.osc.utils.FileUtil;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.catvod.net.OkHttp;
-import com.github.catvod.utils.Path;
 
 import java.io.File;
 import java.util.List;
@@ -137,7 +132,6 @@ public class Action implements Process {
         String type = params.get("type");
         if ("apk".equals(type)) apk(params, files);
         else if ("vod_config".equals(type)) vodConfig(params);
-        else if ("wall_config".equals(type)) wallConfig(params, files);
     }
 
     private void sendHistory(Device device, Map<String, String> params) {
@@ -232,30 +226,6 @@ public class Action implements Process {
         if (TextUtils.isEmpty(url)) return;
         App.post(() -> Notify.progress(App.activity()));
         VodConfig.load(Config.find(url, 0), getCallback());
-    }
-
-    private void wallConfig(Map<String, String> params, Map<String, String> files) {
-        for (String k : files.keySet()) {
-            String fn = params.get(k);
-            File temp = new File(files.get(k));
-            if (!temp.exists()) continue;
-            File wall = new File(Path.download(), fn);
-            Path.copy(temp, wall);
-            App.post(() -> Notify.progress(App.activity()));
-            WallConfig.load(Config.find("file://" + wall.getAbsolutePath(), 2), new Callback() {
-                @Override
-                public void success() {
-                    Notify.dismiss();
-                }
-                @Override
-                public void error(String msg) {
-                    Notify.dismiss();
-                    Notify.show(msg);
-                }
-            });
-            temp.delete();
-            break;
-        }
     }
 
     private Callback getCallback() {

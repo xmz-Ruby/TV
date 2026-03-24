@@ -34,7 +34,6 @@ import com.github.tvbox.osc.Updater;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.PythonPreload;
 import com.github.tvbox.osc.api.config.VodConfig;
-import com.github.tvbox.osc.api.config.WallConfig;
 import com.github.tvbox.osc.bean.Button;
 import com.github.tvbox.osc.bean.Class;
 import com.github.tvbox.osc.bean.Config;
@@ -65,7 +64,6 @@ import com.github.tvbox.osc.utils.FileUtil;
 import com.github.tvbox.osc.utils.KeyUtil;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.tvbox.osc.utils.ResUtil;
-import com.github.tvbox.osc.utils.Tbs;
 import com.github.tvbox.osc.utils.UrlUtil;
 import com.github.catvod.utils.Prefers;
 import com.github.catvod.utils.Trans;
@@ -136,7 +134,6 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
         mClock = Clock.create(mBinding.clock).format("MM/dd HH:mm:ss");
         Server.get().start();
-        Tbs.init();
         setTitleView();
         setRecyclerView();
         setViewModel();
@@ -377,7 +374,6 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
     public void initConfig() {
         if (isLoading()) return;
-        WallConfig.get().init();
         LiveConfig.get().init().load();
         VodConfig.get().init().load(getCallback(""), true);
         setLoading(true);
@@ -641,7 +637,6 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        WallConfig.get().clear();
         LiveConfig.get().clear();
         VodConfig.get().clear();
         Server.get().stop();
