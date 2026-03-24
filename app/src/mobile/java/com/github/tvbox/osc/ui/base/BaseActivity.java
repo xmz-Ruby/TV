@@ -14,9 +14,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.utils.ResUtil;
 
 import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 public abstract class BaseActivity extends AppCompatActivity {
 
@@ -56,6 +59,10 @@ public abstract class BaseActivity extends AppCompatActivity {
     }
 
     protected void initEvent() {
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onRefreshEvent(RefreshEvent event) {
     }
 
     protected void onBackPress() {
