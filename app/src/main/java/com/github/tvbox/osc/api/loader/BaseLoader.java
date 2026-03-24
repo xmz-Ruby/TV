@@ -40,6 +40,10 @@ public class BaseLoader {
         this.jsLoader.clear();
     }
 
+    public void warmupPython() {
+        this.pyLoader.warmup();
+    }
+
     public Spider getSpider(String key, String api, String ext, String jar) {
         boolean js = api.contains(".js");
         boolean py = api.contains(".py");

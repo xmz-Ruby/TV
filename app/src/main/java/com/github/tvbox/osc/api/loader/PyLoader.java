@@ -16,6 +16,8 @@ public class PyLoader {
     private final ConcurrentHashMap<String, Spider> spiders;
     private final ConcurrentHashMap<String, Object> loadingLocks;
     private Object loader;
+    private Method spiderMethod;
+    private Method warmupMethod;
     private String recent;
 
     public PyLoader() {
@@ -28,6 +30,8 @@ public class PyLoader {
         try {
             Class<?> loaderClass = Class.forName("com.undcover.freedom.pyramid.Loader");
             loader = loaderClass.newInstance();
+            warmupMethod = loaderClass.getMethod("warmup", Context.class);
+            spiderMethod = loaderClass.getMethod("spider", Context.class, String.class);
             Logger.i("PyLoader: Pyramid loader initialized successfully");
         } catch (ClassNotFoundException e) {
             Logger.e("PyLoader: Loader class not found - pyramid module not included?", e);
@@ -54,11 +58,27 @@ public class PyLoader {
         this.recent = recent;
     }
 
+    public void warmup() {
+        try {
+            if (loader == null || warmupMethod == null) {
+                Logger.w("PyLoader: warmup skipped because loader not initialized");
+                return;
+            }
+            warmupMethod.invoke(loader, App.get());
+        } catch (Throwable e) {
+            Logger.e("PyLoader: warmup failed", e);
+        }
+    }
+
     public Spider getSpider(String key, String api, String ext) {
         String compositeKey = api + "|" + ext;
         try {
             if (loader == null) {
                 Logger.e("PyLoader: Loader not initialized");
+                return new SpiderNull();
+            }
+            if (spiderMethod == null) {
+                Logger.e("PyLoader: spider method not initialized");
                 return new SpiderNull();
             }
             Spider cachedSpider = spiders.get(compositeKey);
@@ -74,8 +94,7 @@ public class PyLoader {
                     return cachedSpider;
                 }
                 Logger.i("PyLoader: Loading Python spider - key=" + key + ", api=" + api + ", extHash=" + ext.hashCode());
-                Method method = loader.getClass().getMethod("spider", Context.class, String.class);
-                Spider spider = (Spider) method.invoke(loader, App.get(), api);
+                Spider spider = (Spider) spiderMethod.invoke(loader, App.get(), api);
                 spider.init(App.get(), ext);
                 spiders.put(compositeKey, spider);
                 Logger.i("PyLoader: Python spider loaded successfully - key=" + key + ", compositeKey=" + compositeKey.hashCode());

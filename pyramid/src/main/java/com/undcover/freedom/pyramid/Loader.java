@@ -31,6 +31,11 @@ public class Loader {
     }
 
     @Keep
+    public void warmup(Context context) {
+        if (!initialized) init(context);
+    }
+
+    @Keep
     public Spider spider(Context context, String api) {
         if (!initialized) init(context);
         PyObject obj = app.callAttr("spider", Path.py().getAbsolutePath(), api);

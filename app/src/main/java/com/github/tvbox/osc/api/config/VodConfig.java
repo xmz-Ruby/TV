@@ -1,5 +1,7 @@
 package com.github.tvbox.osc.api.config;
 
+import android.app.ActivityManager;
+import android.os.Build;
 import android.text.TextUtils;
 
 import com.github.tvbox.osc.App;
@@ -23,8 +25,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -376,6 +380,38 @@ public class VodConfig {
     // 标记是否已经预加载过 Python 站点
     private static volatile boolean pythonSitesPreloaded = false;
 
+    private int getPythonPreloadParallelism(int totalCount) {
+        int cpuCount = Math.max(1, Runtime.getRuntime().availableProcessors());
+        boolean isArmeabiV7aOnly = Build.SUPPORTED_64_BIT_ABIS.length == 0 && Arrays.asList(Build.SUPPORTED_ABIS).contains("armeabi-v7a");
+
+        if (isArmeabiV7aOnly) {
+            int target = cpuCount >= 8 ? 4 : (cpuCount >= 4 ? 3 : 2);
+            return Math.max(1, Math.min(totalCount, Math.min(target, cpuCount)));
+        }
+
+        int target = cpuCount >= 8 ? 6 : (cpuCount >= 4 ? 4 : 3);
+        return Math.max(1, Math.min(totalCount, target));
+    }
+
+    private String getPythonPreloadDeviceProfile() {
+        ActivityManager activityManager = App.get().getSystemService(ActivityManager.class);
+        int memoryClass = activityManager != null ? activityManager.getMemoryClass() : -1;
+        int largeMemoryClass = activityManager != null ? activityManager.getLargeMemoryClass() : -1;
+        long maxMemoryMb = Runtime.getRuntime().maxMemory() / 1024 / 1024;
+        return "brand=" + Build.BRAND
+                + ", model=" + Build.MODEL
+                + ", sdk=" + Build.VERSION.SDK_INT
+                + ", abis=" + Arrays.toString(Build.SUPPORTED_ABIS)
+                + ", cpu=" + Runtime.getRuntime().availableProcessors()
+                + ", memoryClass=" + memoryClass
+                + ", largeMemoryClass=" + largeMemoryClass
+                + ", maxHeapMb=" + maxMemoryMb;
+    }
+
+    private String formatPythonPreloadElapsed(long elapsedMs) {
+        return String.format(Locale.US, "%.3fs", elapsedMs / 1000f);
+    }
+
     /**
      * 预加载所有 Python 站点的 init 方法
      * 在首页加载完成后调用，提前初始化 Python 站点，提升用户体验
@@ -411,7 +447,10 @@ public class VodConfig {
 
         final int totalCount = pythonSites.size();
         final int token = PythonPreload.start(totalCount);
-        final int parallelism = Math.max(1, Math.min(2, Runtime.getRuntime().availableProcessors()));
+        final int parallelism = getPythonPreloadParallelism(totalCount);
+        final long preloadStartedAt = System.currentTimeMillis();
+        android.util.Log.i("VodConfig", "Python 预加载开始: total=" + totalCount + ", parallelism=" + parallelism + ", " + getPythonPreloadDeviceProfile());
+        BaseLoader.get().warmupPython();
         final ExecutorService preloadExecutor = Executors.newFixedThreadPool(parallelism);
         final AtomicInteger successCount = new AtomicInteger(0);
         final AtomicInteger failCount = new AtomicInteger(0);
@@ -419,25 +458,43 @@ public class VodConfig {
 
         for (Site site : pythonSites) {
             preloadExecutor.execute(() -> {
+                long siteStartedAt = System.currentTimeMillis();
+                boolean success = false;
+                String failureType = "";
                 try {
                     android.util.Log.d("VodConfig", "预加载 Python 站点: " + site.getName() + " (" + site.getKey() + ")");
                     Spider spider = BaseLoader.get().getSpider(site.getKey(), site.getApi(), site.getExt(), site.getJar());
                     if (spider instanceof SpiderNull) {
                         android.util.Log.e("VodConfig", "预加载失败: " + site.getName() + " - SpiderNull");
                         failCount.incrementAndGet();
+                        failureType = "SpiderNull";
                     } else {
                         android.util.Log.d("VodConfig", "成功预加载: " + site.getName());
                         successCount.incrementAndGet();
+                        success = true;
                     }
                 } catch (Throwable e) {
                     android.util.Log.e("VodConfig", "预加载失败: " + site.getName() + " - " + e.getMessage());
                     failCount.incrementAndGet();
+                    failureType = e.getClass().getSimpleName();
                     e.printStackTrace();
                 } finally {
+                    long siteElapsed = System.currentTimeMillis() - siteStartedAt;
+                    android.util.Log.i("VodConfig", "Python 预加载站点完成: site=" + site.getName()
+                            + ", success=" + success
+                            + ", elapsed=" + formatPythonPreloadElapsed(siteElapsed)
+                            + ", thread=" + Thread.currentThread().getName()
+                            + (failureType.isEmpty() ? "" : ", failure=" + failureType));
                     int completed = completedCount.incrementAndGet();
                     PythonPreload.progress(token, totalCount, completed, successCount.get(), failCount.get(), site.getName());
                     if (completed == totalCount) {
-                        android.util.Log.d("VodConfig", "Python 站点预加载完成，成功: " + successCount.get() + "，失败: " + failCount.get());
+                        long totalElapsed = System.currentTimeMillis() - preloadStartedAt;
+                        android.util.Log.i("VodConfig", "Python 预加载完成: success=" + successCount.get()
+                                + ", fail=" + failCount.get()
+                                + ", total=" + totalCount
+                                + ", parallelism=" + parallelism
+                                + ", elapsed=" + formatPythonPreloadElapsed(totalElapsed)
+                                + ", " + getPythonPreloadDeviceProfile());
                         PythonPreload.finish(token, totalCount, completed, successCount.get(), failCount.get());
                         if (successCount.get() == 0) {
                             App.post(() -> Notify.show(R.string.python_preload_all_failed));
