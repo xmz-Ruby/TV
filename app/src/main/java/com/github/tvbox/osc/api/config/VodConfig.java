@@ -111,6 +111,7 @@ public class VodConfig {
         this.flags.clear();
         this.parses.clear();
         this.loadLive = true;
+        pythonSitesPreloaded = false;
         BaseLoader.get().clear();
         return this;
     }
@@ -363,19 +364,12 @@ public class VodConfig {
         }
     }
 
-    // 标记是否已经预加载过 Python 站点
+    // 标记当前配置加载周期内是否已经预加载过 Python 站点
     private static volatile boolean pythonSitesPreloaded = false;
 
     private int getPythonPreloadParallelism(int totalCount) {
-        int cpuCount = Math.max(1, Runtime.getRuntime().availableProcessors());
         boolean isArmeabiV7aOnly = Build.SUPPORTED_64_BIT_ABIS.length == 0 && Arrays.asList(Build.SUPPORTED_ABIS).contains("armeabi-v7a");
-
-        if (isArmeabiV7aOnly) {
-            int target = cpuCount >= 8 ? 4 : (cpuCount >= 4 ? 3 : 2);
-            return Math.max(1, Math.min(totalCount, Math.min(target, cpuCount)));
-        }
-
-        int target = cpuCount >= 8 ? 6 : (cpuCount >= 4 ? 4 : 3);
+        int target = isArmeabiV7aOnly ? 6 : 8;
         return Math.max(1, Math.min(totalCount, target));
     }
 
@@ -401,7 +395,7 @@ public class VodConfig {
     /**
      * 预加载所有 Python 站点的 init 方法
      * 在首页加载完成后调用，提前初始化 Python 站点，提升用户体验
-     * 使用多线程并行加载，只在应用启动时加载一次
+     * 使用多线程并行加载，每次配置重新加载后触发一次
      */
     public void preloadPythonSites() {
         // 如果已经预加载过，直接返回

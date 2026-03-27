@@ -76,6 +76,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private final StringBuilder builder;
     private final Formatter formatter;
     private final Runnable runnable;
+    private final PlaybackLockManager playbackLockManager;
 
     private Map<String, String> headers;
     private MediaSessionCompat session;
@@ -132,6 +133,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         decode = Setting.getDecode(player);
         builder = new StringBuilder();
         runnable = ErrorEvent::timeout;
+        playbackLockManager = new PlaybackLockManager(activity);
         formatter = new Formatter(builder, Locale.getDefault());
         position = C.TIME_UNSET;
         createSession(activity);
@@ -483,6 +485,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void play() {
         if (isPlaying() || isEnd()) return;
         session.setActive(true);
+        playbackLockManager.acquire();
         if (isExo()) playExo();
         if (isIjk()) playIjk();
         if (haveDanmu()) danmuView.resume();
@@ -492,6 +495,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void pause() {
         if (isExo()) pauseExo();
         if (isIjk()) pauseIjk();
+        playbackLockManager.release();
         if (haveDanmu()) danmuView.pause();
         setPlaybackState(PlaybackStateCompat.STATE_PAUSED);
     }
@@ -499,6 +503,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void stop() {
         if (isExo()) stopExo();
         if (isIjk()) stopIjk();
+        playbackLockManager.release();
         session.setActive(false);
         if (haveDanmu()) danmuView.stop();
         setPlaybackState(PlaybackStateCompat.STATE_STOPPED);
@@ -509,6 +514,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         session.release();
         if (isExo()) releaseExo();
         if (isIjk()) releaseIjk();
+        playbackLockManager.release();
         if (haveDanmu()) danmuView.release();
         removeTimeoutCheck();
         Server.get().setPlayer(null);
@@ -615,6 +621,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private void setMediaSource(Map<String, String> headers, String url, String format, Drm drm, List<Sub> subs, int timeout) {
         prepareStartedAt = System.currentTimeMillis();
+        playbackLockManager.acquire();
         long startPosition = position == C.TIME_UNSET ? 0 : position;
         if (isIjk() && ijkPlayer != null) ijkPlayer.setMediaSource(IjkUtil.getSource(this.headers = checkUa(headers), this.url = url), startPosition);
         if (isExo() && exoPlayer != null) exoPlayer.setMediaItem(ExoUtil.getMediaItem(this.headers = checkUa(headers), UrlUtil.uri(this.url = url), this.format = format, this.drm = drm, checkSub(this.subs = subs), decode), startPosition);
@@ -813,12 +820,17 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void onPlayerError(@NonNull PlaybackException error) {
         logPrepareElapsed("error");
         removeTimeoutCheck();
+        playbackLockManager.release();
         Logger.t(TAG).e(error.errorCode + "," + url);
         ErrorEvent.url(ExoUtil.getRetry(error.errorCode), error.errorCode);
     }
 
     @Override
     public void onPlaybackStateChanged(int state) {
+        if (isExo() && exoPlayer != null && (state == Player.STATE_BUFFERING || state == Player.STATE_READY)) {
+            long bufferedAheadMs = Math.max(0, exoPlayer.getBufferedPosition() - exoPlayer.getCurrentPosition());
+            Logger.t(TAG).i("exo state=" + state + ", bufferedAhead=" + bufferedAheadMs + "ms, bufferedPos=" + exoPlayer.getBufferedPosition() + ", currentPos=" + exoPlayer.getCurrentPosition());
+        }
         if (state == Player.STATE_READY) {
             logPrepareElapsed("ready");
             removeTimeoutCheck();
@@ -844,6 +856,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public boolean onError(IMediaPlayer mp, int what, int extra) {
         logPrepareElapsed("ijk_error");
         removeTimeoutCheck();
+        playbackLockManager.release();
         setPlaybackState(PlaybackStateCompat.STATE_ERROR);
         ErrorEvent.url(1);
         return true;
@@ -858,6 +871,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     @Override
     public void onCompletion(IMediaPlayer mp) {
+        playbackLockManager.release();
         PlayerEvent.state(Player.STATE_ENDED);
     }
 

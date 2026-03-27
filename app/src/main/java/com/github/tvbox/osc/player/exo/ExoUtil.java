@@ -33,6 +33,7 @@ import com.github.tvbox.osc.bean.Sub;
 import com.github.tvbox.osc.bean.Track;
 import com.github.tvbox.osc.player.Players;
 import com.github.tvbox.osc.utils.Sniffer;
+import com.orhanobut.logger.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,8 +43,8 @@ import java.util.concurrent.TimeUnit;
 
 public class ExoUtil {
 
-    public static final int MIN_TARGET_BUFFER_BYTES = 32 * 1024 * 1024;
-    public static final int MAX_TARGET_BUFFER_BYTES = 128 * 1024 * 1024;
+    public static final int MIN_TARGET_BUFFER_BYTES = 48 * 1024 * 1024;
+    public static final int MAX_TARGET_BUFFER_BYTES = 256 * 1024 * 1024;
     public static final long MAX_DISK_CACHE_BYTES = 256L * 1024 * 1024;
     private static final int MIN_BUFFER_FLOOR_MS = 15_000;
     private static final int MIN_REBUFFER_FLOOR_MS = 3_000;
@@ -64,7 +65,8 @@ public class ExoUtil {
      *
      * - 起播/重缓冲门槛继续沿用用户设置的秒数
      * - 持续缓冲的总时长上限按设备内存限制在 45~90 秒
-     * - 内存缓冲字节上限按设备内存分档限制在 32~128MB
+     * - 内存缓冲字节上限按设备内存分档限制在 48~256MB
+     * - 中高内存设备优先按缓冲时长决策，避免高码率视频只预缓冲几秒就停
      */
     public static LoadControl buildLoadControl() {
         int playbackBufferMs = Setting.getBuffer() * 1000;
@@ -74,6 +76,18 @@ public class ExoUtil {
         if (isArmeabiV7aOnly()) bufferForPlaybackAfterRebufferMs = Math.min(bufferForPlaybackAfterRebufferMs, LOW_PERF_REBUFFER_CAP_MS);
         int memoryClassMb = getMemoryClassMb();
         int maxBufferMs = Math.max(getTieredMaxBufferMs(memoryClassMb), minBufferMs);
+        int targetBufferBytes = getTargetBufferBytes();
+        boolean prioritizeTime = shouldPrioritizeTimeOverSizeThresholds(memoryClassMb);
+        Logger.i(
+                "Exo load control: memClass=%dMB, playback=%dms, min=%dms, max=%dms, rebuffer=%dms, targetBytes=%dMB, prioritizeTime=%s",
+                memoryClassMb,
+                playbackBufferMs,
+                minBufferMs,
+                maxBufferMs,
+                bufferForPlaybackAfterRebufferMs,
+                targetBufferBytes / (1024 * 1024),
+                prioritizeTime
+        );
         return new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
                         minBufferMs,
@@ -81,17 +95,21 @@ public class ExoUtil {
                         playbackBufferMs,
                         bufferForPlaybackAfterRebufferMs
                 )
-                .setTargetBufferBytes(getTargetBufferBytes())
-                .setPrioritizeTimeOverSizeThresholds(false)
+                .setTargetBufferBytes(targetBufferBytes)
+                .setPrioritizeTimeOverSizeThresholds(prioritizeTime)
                 .build();
     }
 
     public static int getTargetBufferBytes() {
         int memoryClassMb = getMemoryClassMb();
-        if (memoryClassMb <= LOW_MEMORY_CLASS_MB) return 32 * 1024 * 1024;
-        if (memoryClassMb <= MID_MEMORY_CLASS_MB) return 64 * 1024 * 1024;
-        if (memoryClassMb <= HIGH_MEMORY_CLASS_MB) return 96 * 1024 * 1024;
+        if (memoryClassMb <= LOW_MEMORY_CLASS_MB) return MIN_TARGET_BUFFER_BYTES;
+        if (memoryClassMb <= MID_MEMORY_CLASS_MB) return 96 * 1024 * 1024;
+        if (memoryClassMb <= HIGH_MEMORY_CLASS_MB) return 160 * 1024 * 1024;
         return MAX_TARGET_BUFFER_BYTES;
+    }
+
+    private static boolean shouldPrioritizeTimeOverSizeThresholds(int memoryClassMb) {
+        return memoryClassMb > LOW_MEMORY_CLASS_MB;
     }
 
     private static int getMemoryClassMb() {
