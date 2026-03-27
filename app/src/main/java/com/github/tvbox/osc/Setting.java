@@ -10,6 +10,9 @@ import com.github.catvod.utils.Prefers;
 
 public class Setting {
 
+    public static final int CONFIG_LOAD_MODE_WIFI = 0;
+    public static final int CONFIG_LOAD_MODE_MOBILE = 1;
+
     public static String getDoh() {
         return Prefers.getString("doh", "{\"name\":\"System\",\"url\":\"\"}");
     }
@@ -529,6 +532,18 @@ public class Setting {
 
     public static int getConfigCache() {
         return Math.min(Prefers.getInt("config_cache", 0), 2);
+    }
+
+    public static int getConfigLoadMode() {
+        return Prefers.getInt("config_load_mode", CONFIG_LOAD_MODE_WIFI) == CONFIG_LOAD_MODE_MOBILE ? CONFIG_LOAD_MODE_MOBILE : CONFIG_LOAD_MODE_WIFI;
+    }
+
+    public static void putConfigLoadMode(int mode) {
+        Prefers.put("config_load_mode", mode == CONFIG_LOAD_MODE_MOBILE ? CONFIG_LOAD_MODE_MOBILE : CONFIG_LOAD_MODE_WIFI);
+    }
+
+    public static boolean isConfigLoadMobileMode() {
+        return getConfigLoadMode() == CONFIG_LOAD_MODE_MOBILE;
     }
 
     public static void putLanguage(int key) {

@@ -11,6 +11,9 @@
 
     <!-- Vod -->
     <string name="vod_home">Home</string>
+    <string name="vod_config_mode_wifi">WiFi</string>
+    <string name="vod_config_mode_mobile">Mobile</string>
+    <string name="vod_config_mode_switched">Switched to %1$s config</string>
 
     <!-- Detail -->
     <string name="detail_flag">Flag</string>

@@ -17,6 +17,7 @@ import androidx.viewbinding.ViewBinding;
 
 import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.Updater;
 import com.github.tvbox.osc.api.config.LiveConfig;
 import com.github.tvbox.osc.api.config.PythonPreload;
@@ -38,6 +39,7 @@ import com.github.tvbox.osc.ui.fragment.SettingFragment;
 import com.github.tvbox.osc.ui.fragment.SettingPlayerFragment;
 import com.github.tvbox.osc.ui.fragment.VodFragment;
 import com.github.tvbox.osc.utils.FileChooser;
+import com.github.tvbox.osc.utils.NetworkUtil;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.tvbox.osc.utils.UrlUtil;
 import com.google.android.material.navigation.NavigationBarView;
@@ -68,6 +70,7 @@ public class MainActivity extends BaseActivity implements NavigationBarView.OnIt
 
     @Override
     protected void initView(Bundle savedInstanceState) {
+        Setting.putConfigLoadMode(NetworkUtil.getConfigLoadMode());
         initFragment(savedInstanceState);
         observePythonPreload();
         Server.get().start();

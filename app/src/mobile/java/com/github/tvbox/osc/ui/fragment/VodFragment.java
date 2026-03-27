@@ -106,6 +106,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         EventBus.getDefault().register(this);
         setRecyclerView();
         setAppBarView();
+        updateConfigMode();
         setViewModel();
         showProgress();
         initHot();
@@ -116,6 +117,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
     protected void initEvent() {
         mBinding.top.setOnClickListener(this::onTop);
         mBinding.link.setOnClickListener(this::onLink);
+        mBinding.configMode.setOnClickListener(this::onConfigMode);
         mBinding.logo.setOnClickListener(this::onLogo);
         mBinding.logo.setOnLongClickListener(this::onRefresh);
         mBinding.hot.setOnClickListener(this::onHot);
@@ -226,6 +228,14 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         LinkDialog.create(this).show();
     }
 
+    private void onConfigMode(View view) {
+        int mode = Setting.isConfigLoadMobileMode() ? Setting.CONFIG_LOAD_MODE_WIFI : Setting.CONFIG_LOAD_MODE_MOBILE;
+        Setting.putConfigLoadMode(mode);
+        updateConfigMode();
+        Config config = VodConfig.get().getConfig();
+        if (!config.isEmpty()) setConfig(config, getString(R.string.vod_config_mode_switched, getConfigModeText()));
+    }
+
     private void onLogo(View view) {
         if (Setting.isHomeDisplayName()) HistoryDialog.create(this).type(0).show();
         else SiteDialog.create(this).change().show();
@@ -325,6 +335,14 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         RefreshEvent.config();
     }
 
+    private void updateConfigMode() {
+        mBinding.configMode.setText(getConfigModeText());
+    }
+
+    private String getConfigModeText() {
+        return getString(Setting.isConfigLoadMobileMode() ? R.string.vod_config_mode_mobile : R.string.vod_config_mode_wifi);
+    }
+
     @Override
     public void setConfig(Config config) {
         setConfig(config, "");
@@ -372,6 +390,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
                 break;
             case CONFIG:
                 setAppBarView();
+                updateConfigMode();
                 setLogo();
                 break;
         }

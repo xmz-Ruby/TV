@@ -6,6 +6,7 @@ import android.text.TextUtils;
 
 import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.api.Decoder;
 import com.github.tvbox.osc.api.loader.BaseLoader;
 import com.github.tvbox.osc.bean.Config;
@@ -34,6 +35,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class VodConfig {
+
+    private static final List<String> MOBILE_SKIP_KEYWORDS = Arrays.asList("4K", "超清");
 
     private List<Doh> doh;
     private List<Rule> rules;
@@ -198,6 +201,7 @@ public class VodConfig {
         String spider = Json.safeString(object, "spider");
         for (JsonElement element : Json.safeListElement(object, "sites")) {
             Site site = Site.objectFrom(element);
+            if (skipSite(site)) continue;
             if (sites.contains(site)) continue;
             site.setApi(parseApi(site.getApi()));
             site.setExt(parseExt(site.getExt()));
@@ -211,6 +215,22 @@ public class VodConfig {
         }
         // Eagerly load all site-specific JARs
         loadAllSiteJars();
+    }
+
+    private boolean skipSite(Site site) {
+        if (!Setting.isConfigLoadMobileMode()) return false;
+        for (String keyword : MOBILE_SKIP_KEYWORDS) {
+            if (containsKeyword(site.getName(), keyword) || containsKeyword(site.getKey(), keyword)) {
+                android.util.Log.d("VodConfig", "流量模式跳过站点: " + site.getName() + " (" + site.getKey() + ")");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsKeyword(String value, String keyword) {
+        if (TextUtils.isEmpty(value)) return false;
+        return value.toUpperCase(Locale.US).contains(keyword.toUpperCase(Locale.US));
     }
 
     private void loadAllSiteJars() {

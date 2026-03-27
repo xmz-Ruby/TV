@@ -11,6 +11,9 @@
 
     <!-- Vod -->
     <string name="vod_home">推荐</string>
+    <string name="vod_config_mode_wifi">WiFi</string>
+    <string name="vod_config_mode_mobile">流量</string>
+    <string name="vod_config_mode_switched">已切换到%1$s配置</string>
 
     <!-- Detail -->
     <string name="detail_flag">线路</string>
