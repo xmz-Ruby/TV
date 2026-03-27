@@ -106,6 +106,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         EventBus.getDefault().register(this);
         setRecyclerView();
         setAppBarView();
+        updateContentMode();
         updateConfigMode();
         setViewModel();
         showProgress();
@@ -117,6 +118,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
     protected void initEvent() {
         mBinding.top.setOnClickListener(this::onTop);
         mBinding.link.setOnClickListener(this::onLink);
+        mBinding.contentMode.setOnClickListener(this::onContentMode);
         mBinding.configMode.setOnClickListener(this::onConfigMode);
         mBinding.logo.setOnClickListener(this::onLogo);
         mBinding.logo.setOnLongClickListener(this::onRefresh);
@@ -228,6 +230,15 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         LinkDialog.create(this).show();
     }
 
+    private void onContentMode(View view) {
+        if (!VodConfig.get().hasShortDramaSites()) return;
+        int mode = Setting.isVodContentShortDramaMode() ? Setting.VOD_CONTENT_MODE_FILM : Setting.VOD_CONTENT_MODE_SHORT_DRAMA;
+        Setting.putVodContentMode(mode);
+        updateContentMode();
+        Config config = VodConfig.get().getConfig();
+        if (!config.isEmpty()) setConfig(config, getString(R.string.vod_content_mode_switched, getCurrentContentModeText()));
+    }
+
     private void onConfigMode(View view) {
         int mode = Setting.isConfigLoadMobileMode() ? Setting.CONFIG_LOAD_MODE_WIFI : Setting.CONFIG_LOAD_MODE_MOBILE;
         Setting.putConfigLoadMode(mode);
@@ -335,6 +346,19 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         RefreshEvent.config();
     }
 
+    private void updateContentMode() {
+        mBinding.contentMode.setVisibility(VodConfig.get().hasShortDramaSites() ? View.VISIBLE : View.GONE);
+        if (VodConfig.get().hasShortDramaSites()) mBinding.contentMode.setText(getContentModeButtonText());
+    }
+
+    private String getContentModeButtonText() {
+        return getString(Setting.isVodContentShortDramaMode() ? R.string.vod_content_mode_film_action : R.string.vod_content_mode_short_drama_action);
+    }
+
+    private String getCurrentContentModeText() {
+        return getString(Setting.isVodContentShortDramaMode() ? R.string.vod_content_mode_short_drama : R.string.vod_content_mode_film);
+    }
+
     private void updateConfigMode() {
         mBinding.configMode.setText(getConfigModeText());
     }
@@ -390,6 +414,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
                 break;
             case CONFIG:
                 setAppBarView();
+                updateContentMode();
                 updateConfigMode();
                 setLogo();
                 break;

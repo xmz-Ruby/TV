@@ -256,7 +256,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private String getHistoryKey() {
-        return getKey().concat(AppDatabase.SYMBOL).concat(getId()).concat(AppDatabase.SYMBOL) + VodConfig.getCid();
+        return getKey().concat(AppDatabase.SYMBOL).concat(getId()).concat(AppDatabase.SYMBOL).concat(String.valueOf(VodConfig.getCid())).concat(AppDatabase.SYMBOL).concat(String.valueOf(Setting.getVodContentMode()));
     }
 
     private Site getSite() {
@@ -316,6 +316,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         return mBinding.getRoot().getTag().equals("port");
     }
 
+    private boolean isShortDramaMode() {
+        return VodConfig.get().isShortDramaMode();
+    }
+
     @Override
     protected boolean transparent() {
         return false;
@@ -333,6 +337,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         if (TextUtils.isEmpty(id) || id.equals(getId())) return;
         mBinding.swipeLayout.setRefreshing(true);
         getIntent().putExtras(intent);
+        mKeyDown.setShortDramaMode(isShortDramaMode());
         stopSearch();
         setOrient();
         checkId();
@@ -341,6 +346,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     @Override
     protected void initView(Bundle savedInstanceState) {
         mKeyDown = CustomKeyDownVod.create(this, mBinding.video);
+        mKeyDown.setShortDramaMode(isShortDramaMode());
         mFrameParams = mBinding.video.getLayoutParams();
         mDanmakuContext = DanmakuContext.create();
         mBinding.progressLayout.showProgress();
@@ -359,6 +365,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mR3 = this::setOrient;
         mR4 = this::showEmpty;
         mPiP = new PiP();
+        if (isShortDramaMode()) setOrient();
         setForeground(true);
         setRecyclerView();
         setVideoView();
@@ -1037,6 +1044,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void onRotate() {
+        if (isShortDramaMode()) return;
         setR1Callback();
         setRotate(!isRotate());
         setRequestedOrientation(ResUtil.isLand(this) ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
@@ -1221,6 +1229,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private boolean shouldEnterFullscreen(Episode item) {
+        if (isShortDramaMode()) return false;
         boolean enter = !isFullscreen() && item.isActivated();
         if (enter) enterFullscreen();
         return enter;
@@ -1229,10 +1238,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private void enterFullscreen() {
         if (isFullscreen()) return;
         App.post(() -> mBinding.video.setLayoutParams(new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT)), 50);
-        setRequestedOrientation(mPlayers.isPortrait() ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        setRequestedOrientation(isShortDramaMode() ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT : mPlayers.isPortrait() ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         mBinding.control.full.setVisibility(View.GONE);
         mDanmakuContext.setScaleTextSize(1.0f * Setting.getDanmuSize());
-        setRotate(mPlayers.isPortrait(), true);
+        setRotate(isShortDramaMode() || mPlayers.isPortrait(), true);
         Util.hideSystemUI(this);
         App.post(mR3, 2000);
         hideControl();
@@ -1240,7 +1249,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private void exitFullscreen() {
         if (!isFullscreen()) return;
-        setRequestedOrientation(isPort() ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
+        setRequestedOrientation(isShortDramaMode() ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT : isPort() ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
         mBinding.episode.scrollToPosition(mEpisodeAdapter.getPosition());
         mBinding.control.full.setVisibility(View.VISIBLE);
         mBinding.video.setLayoutParams(mFrameParams);
@@ -1292,7 +1301,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mBinding.control.action.danmuSearch.setVisibility(isLock() || !Setting.isDanmuLoad() ? View.GONE : View.VISIBLE);
         mBinding.control.setting.setVisibility(mHistory == null || isFullscreen() ? View.GONE : View.VISIBLE);
         mBinding.control.batteryInfo.setVisibility(isFullscreen() ? View.VISIBLE : View.GONE);
-        mBinding.control.right.rotate.setVisibility(isFullscreen() && !isLock() ? View.VISIBLE : View.GONE);
+        mBinding.control.right.rotate.setVisibility(isShortDramaMode() ? View.GONE : isFullscreen() && !isLock() ? View.VISIBLE : View.GONE);
         mBinding.control.keep.setVisibility(mHistory == null ? View.GONE : View.VISIBLE);
         mBinding.control.right.back.setVisibility(isFullscreen() && !isLock() ? View.VISIBLE : View.GONE);
         mBinding.control.parse.setVisibility(isFullscreen() && isUseParse() ? View.VISIBLE : View.GONE);
@@ -1303,6 +1312,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mBinding.control.center.setVisibility(isLock() ? View.GONE : View.VISIBLE);
         mBinding.control.bottom.setVisibility(isLock() ? View.GONE : View.VISIBLE);
         mBinding.control.top.setVisibility(isLock() ? View.GONE : View.VISIBLE);
+        mBinding.control.full.setVisibility(isFullscreen() ? View.GONE : View.VISIBLE);
         mBinding.control.getRoot().setVisibility(View.VISIBLE);
         showDisplayInfo();
         checkPlayImg(mPlayers.isPlaying());
@@ -1339,6 +1349,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setOrient() {
+        if (isShortDramaMode()) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
+            return;
+        }
         if (isPort() && isAutoRotate()) setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
         if (isLand() && isAutoRotate()) setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE);
     }
@@ -2006,7 +2020,13 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     @Override
     public void onDoubleTap() {
-        if (!isFullscreen()) {
+        if (isShortDramaMode()) {
+            if (mPlayers.isPlaying()) onPaused();
+            else {
+                hideControl();
+                onPlay();
+            }
+        } else if (!isFullscreen()) {
             App.post(this::enterFullscreen, 250);
         } else if (mPlayers.isPlaying()) {
             onPaused();
@@ -2066,6 +2086,16 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             setForeground(true);
             if (isStop()) finish();
         }
+    }
+
+    @Override
+    public void onEpisodeNext() {
+        if (isShortDramaMode()) checkNext();
+    }
+
+    @Override
+    public void onEpisodePrev() {
+        if (isShortDramaMode()) checkPrev();
     }
 
     @Override

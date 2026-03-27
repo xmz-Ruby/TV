@@ -14,6 +14,11 @@
     <string name="vod_config_mode_wifi">WiFi</string>
     <string name="vod_config_mode_mobile">Mobile</string>
     <string name="vod_config_mode_switched">Switched to %1$s config</string>
+    <string name="vod_content_mode_film">Film</string>
+    <string name="vod_content_mode_short_drama">Short drama</string>
+    <string name="vod_content_mode_film_action">Watch films</string>
+    <string name="vod_content_mode_short_drama_action">Watch short dramas</string>
+    <string name="vod_content_mode_switched">Switched to %1$s mode</string>
 
     <!-- Detail -->
     <string name="detail_flag">Flag</string>

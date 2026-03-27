@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.viewbinding.ViewBinding;
 
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.api.config.VodConfig;
 import com.github.tvbox.osc.bean.Episode;
 import com.github.tvbox.osc.bean.Flag;
@@ -81,7 +82,7 @@ public class DetailActivity extends BaseActivity implements FlagAdapter.OnClickL
     }
 
     private String getHistoryKey() {
-        return getKey().concat(AppDatabase.SYMBOL).concat(getId()).concat(AppDatabase.SYMBOL) + VodConfig.getCid();
+        return getKey().concat(AppDatabase.SYMBOL).concat(getId()).concat(AppDatabase.SYMBOL).concat(String.valueOf(VodConfig.getCid())).concat(AppDatabase.SYMBOL).concat(String.valueOf(Setting.getVodContentMode()));
     }
 
     private Site getSite() {

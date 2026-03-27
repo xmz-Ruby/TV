@@ -45,6 +45,8 @@ public class VodConfig {
     private List<String> flags;
     private List<String> ads;
     private boolean loadLive;
+    private boolean hasShortDramaSites;
+    private boolean shortDramaMode;
     private Config config;
     private Parse parse;
     private Site home;
@@ -96,6 +98,8 @@ public class VodConfig {
         this.flags = new ArrayList<>();
         this.parses = new ArrayList<>();
         this.loadLive = false;
+        this.hasShortDramaSites = false;
+        this.shortDramaMode = false;
         return this;
     }
 
@@ -114,6 +118,8 @@ public class VodConfig {
         this.flags.clear();
         this.parses.clear();
         this.loadLive = true;
+        this.hasShortDramaSites = false;
+        this.shortDramaMode = false;
         pythonSitesPreloaded = false;
         BaseLoader.get().clear();
         return this;
@@ -194,12 +200,14 @@ public class VodConfig {
     }
 
     private void initSite(JsonObject object) {
-        if (object.has("video")) {
-            initSite(object.getAsJsonObject("video"));
-            return;
-        }
-        String spider = Json.safeString(object, "spider");
-        for (JsonElement element : Json.safeListElement(object, "sites")) {
+        JsonObject video = object.has("video") ? object.getAsJsonObject("video") : object;
+        String spider = Json.safeString(video, "spider");
+        if (TextUtils.isEmpty(spider)) spider = Json.safeString(object, "spider");
+        hasShortDramaSites = !Json.safeListElement(video, "sites_duanju").isEmpty();
+        if (!hasShortDramaSites && Setting.isVodContentShortDramaMode()) Setting.putVodContentMode(Setting.VOD_CONTENT_MODE_FILM);
+        shortDramaMode = hasShortDramaSites && Setting.isVodContentShortDramaMode();
+        String key = shortDramaMode ? "sites_duanju" : "sites";
+        for (JsonElement element : Json.safeListElement(video, key)) {
             Site site = Site.objectFrom(element);
             if (skipSite(site)) continue;
             if (sites.contains(site)) continue;
@@ -215,6 +223,14 @@ public class VodConfig {
         }
         // Eagerly load all site-specific JARs
         loadAllSiteJars();
+    }
+
+    public boolean hasShortDramaSites() {
+        return hasShortDramaSites;
+    }
+
+    public boolean isShortDramaMode() {
+        return shortDramaMode;
     }
 
     private boolean skipSite(Site site) {

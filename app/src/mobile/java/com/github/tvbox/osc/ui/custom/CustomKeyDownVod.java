@@ -24,8 +24,10 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
     private boolean changeVolume;
     private boolean changeSpeed;
     private boolean changeTime;
+    private boolean changeEpisode;
     private boolean touch;
     private boolean lock;
+    private boolean shortDramaMode;
     private float bright;
     private float volume;
     private int time;
@@ -47,11 +49,16 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
         if (changeSpeed && e.getAction() == MotionEvent.ACTION_UP) listener.onSpeedEnd();
         if (changeBright && e.getAction() == MotionEvent.ACTION_UP) listener.onBrightEnd();
         if (changeVolume && e.getAction() == MotionEvent.ACTION_UP) listener.onVolumeEnd();
+        if (changeEpisode && e.getAction() == MotionEvent.ACTION_UP) changeEpisode = false;
         return detector.onTouchEvent(e);
     }
 
     public void setLock(boolean lock) {
         this.lock = lock;
+    }
+
+    public void setShortDramaMode(boolean shortDramaMode) {
+        this.shortDramaMode = shortDramaMode;
     }
 
     private boolean isEdge(MotionEvent e) {
@@ -67,6 +74,7 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
         changeVolume = false;
         changeSpeed = false;
         changeTime = false;
+        changeEpisode = false;
         touch = true;
         return true;
     }
@@ -83,7 +91,8 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
         if (isEdge(e1) || lock) return true;
         float deltaX = e2.getX() - e1.getX();
         float deltaY = e1.getY() - e2.getY();
-        if (touch) checkFunc(distanceX, distanceY, e2);
+        if (touch) checkFunc(distanceX, distanceY, e1, e2);
+        if (changeEpisode) return true;
         if (changeTime) listener.onSeek(time = (int) deltaX * 50);
         if (changeBright) setBright(deltaY);
         if (changeVolume) setVolume(deltaY);
@@ -108,7 +117,15 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
         time = 0;
     }
 
-    private void checkFunc(float distanceX, float distanceY, MotionEvent e2) {
+    private void checkFunc(float distanceX, float distanceY, MotionEvent e1, MotionEvent e2) {
+        if (Math.max(Math.abs(e2.getX() - e1.getX()), Math.abs(e2.getY() - e1.getY())) < ResUtil.dp2px(48)) return;
+        if (shortDramaMode && Math.abs(distanceY) > Math.abs(distanceX)) {
+            changeEpisode = true;
+            if (e1.getY() - e2.getY() > 0) listener.onEpisodeNext();
+            else listener.onEpisodePrev();
+            touch = false;
+            return;
+        }
         changeTime = Math.abs(distanceX) >= Math.abs(distanceY);
         if (!changeTime) checkSide(e2);
         touch = false;
@@ -163,5 +180,9 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
         void onSingleTap();
 
         void onDoubleTap();
+
+        void onEpisodeNext();
+
+        void onEpisodePrev();
     }
 }

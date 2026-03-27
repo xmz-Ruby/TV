@@ -62,7 +62,7 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.ViewHold
         mItems.clear();
         setDelete(false);
         notifyDataSetChanged();
-        History.delete(VodConfig.getCid());
+        History.deleteCurrentMode(VodConfig.getCid());
     }
 
     public void remove(History item) {

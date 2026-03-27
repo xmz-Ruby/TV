@@ -5,6 +5,7 @@ import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
 import com.github.tvbox.osc.App;
+import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.api.config.VodConfig;
 import com.github.tvbox.osc.db.AppDatabase;
 import com.github.tvbox.osc.event.RefreshEvent;
@@ -111,7 +112,9 @@ public class Keep {
     }
 
     public static Keep find(int cid, String key) {
-        return AppDatabase.get().getKeepDao().find(cid, key);
+        Keep item = AppDatabase.get().getKeepDao().find(cid, key);
+        if (item == null && Setting.isVodContentFilmMode()) item = AppDatabase.get().getKeepDao().find(cid, getLegacyKey(key));
+        return item;
     }
 
     public static boolean exist(String key) {
@@ -167,5 +170,10 @@ public class Keep {
             startSync(configs, targets);
             RefreshEvent.keep();
         });
+    }
+
+    private static String getLegacyKey(String key) {
+        int index = key.lastIndexOf(AppDatabase.SYMBOL);
+        return index == -1 ? key : key.substring(0, index);
     }
 }

@@ -5,6 +5,7 @@ import androidx.room.Entity;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
+import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.db.AppDatabase;
 import com.github.tvbox.osc.player.Players;
 
@@ -119,10 +120,18 @@ public class Track {
     }
 
     public static List<Track> find(String key) {
-        return AppDatabase.get().getTrackDao().find(key);
+        List<Track> items = AppDatabase.get().getTrackDao().find(key);
+        if (items.isEmpty() && Setting.isVodContentFilmMode()) items = AppDatabase.get().getTrackDao().find(getLegacyKey(key));
+        return items;
     }
 
     public static void delete(String key) {
         AppDatabase.get().getTrackDao().delete(key);
+        if (Setting.isVodContentFilmMode()) AppDatabase.get().getTrackDao().delete(getLegacyKey(key));
+    }
+
+    private static String getLegacyKey(String key) {
+        int index = key.lastIndexOf(AppDatabase.SYMBOL);
+        return index == -1 ? key : key.substring(0, index);
     }
 }

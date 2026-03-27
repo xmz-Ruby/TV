@@ -12,6 +12,8 @@ public class Setting {
 
     public static final int CONFIG_LOAD_MODE_WIFI = 0;
     public static final int CONFIG_LOAD_MODE_MOBILE = 1;
+    public static final int VOD_CONTENT_MODE_FILM = 0;
+    public static final int VOD_CONTENT_MODE_SHORT_DRAMA = 1;
 
     public static String getDoh() {
         return Prefers.getString("doh", "{\"name\":\"System\",\"url\":\"\"}");
@@ -38,11 +40,19 @@ public class Setting {
     }
 
     public static String getKeyword() {
-        return Prefers.getString("keyword");
+        String key = "keyword_" + getVodContentMode();
+        String value = Prefers.getString(key);
+        if (isVodContentFilmMode() && value.isEmpty()) {
+            String legacy = Prefers.getString("keyword");
+            if (!legacy.isEmpty()) Prefers.put(key, legacy);
+            return legacy;
+        }
+        return value;
     }
 
     public static void putKeyword(String keyword) {
-        Prefers.put("keyword", keyword);
+        Prefers.put("keyword_" + getVodContentMode(), keyword);
+        if (isVodContentFilmMode()) Prefers.put("keyword", keyword);
     }
 
     public static String getHot() {
@@ -544,6 +554,22 @@ public class Setting {
 
     public static boolean isConfigLoadMobileMode() {
         return getConfigLoadMode() == CONFIG_LOAD_MODE_MOBILE;
+    }
+
+    public static int getVodContentMode() {
+        return Prefers.getInt("vod_content_mode", VOD_CONTENT_MODE_FILM) == VOD_CONTENT_MODE_SHORT_DRAMA ? VOD_CONTENT_MODE_SHORT_DRAMA : VOD_CONTENT_MODE_FILM;
+    }
+
+    public static void putVodContentMode(int mode) {
+        Prefers.put("vod_content_mode", mode == VOD_CONTENT_MODE_SHORT_DRAMA ? VOD_CONTENT_MODE_SHORT_DRAMA : VOD_CONTENT_MODE_FILM);
+    }
+
+    public static boolean isVodContentFilmMode() {
+        return getVodContentMode() == VOD_CONTENT_MODE_FILM;
+    }
+
+    public static boolean isVodContentShortDramaMode() {
+        return getVodContentMode() == VOD_CONTENT_MODE_SHORT_DRAMA;
     }
 
     public static void putLanguage(int key) {

@@ -9,12 +9,14 @@ import androidx.room.PrimaryKey;
 
 import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.R;
+import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.api.config.VodConfig;
 import com.github.tvbox.osc.db.AppDatabase;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.reflect.TypeToken;
 
+import java.util.ArrayList;
 import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.List;
@@ -224,6 +226,16 @@ public class History {
         return getKey().split(AppDatabase.SYMBOL)[1];
     }
 
+    public int getVodContentMode() {
+        String[] values = getKey().split(AppDatabase.SYMBOL);
+        if (values.length < 4) return Setting.VOD_CONTENT_MODE_FILM;
+        try {
+            return Integer.parseInt(values[3]) == Setting.VOD_CONTENT_MODE_SHORT_DRAMA ? Setting.VOD_CONTENT_MODE_SHORT_DRAMA : Setting.VOD_CONTENT_MODE_FILM;
+        } catch (Throwable ignored) {
+            return Setting.VOD_CONTENT_MODE_FILM;
+        }
+    }
+
     public Flag getFlag() {
         return Flag.create(getVodFlag());
     }
@@ -253,15 +265,24 @@ public class History {
     }
 
     public static List<History> get(int cid) {
-        return AppDatabase.get().getHistoryDao().find(cid);
+        return filterByCurrentMode(AppDatabase.get().getHistoryDao().find(cid));
     }
 
     public static History find(String key) {
-        return AppDatabase.get().getHistoryDao().find(VodConfig.getCid(), key);
+        History item = AppDatabase.get().getHistoryDao().find(VodConfig.getCid(), key);
+        if (item == null && Setting.isVodContentFilmMode()) item = AppDatabase.get().getHistoryDao().find(VodConfig.getCid(), getLegacyKey(key));
+        return item;
     }
 
     public static void delete(int cid) {
         AppDatabase.get().getHistoryDao().delete(cid);
+    }
+
+    public static void deleteCurrentMode(int cid) {
+        for (History item : get(cid)) {
+            AppDatabase.get().getHistoryDao().delete(cid, item.getKey());
+            AppDatabase.get().getTrackDao().delete(item.getKey());
+        }
     }
 
     private void checkParam(History item) {
@@ -306,7 +327,19 @@ public class History {
     }
 
     public List<History> find() {
-        return AppDatabase.get().getHistoryDao().findByName(VodConfig.getCid(), getVodName());
+        return filterByCurrentMode(AppDatabase.get().getHistoryDao().findByName(VodConfig.getCid(), getVodName()));
+    }
+
+    private static List<History> filterByCurrentMode(List<History> items) {
+        List<History> results = new ArrayList<>();
+        int mode = Setting.getVodContentMode();
+        for (History item : items) if (item.getVodContentMode() == mode) results.add(item);
+        return results;
+    }
+
+    private static String getLegacyKey(String key) {
+        int index = key.lastIndexOf(AppDatabase.SYMBOL);
+        return index == -1 ? key : key.substring(0, index);
     }
 
     public void findEpisode(List<Flag> flags) {
