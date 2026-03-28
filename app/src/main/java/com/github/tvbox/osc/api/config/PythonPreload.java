@@ -35,6 +35,11 @@ public final class PythonPreload {
         STATE.postValue(State.finished(token, total, completed, success, fail));
     }
 
+    public static void cancel() {
+        TOKEN.incrementAndGet();
+        STATE.postValue(State.idle());
+    }
+
     public static void hide() {
         STATE.postValue(State.idle());
     }

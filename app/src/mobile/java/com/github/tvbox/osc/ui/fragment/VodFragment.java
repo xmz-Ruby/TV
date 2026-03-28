@@ -1,13 +1,14 @@
 package com.github.tvbox.osc.ui.fragment;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -58,10 +59,10 @@ import com.github.tvbox.osc.utils.FileUtil;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.tvbox.osc.utils.ResUtil;
 import com.github.tvbox.osc.utils.UrlUtil;
+import com.github.tvbox.osc.utils.Util;
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.crawler.SpiderDebug;
 import com.google.common.net.HttpHeaders;
-import com.permissionx.guolindev.PermissionX;
-
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -83,6 +84,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
     private Runnable mRunnable;
     private List<String> mHots;
     private Result mResult;
+    private boolean modeSwitchRestarting;
 
     public static VodFragment newInstance() {
         return new VodFragment();
@@ -105,6 +107,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
     protected void initView() {
         EventBus.getDefault().register(this);
         setRecyclerView();
+        setActionButtons();
         setAppBarView();
         updateContentMode();
         updateConfigMode();
@@ -116,6 +119,8 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
 
     @Override
     protected void initEvent() {
+        setInterceptTouch(mBinding.contentMode);
+        setInterceptTouch(mBinding.configMode);
         mBinding.top.setOnClickListener(this::onTop);
         mBinding.link.setOnClickListener(this::onLink);
         mBinding.contentMode.setOnClickListener(this::onContentMode);
@@ -156,6 +161,23 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         mBinding.type.setItemAnimator(null);
         mBinding.type.setAdapter(mAdapter = new TypeAdapter(this));
         mBinding.pager.setAdapter(new PageAdapter(getChildFragmentManager()));
+    }
+
+    private void setActionButtons() {
+        mBinding.contentMode.bringToFront();
+        mBinding.configMode.bringToFront();
+        mBinding.contentMode.setClickable(true);
+        mBinding.configMode.setClickable(true);
+    }
+
+    private void setInterceptTouch(View view) {
+        view.setOnTouchListener((v, event) -> {
+            ViewParent parent = v.getParent();
+            if (parent != null && (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE)) {
+                parent.requestDisallowInterceptTouchEvent(true);
+            }
+            return false;
+        });
     }
 
     private void setViewModel() {
@@ -231,20 +253,22 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
     }
 
     private void onContentMode(View view) {
+        SpiderDebug.log("点击内容模式按钮 current=" + Setting.getVodContentMode() + " hasShortDramaSites=" + VodConfig.get().hasShortDramaSites());
         if (!VodConfig.get().hasShortDramaSites()) return;
         int mode = Setting.isVodContentShortDramaMode() ? Setting.VOD_CONTENT_MODE_FILM : Setting.VOD_CONTENT_MODE_SHORT_DRAMA;
         Setting.putVodContentMode(mode);
         updateContentMode();
-        Config config = VodConfig.get().getConfig();
-        if (!config.isEmpty()) setConfig(config, getString(R.string.vod_content_mode_switched, getCurrentContentModeText()));
+        SpiderDebug.log("内容模式切换后重启应用 mode=" + mode);
+        restartForModeSwitch(view, getString(R.string.vod_content_mode_switched, getCurrentContentModeText()));
     }
 
     private void onConfigMode(View view) {
+        SpiderDebug.log("点击配置模式按钮 current=" + Setting.getConfigLoadMode());
         int mode = Setting.isConfigLoadMobileMode() ? Setting.CONFIG_LOAD_MODE_WIFI : Setting.CONFIG_LOAD_MODE_MOBILE;
         Setting.putConfigLoadMode(mode);
         updateConfigMode();
-        Config config = VodConfig.get().getConfig();
-        if (!config.isEmpty()) setConfig(config, getString(R.string.vod_config_mode_switched, getConfigModeText()));
+        SpiderDebug.log("配置模式切换后重启应用 mode=" + mode);
+        restartForModeSwitch(view, getString(R.string.vod_config_mode_switched, getConfigModeText()));
     }
 
     private void onLogo(View view) {
@@ -311,6 +335,7 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         mAdapter.clear();
         mViewModel.homeContent();
         mBinding.pager.setAdapter(new PageAdapter(getChildFragmentManager()));
+        mBinding.pager.setCurrentItem(0, false);
     }
 
     private void setLogo() {
@@ -373,16 +398,24 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
     }
 
     private void setConfig(Config config, String success) {
-        if (config.getUrl().startsWith("file") && !PermissionX.isGranted(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            PermissionX.init(this).permissions(Manifest.permission.WRITE_EXTERNAL_STORAGE).request((allGranted, grantedList, deniedList) -> load(config, success));
-        } else {
-            load(config, success);
-        }
+        SpiderDebug.log("VodFragment.setConfig url=" + config.getUrl() + " empty=" + config.isEmpty());
+        load(config, success);
+    }
+
+    private void restartForModeSwitch(View view, String message) {
+        if (modeSwitchRestarting) return;
+        modeSwitchRestarting = true;
+        view.setEnabled(false);
+        mBinding.contentMode.setEnabled(false);
+        mBinding.configMode.setEnabled(false);
+        Notify.show(message);
+        App.post(() -> Util.restartApp(getActivity()), 100);
     }
 
     private void load(Config config, String success) {
         switch (config.getType()) {
             case 0:
+                SpiderDebug.log("VodFragment.load type=" + config.getType() + " vodContentMode=" + Setting.getVodContentMode() + " configLoadMode=" + Setting.getConfigLoadMode());
                 Notify.progress(getActivity());
                 VodConfig.load(config, getCallback(success));
                 break;
@@ -497,10 +530,6 @@ public class VodFragment extends BaseFragment implements SiteCallback, FilterCal
         @Override
         public int getCount() {
             return mAdapter.getItemCount();
-        }
-
-        @Override
-        public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
         }
     }
 }

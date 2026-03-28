@@ -93,6 +93,14 @@ public class Prefers {
         getPrefers().edit().remove(key).apply();
     }
 
+    public static boolean contains(String key) {
+        try {
+            return getPrefers().contains(key);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static int cleanupExpiredCache() {
         long nowSeconds = System.currentTimeMillis() / 1000;
         SharedPreferences prefers = getPrefers();

@@ -10,12 +10,14 @@ import com.github.catvod.utils.Util;
 
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PyLoader {
 
     private final ConcurrentHashMap<String, Spider> spiders;
     private final ConcurrentHashMap<String, Object> loadingLocks;
+    private final AtomicInteger generation;
     private Object loader;
     private Method spiderMethod;
     private Method warmupMethod;
@@ -24,6 +26,7 @@ public class PyLoader {
     public PyLoader() {
         this.spiders = new ConcurrentHashMap<>();
         this.loadingLocks = new ConcurrentHashMap<>();
+        this.generation = new AtomicInteger(0);
         init();
     }
 
@@ -42,6 +45,7 @@ public class PyLoader {
     }
 
     public void clear() {
+        generation.incrementAndGet();
         for (Spider spider : spiders.values()) {
             final Spider currentSpider = spider;
             App.execute(new Runnable() {
@@ -72,6 +76,7 @@ public class PyLoader {
     }
 
     public Spider getSpider(String key, String api, String ext) {
+        int currentGeneration = generation.get();
         String compositeKey = api + "|" + ext;
         String moduleKey = Util.md5(key + "|" + compositeKey);
         try {
@@ -95,9 +100,18 @@ public class PyLoader {
                     Logger.d("PyLoader: Reusing cached spider after lock - key=" + key + ", compositeKey=" + compositeKey.hashCode());
                     return cachedSpider;
                 }
+                if (isStale(currentGeneration)) {
+                    Logger.w("PyLoader: Loading cancelled before init - key=" + key);
+                    return new SpiderNull();
+                }
                 Logger.i("PyLoader: Loading Python spider - key=" + key + ", api=" + api + ", extHash=" + ext.hashCode());
                 Spider spider = (Spider) spiderMethod.invoke(loader, App.get(), api, moduleKey);
                 spider.init(App.get(), ext);
+                if (isStale(currentGeneration)) {
+                    Logger.w("PyLoader: Discard stale Python spider - key=" + key);
+                    destroyQuietly(spider);
+                    return new SpiderNull();
+                }
                 spiders.put(compositeKey, spider);
                 Logger.i("PyLoader: Python spider loaded successfully - key=" + key + ", compositeKey=" + compositeKey.hashCode());
                 return spider;
@@ -116,6 +130,19 @@ public class PyLoader {
         Object newLock = new Object();
         Object racingLock = loadingLocks.putIfAbsent(compositeKey, newLock);
         return racingLock != null ? racingLock : newLock;
+    }
+
+    private boolean isStale(int currentGeneration) {
+        return currentGeneration != generation.get() || Thread.currentThread().isInterrupted();
+    }
+
+    private void destroyQuietly(Spider spider) {
+        if (spider == null) return;
+        try {
+            spider.destroy();
+        } catch (Throwable e) {
+            Logger.w("PyLoader: destroy stale spider failed", e);
+        }
     }
 
     public Object[] proxyInvoke(Map<String, String> params) {

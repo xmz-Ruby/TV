@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.Call;
@@ -51,6 +52,7 @@ public class SiteViewModel extends ViewModel {
     public MutableLiveData<Danmu> danmaku;
     public MutableLiveData<Result> download;
     private ExecutorService executor;
+    private int requestGeneration;
 
     public SiteViewModel() {
         this.ep = new MutableLiveData<>();
@@ -302,18 +304,33 @@ public class SiteViewModel extends ViewModel {
 
     private void execute(MutableLiveData<Result> result, Callable<Result> callable) {
         if (executor != null) executor.shutdownNow();
-        executor = Executors.newFixedThreadPool(2);
-        executor.execute(() -> {
+        final ExecutorService currentExecutor = Executors.newFixedThreadPool(2);
+        final int generation = ++requestGeneration;
+        executor = currentExecutor;
+        currentExecutor.execute(() -> {
+            Future<Result> future = null;
             try {
-                if (Thread.interrupted()) return;
-                result.postValue(executor.submit(callable).get(Constant.TIMEOUT_VOD, TimeUnit.MILLISECONDS));
+                if (isExpired(currentExecutor, generation)) return;
+                future = currentExecutor.submit(callable);
+                Result value = future.get(Constant.TIMEOUT_VOD, TimeUnit.MILLISECONDS);
+                if (isExpired(currentExecutor, generation)) return;
+                result.postValue(value == null ? Result.empty() : value);
             } catch (Throwable e) {
-                if (e instanceof InterruptedException || Thread.interrupted()) return;
-                if (e.getCause() instanceof ExtractException) result.postValue(Result.error(e.getCause().getMessage()));
+                if (future != null) future.cancel(true);
+                if (e instanceof InterruptedException || isExpired(currentExecutor, generation)) return;
+                Throwable cause = e.getCause();
+                if (cause instanceof ExtractException) result.postValue(Result.error(cause.getMessage()));
                 else result.postValue(Result.empty());
                 e.printStackTrace();
             }
         });
+    }
+
+    private boolean isExpired(ExecutorService currentExecutor, int generation) {
+        return Thread.currentThread().isInterrupted()
+                || currentExecutor.isShutdown()
+                || executor != currentExecutor
+                || requestGeneration != generation;
     }
 
     @Override

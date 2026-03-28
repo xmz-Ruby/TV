@@ -50,6 +50,8 @@ public class VodConfig {
     private Config config;
     private Parse parse;
     private Site home;
+    private final AtomicInteger loadGeneration = new AtomicInteger(0);
+    private volatile ExecutorService preloadExecutor;
 
     private static class Loader {
         static volatile VodConfig INSTANCE = new VodConfig();
@@ -84,7 +86,11 @@ public class VodConfig {
     }
 
     public static void load(Config config, Callback callback) {
-        get().clear().config(config).load(callback);
+        get().startLoad(config, callback);
+    }
+
+    public static void switchContentMode(Callback callback) {
+        get().startContentModeSwitch(callback);
     }
 
     public VodConfig init() {
@@ -109,6 +115,17 @@ public class VodConfig {
     }
 
     public VodConfig clear() {
+        loadGeneration.incrementAndGet();
+        return clearState();
+    }
+
+    private VodConfig clearState() {
+        resetState(true, true);
+        return this;
+    }
+
+    private void resetState(boolean clearLoader, boolean resetLive) {
+        cancelPythonPreload();
         this.home = null;
         this.parse = null;
         this.ads.clear();
@@ -117,12 +134,47 @@ public class VodConfig {
         this.sites.clear();
         this.flags.clear();
         this.parses.clear();
-        this.loadLive = true;
+        this.loadLive = resetLive;
         this.hasShortDramaSites = false;
         this.shortDramaMode = false;
         pythonSitesPreloaded = false;
-        BaseLoader.get().clear();
-        return this;
+        if (clearLoader) BaseLoader.get().clear();
+    }
+
+    private void startLoad(Config config, Callback callback) {
+        int generation;
+        synchronized (this) {
+            generation = loadGeneration.incrementAndGet();
+            clearState();
+            config(config);
+        }
+        load(callback, false, generation, config);
+    }
+
+    private void startContentModeSwitch(Callback callback) {
+        Config currentConfig;
+        int generation;
+        synchronized (this) {
+            currentConfig = getConfig();
+            generation = loadGeneration.incrementAndGet();
+            resetState(false, false);
+            config(currentConfig);
+        }
+        if (TextUtils.isEmpty(currentConfig.getJson())) {
+            load(callback, true, generation, currentConfig);
+            return;
+        }
+        App.execute(() -> {
+            try {
+                if (isStale(generation)) return;
+                checkJson(Json.parse(currentConfig.getJson()).getAsJsonObject(), callback, generation, currentConfig, false, false);
+            } catch (Throwable e) {
+                if (isStale(generation)) return;
+                App.post(() -> {
+                    if (!isStale(generation)) callback.error(Notify.getError(R.string.error_config_parse, e));
+                });
+            }
+        });
     }
 
     public void load(Callback callback) {
@@ -130,81 +182,130 @@ public class VodConfig {
     }
 
     public void load(Callback callback, boolean cache) {
-        if (cache) App.execute(() -> loadConfigCache(callback));
-        else App.execute(() -> loadConfig(callback));
+        int generation = loadGeneration.get();
+        Config currentConfig = getConfig();
+        load(callback, cache, generation, currentConfig);
     }
 
-    private void loadConfig(Callback callback) {
+    private void load(Callback callback, boolean cache, int generation, Config targetConfig) {
+        if (cache) App.execute(() -> loadConfigCache(callback, generation, targetConfig));
+        else App.execute(() -> loadConfig(callback, generation, targetConfig));
+    }
+
+    private void loadConfig(Callback callback, int generation, Config targetConfig) {
         try {
-            checkJson(Json.parse(Decoder.getJson(config.getUrl())).getAsJsonObject(), callback);
+            if (isStale(generation)) return;
+            checkJson(Json.parse(Decoder.getJson(targetConfig.getUrl())).getAsJsonObject(), callback, generation, targetConfig);
         } catch (Throwable e) {
-            if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
-            else loadCache(callback, e);
+            if (isStale(generation)) return;
+            if (TextUtils.isEmpty(targetConfig.getUrl())) {
+                App.post(() -> {
+                    if (!isStale(generation)) callback.error("");
+                });
+            } else {
+                loadCache(callback, e, generation, targetConfig);
+            }
             e.printStackTrace();
         }
     }
 
-    private void loadCache(Callback callback, Throwable e) {
-        if (!TextUtils.isEmpty(config.getJson())) checkJson(Json.parse(config.getJson()).getAsJsonObject(), callback);
-        else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
-    }
-
-    private void loadConfigCache(Callback callback) {
-        if (!TextUtils.isEmpty(config.getJson()) && config.isCache()) checkJson(Json.parse(config.getJson()).getAsJsonObject(), callback);
-        else loadConfig(callback);
-    }
-
-    private void checkJson(JsonObject object, Callback callback) {
-        if (object.has("msg") && callback != null) {
-            App.post(() -> callback.error(object.get("msg").getAsString()));
-        } else if (object.has("urls")) {
-            parseDepot(object, callback);
+    private void loadCache(Callback callback, Throwable e, int generation, Config targetConfig) {
+        if (isStale(generation)) return;
+        if (!TextUtils.isEmpty(targetConfig.getJson())) {
+            checkJson(Json.parse(targetConfig.getJson()).getAsJsonObject(), callback, generation, targetConfig);
         } else {
-            parseConfig(object, callback);
+            App.post(() -> {
+                if (!isStale(generation)) callback.error(Notify.getError(R.string.error_config_get, e));
+            });
         }
     }
 
-    private void parseDepot(JsonObject object, Callback callback) {
+    private void loadConfigCache(Callback callback, int generation, Config targetConfig) {
+        if (isStale(generation)) return;
+        if (!TextUtils.isEmpty(targetConfig.getJson()) && targetConfig.isCache()) {
+            checkJson(Json.parse(targetConfig.getJson()).getAsJsonObject(), callback, generation, targetConfig);
+        } else {
+            loadConfig(callback, generation, targetConfig);
+        }
+    }
+
+    private void checkJson(JsonObject object, Callback callback, int generation, Config targetConfig) {
+        checkJson(object, callback, generation, targetConfig, true, true);
+    }
+
+    private void checkJson(JsonObject object, Callback callback, int generation, Config targetConfig, boolean preloadPython, boolean eagerLoadSpider) {
+        if (isStale(generation)) return;
+        if (object.has("msg") && callback != null) {
+            App.post(() -> {
+                if (!isStale(generation)) callback.error(object.get("msg").getAsString());
+            });
+        } else if (object.has("urls")) {
+            parseDepot(object, callback, generation, targetConfig);
+        } else {
+            parseConfig(object, callback, generation, targetConfig, preloadPython, eagerLoadSpider);
+        }
+    }
+
+    private void parseDepot(JsonObject object, Callback callback, int generation, Config targetConfig) {
+        if (isStale(generation)) return;
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
         List<Config> configs = new ArrayList<>();
         for (Depot item : items) configs.add(Config.find(item, 0));
-        Config.delete(config.getUrl());
-        config = configs.get(0);
-        loadConfig(callback);
+        Config.delete(targetConfig.getUrl());
+        if (configs.isEmpty()) return;
+        synchronized (this) {
+            if (isStale(generation)) return;
+            config = configs.get(0);
+        }
+        loadConfig(callback, generation, configs.get(0));
     }
 
-    private void parseConfig(JsonObject object, Callback callback) {
+    private void parseConfig(JsonObject object, Callback callback, int generation, Config targetConfig) {
+        parseConfig(object, callback, generation, targetConfig, true, true);
+    }
+
+    private void parseConfig(JsonObject object, Callback callback, int generation, Config targetConfig, boolean preloadPython, boolean eagerLoadSpider) {
         try {
+            if (isStale(generation)) return;
             android.util.Log.d("VodConfig", "parseConfig 开始");
-            initSite(object);
+            initSite(object, eagerLoadSpider);
             initParse(object);
             initOther(object);
-            BaseLoader.get().parseJar(Json.safeString(object, "spider"));
+            if (eagerLoadSpider) BaseLoader.get().parseJar(Json.safeString(object, "spider"));
             if (loadLive && object.has("lives")) initLive(object);
             String notice = Json.safeString(object, "notice");
-            config.logo(Json.safeString(object, "logo"));
+            if (isStale(generation)) return;
+            targetConfig.logo(Json.safeString(object, "logo"));
             android.util.Log.d("VodConfig", "准备调用 callback.success(notice)");
-            App.post(() -> callback.success(notice));
-            config.json(object.toString()).update();
+            App.post(() -> {
+                if (!isStale(generation)) callback.success(notice);
+            });
+            targetConfig.json(object.toString()).update();
             android.util.Log.d("VodConfig", "准备调用 callback.success()");
-            App.post(callback::success);
+            App.post(() -> {
+                if (!isStale(generation)) callback.success();
+            });
             android.util.Log.d("VodConfig", "parseConfig 完成");
 
-            // 在配置解析完成后，直接预加载 Python 站点
-            android.util.Log.d("VodConfig", "parseConfig 完成后，准备预加载 Python 站点");
-            preloadPythonSites();
+            if (preloadPython) {
+                android.util.Log.d("VodConfig", "parseConfig 完成后，准备预加载 Python 站点");
+                preloadPythonSites(generation);
+            } else {
+                android.util.Log.d("VodConfig", "parseConfig 完成后，跳过 Python 预加载（内容模式切换）");
+            }
         } catch (Throwable e) {
             e.printStackTrace();
-            App.post(() -> callback.error(Notify.getError(R.string.error_config_parse, e)));
+            App.post(() -> {
+                if (!isStale(generation)) callback.error(Notify.getError(R.string.error_config_parse, e));
+            });
         }
     }
 
-    private void initSite(JsonObject object) {
+    private void initSite(JsonObject object, boolean eagerLoadSpider) {
         JsonObject video = object.has("video") ? object.getAsJsonObject("video") : object;
         String spider = Json.safeString(video, "spider");
         if (TextUtils.isEmpty(spider)) spider = Json.safeString(object, "spider");
         hasShortDramaSites = !Json.safeListElement(video, "sites_duanju").isEmpty();
-        if (!hasShortDramaSites && Setting.isVodContentShortDramaMode()) Setting.putVodContentMode(Setting.VOD_CONTENT_MODE_FILM);
         shortDramaMode = hasShortDramaSites && Setting.isVodContentShortDramaMode();
         String key = shortDramaMode ? "sites_duanju" : "sites";
         for (JsonElement element : Json.safeListElement(video, key)) {
@@ -221,8 +322,7 @@ public class VodConfig {
                 setHome(site);
             }
         }
-        // Eagerly load all site-specific JARs
-        loadAllSiteJars();
+        if (eagerLoadSpider) loadAllSiteJars();
     }
 
     public boolean hasShortDramaSites() {
@@ -231,6 +331,10 @@ public class VodConfig {
 
     public boolean isShortDramaMode() {
         return shortDramaMode;
+    }
+
+    public int getVodContentMode() {
+        return isShortDramaMode() ? Setting.VOD_CONTENT_MODE_SHORT_DRAMA : Setting.VOD_CONTENT_MODE_FILM;
     }
 
     private boolean skipSite(Site site) {
@@ -403,6 +507,21 @@ public class VodConfig {
     // 标记当前配置加载周期内是否已经预加载过 Python 站点
     private static volatile boolean pythonSitesPreloaded = false;
 
+    private boolean isStale(int generation) {
+        return loadGeneration.get() != generation || Thread.currentThread().isInterrupted();
+    }
+
+    private void cancelPythonPreload() {
+        ExecutorService executor;
+        synchronized (this) {
+            executor = preloadExecutor;
+            preloadExecutor = null;
+            pythonSitesPreloaded = false;
+        }
+        if (executor != null) executor.shutdownNow();
+        PythonPreload.cancel();
+    }
+
     private int getPythonPreloadParallelism(int totalCount) {
         boolean isArmeabiV7aOnly = Build.SUPPORTED_64_BIT_ABIS.length == 0 && Arrays.asList(Build.SUPPORTED_ABIS).contains("armeabi-v7a");
         int target = isArmeabiV7aOnly ? 6 : 8;
@@ -433,7 +552,8 @@ public class VodConfig {
      * 在首页加载完成后调用，提前初始化 Python 站点，提升用户体验
      * 使用多线程并行加载，每次配置重新加载后触发一次
      */
-    public void preloadPythonSites() {
+    public void preloadPythonSites(int generation) {
+        if (isStale(generation)) return;
         // 如果已经预加载过，直接返回
         if (pythonSitesPreloaded) {
             android.util.Log.d("VodConfig", "Python 站点已预加载过，跳过本次预加载");
@@ -467,19 +587,29 @@ public class VodConfig {
         final long preloadStartedAt = System.currentTimeMillis();
         android.util.Log.i("VodConfig", "Python 预加载开始: total=" + totalCount + ", parallelism=" + parallelism + ", " + getPythonPreloadDeviceProfile());
         BaseLoader.get().warmupPython();
-        final ExecutorService preloadExecutor = Executors.newFixedThreadPool(parallelism);
+        final ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+        synchronized (this) {
+            if (isStale(generation)) {
+                executor.shutdownNow();
+                PythonPreload.cancel();
+                return;
+            }
+            preloadExecutor = executor;
+        }
         final AtomicInteger successCount = new AtomicInteger(0);
         final AtomicInteger failCount = new AtomicInteger(0);
         final AtomicInteger completedCount = new AtomicInteger(0);
 
         for (Site site : pythonSites) {
-            preloadExecutor.execute(() -> {
+            executor.execute(() -> {
                 long siteStartedAt = System.currentTimeMillis();
                 boolean success = false;
                 String failureType = "";
                 try {
+                    if (isStale(generation)) return;
                     android.util.Log.d("VodConfig", "预加载 Python 站点: " + site.getName() + " (" + site.getKey() + ")");
                     Spider spider = BaseLoader.get().getSpider(site.getKey(), site.getApi(), site.getExt(), site.getJar());
+                    if (isStale(generation)) return;
                     if (spider instanceof SpiderNull) {
                         android.util.Log.e("VodConfig", "预加载失败: " + site.getName() + " - SpiderNull");
                         failCount.incrementAndGet();
@@ -501,6 +631,7 @@ public class VodConfig {
                             + ", elapsed=" + formatPythonPreloadElapsed(siteElapsed)
                             + ", thread=" + Thread.currentThread().getName()
                             + (failureType.isEmpty() ? "" : ", failure=" + failureType));
+                    if (isStale(generation)) return;
                     int completed = completedCount.incrementAndGet();
                     PythonPreload.progress(token, totalCount, completed, successCount.get(), failCount.get(), site.getName());
                     if (completed == totalCount) {
@@ -513,11 +644,18 @@ public class VodConfig {
                                 + ", " + getPythonPreloadDeviceProfile());
                         PythonPreload.finish(token, totalCount, completed, successCount.get(), failCount.get());
                         if (successCount.get() == 0) {
-                            App.post(() -> Notify.show(R.string.python_preload_all_failed));
+                            App.post(() -> {
+                                if (!isStale(generation)) Notify.show(R.string.python_preload_all_failed);
+                            });
                         } else if (failCount.get() > 0) {
-                            App.post(() -> Notify.show(App.get().getString(R.string.python_preload_partial_failed, failCount.get(), totalCount)));
+                            App.post(() -> {
+                                if (!isStale(generation)) Notify.show(App.get().getString(R.string.python_preload_partial_failed, failCount.get(), totalCount));
+                            });
                         }
-                        preloadExecutor.shutdown();
+                        synchronized (VodConfig.this) {
+                            if (preloadExecutor == executor) preloadExecutor = null;
+                        }
+                        executor.shutdown();
                     }
                 }
             });

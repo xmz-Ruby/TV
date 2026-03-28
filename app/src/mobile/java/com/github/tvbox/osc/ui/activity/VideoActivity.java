@@ -256,7 +256,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private String getHistoryKey() {
-        return getKey().concat(AppDatabase.SYMBOL).concat(getId()).concat(AppDatabase.SYMBOL).concat(String.valueOf(VodConfig.getCid())).concat(AppDatabase.SYMBOL).concat(String.valueOf(Setting.getVodContentMode()));
+        return getKey().concat(AppDatabase.SYMBOL).concat(getId()).concat(AppDatabase.SYMBOL).concat(String.valueOf(VodConfig.getCid())).concat(AppDatabase.SYMBOL).concat(String.valueOf(VodConfig.get().getVodContentMode()));
     }
 
     private Site getSite() {

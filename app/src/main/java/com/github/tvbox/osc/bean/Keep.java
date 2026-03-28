@@ -113,7 +113,7 @@ public class Keep {
 
     public static Keep find(int cid, String key) {
         Keep item = AppDatabase.get().getKeepDao().find(cid, key);
-        if (item == null && Setting.isVodContentFilmMode()) item = AppDatabase.get().getKeepDao().find(cid, getLegacyKey(key));
+        if (item == null && Setting.isCurrentVodContentFilmMode()) item = AppDatabase.get().getKeepDao().find(cid, getLegacyKey(key));
         return item;
     }
 

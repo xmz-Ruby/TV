@@ -70,7 +70,7 @@ public class MainActivity extends BaseActivity implements NavigationBarView.OnIt
 
     @Override
     protected void initView(Bundle savedInstanceState) {
-        Setting.putConfigLoadMode(NetworkUtil.getConfigLoadMode());
+        Setting.initConfigLoadMode(NetworkUtil.getConfigLoadMode());
         initFragment(savedInstanceState);
         observePythonPreload();
         Server.get().start();

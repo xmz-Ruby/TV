@@ -121,13 +121,13 @@ public class Track {
 
     public static List<Track> find(String key) {
         List<Track> items = AppDatabase.get().getTrackDao().find(key);
-        if (items.isEmpty() && Setting.isVodContentFilmMode()) items = AppDatabase.get().getTrackDao().find(getLegacyKey(key));
+        if (items.isEmpty() && Setting.isCurrentVodContentFilmMode()) items = AppDatabase.get().getTrackDao().find(getLegacyKey(key));
         return items;
     }
 
     public static void delete(String key) {
         AppDatabase.get().getTrackDao().delete(key);
-        if (Setting.isVodContentFilmMode()) AppDatabase.get().getTrackDao().delete(getLegacyKey(key));
+        if (Setting.isCurrentVodContentFilmMode()) AppDatabase.get().getTrackDao().delete(getLegacyKey(key));
     }
 
     private static String getLegacyKey(String key) {

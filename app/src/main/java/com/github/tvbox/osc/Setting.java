@@ -4,6 +4,7 @@ package com.github.tvbox.osc;
 import android.content.Intent;
 import android.provider.Settings;
 
+import com.github.tvbox.osc.api.config.VodConfig;
 import com.github.tvbox.osc.player.Players;
 import com.github.tvbox.osc.utils.LanguageUtil;
 import com.github.catvod.utils.Prefers;
@@ -40,9 +41,9 @@ public class Setting {
     }
 
     public static String getKeyword() {
-        String key = "keyword_" + getVodContentMode();
+        String key = "keyword_" + getCurrentVodContentMode();
         String value = Prefers.getString(key);
-        if (isVodContentFilmMode() && value.isEmpty()) {
+        if (isCurrentVodContentFilmMode() && value.isEmpty()) {
             String legacy = Prefers.getString("keyword");
             if (!legacy.isEmpty()) Prefers.put(key, legacy);
             return legacy;
@@ -51,8 +52,8 @@ public class Setting {
     }
 
     public static void putKeyword(String keyword) {
-        Prefers.put("keyword_" + getVodContentMode(), keyword);
-        if (isVodContentFilmMode()) Prefers.put("keyword", keyword);
+        Prefers.put("keyword_" + getCurrentVodContentMode(), keyword);
+        if (isCurrentVodContentFilmMode()) Prefers.put("keyword", keyword);
     }
 
     public static String getHot() {
@@ -545,15 +546,31 @@ public class Setting {
     }
 
     public static int getConfigLoadMode() {
-        return Prefers.getInt("config_load_mode", CONFIG_LOAD_MODE_WIFI) == CONFIG_LOAD_MODE_MOBILE ? CONFIG_LOAD_MODE_MOBILE : CONFIG_LOAD_MODE_WIFI;
+        return normalizeConfigLoadMode(Prefers.getInt("config_load_mode", CONFIG_LOAD_MODE_WIFI));
     }
 
     public static void putConfigLoadMode(int mode) {
-        Prefers.put("config_load_mode", mode == CONFIG_LOAD_MODE_MOBILE ? CONFIG_LOAD_MODE_MOBILE : CONFIG_LOAD_MODE_WIFI);
+        int normalizedMode = normalizeConfigLoadMode(mode);
+        Prefers.put("config_load_mode", normalizedMode);
+        Prefers.put("config_load_mode_pending", normalizedMode);
     }
 
     public static boolean isConfigLoadMobileMode() {
         return getConfigLoadMode() == CONFIG_LOAD_MODE_MOBILE;
+    }
+
+    public static void initConfigLoadMode(int mode) {
+        int targetMode = normalizeConfigLoadMode(mode);
+        if (Prefers.contains("config_load_mode_pending")) {
+            targetMode = normalizeConfigLoadMode(Prefers.getInt("config_load_mode_pending", targetMode));
+            Prefers.remove("config_load_mode_pending");
+        }
+        Prefers.put("config_load_mode", targetMode);
+        Prefers.remove("config_load_mode_initialized");
+    }
+
+    private static int normalizeConfigLoadMode(int mode) {
+        return mode == CONFIG_LOAD_MODE_MOBILE ? CONFIG_LOAD_MODE_MOBILE : CONFIG_LOAD_MODE_WIFI;
     }
 
     public static int getVodContentMode() {
@@ -570,6 +587,18 @@ public class Setting {
 
     public static boolean isVodContentShortDramaMode() {
         return getVodContentMode() == VOD_CONTENT_MODE_SHORT_DRAMA;
+    }
+
+    public static int getCurrentVodContentMode() {
+        return VodConfig.get().isShortDramaMode() ? VOD_CONTENT_MODE_SHORT_DRAMA : VOD_CONTENT_MODE_FILM;
+    }
+
+    public static boolean isCurrentVodContentFilmMode() {
+        return getCurrentVodContentMode() == VOD_CONTENT_MODE_FILM;
+    }
+
+    public static boolean isCurrentVodContentShortDramaMode() {
+        return getCurrentVodContentMode() == VOD_CONTENT_MODE_SHORT_DRAMA;
     }
 
     public static void putLanguage(int key) {

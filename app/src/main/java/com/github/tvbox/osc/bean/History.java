@@ -270,7 +270,7 @@ public class History {
 
     public static History find(String key) {
         History item = AppDatabase.get().getHistoryDao().find(VodConfig.getCid(), key);
-        if (item == null && Setting.isVodContentFilmMode()) item = AppDatabase.get().getHistoryDao().find(VodConfig.getCid(), getLegacyKey(key));
+        if (item == null && Setting.isCurrentVodContentFilmMode()) item = AppDatabase.get().getHistoryDao().find(VodConfig.getCid(), getLegacyKey(key));
         return item;
     }
 
@@ -332,7 +332,7 @@ public class History {
 
     private static List<History> filterByCurrentMode(List<History> items) {
         List<History> results = new ArrayList<>();
-        int mode = Setting.getVodContentMode();
+        int mode = Setting.getCurrentVodContentMode();
         for (History item : items) if (item.getVodContentMode() == mode) results.add(item);
         return results;
     }

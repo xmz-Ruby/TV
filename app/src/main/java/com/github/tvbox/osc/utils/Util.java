@@ -30,6 +30,8 @@ import java.util.List;
 
 public class Util {
 
+    private static volatile boolean restarting;
+
     public static void toggleFullscreen(Activity activity, boolean fullscreen) {
         if (fullscreen) hideSystemUI(activity);
         else showSystemUI(activity);
@@ -193,11 +195,23 @@ public class Util {
     }
 
     public static void restartApp(Activity activity) {
-        Intent intent = activity.getBaseContext().getPackageManager().getLaunchIntentForPackage(activity.getBaseContext().getPackageName());
-        ComponentName componentName = intent.getComponent();
-        Intent mainIntent = Intent.makeRestartActivityTask(componentName);
-        activity.startActivity(mainIntent);
-        Runtime.getRuntime().exit(0);
+        if (restarting) return;
+        restarting = true;
+        try {
+            Context context = activity != null ? activity.getApplicationContext() : Init.context();
+            Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+            if (intent == null) {
+                restarting = false;
+                return;
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            android.os.Process.killProcess(android.os.Process.myPid());
+            System.exit(0);
+        } catch (Exception e) {
+            restarting = false;
+            e.printStackTrace();
+        }
     }
 
 }
