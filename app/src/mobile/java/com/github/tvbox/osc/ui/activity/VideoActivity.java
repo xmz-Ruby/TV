@@ -119,6 +119,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -320,6 +321,15 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         return VodConfig.get().isShortDramaMode();
     }
 
+    private boolean isEmbyPySource() {
+        String api = getSite().getApi();
+        return !TextUtils.isEmpty(api) && api.toLowerCase(Locale.US).contains("emby.py");
+    }
+
+    private boolean canShowDownload() {
+        return !isEmbyPySource();
+    }
+
     @Override
     protected boolean transparent() {
         return false;
@@ -372,6 +382,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         setDisplayView();
         setDanmuView();
         setViewModel();
+        updateDownloadView();
         showProgress();
         checkId();
     }
@@ -580,6 +591,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         getIntent().putExtra("key", item.getSiteKey());
         getIntent().putExtra("pic", item.getVodPic());
         getIntent().putExtra("id", item.getVodId());
+        updateDownloadView();
         mBinding.swipeLayout.setRefreshing(true);
         mBinding.swipeLayout.setEnabled(false);
         mBinding.scroll.scrollTo(0, 0);
@@ -632,9 +644,14 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         setOther(mBinding.other, item);
         setArtwork(item.getVodPic());
         App.removeCallbacks(mR4);
+        updateDownloadView();
         checkHistory(item);
         checkFlag(item);
         checkKeepImg();
+    }
+
+    private void updateDownloadView() {
+        mBinding.download.setVisibility(canShowDownload() ? View.VISIBLE : View.GONE);
     }
 
     private void setText(TextView view, int resId, String text) {
@@ -900,6 +917,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void onDownload() {
+        if (!canShowDownload()) return;
         EpisodeGridDialog.create().reverse(mHistory.isRevSort()).episodes(mEpisodeAdapter.getItems()).download(true).show(this);
     }
 
@@ -953,7 +971,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void onInfo() {
-        InfoDialog.create(this).title(mBinding.control.title.getText()).headers(mPlayers.getHeaders()).url(mPlayers.getUrl()).show();
+        InfoDialog.create(this).title(mBinding.control.title.getText()).headers(mPlayers.getHeaders()).url(mPlayers.getUrl()).copyable(false).show();
     }
 
     private void onFull() {
@@ -2038,7 +2056,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     @Override
     public void onShare(CharSequence title) {
-        boolean idm = IDMUtil.downloadFile(this, UrlUtil.fixDownloadUrl(mPlayers.getUrl()), title.toString(), mPlayers.getHeaders(), false, false);
+        boolean idm = !isEmbyPySource() && IDMUtil.downloadFile(this, UrlUtil.fixDownloadUrl(mPlayers.getUrl()), title.toString(), mPlayers.getHeaders(), false, false);
         if (!idm) mPlayers.share(this, title);
         setRedirect(true);
     }

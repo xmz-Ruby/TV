@@ -21,6 +21,7 @@ public class InfoDialog {
     private CharSequence title;
     private String header;
     private String url;
+    private boolean copyable = true;
 
     public static InfoDialog create(Activity activity) {
         return new InfoDialog(activity);
@@ -48,6 +49,11 @@ public class InfoDialog {
         return this;
     }
 
+    public InfoDialog copyable(boolean copyable) {
+        this.copyable = copyable;
+        return this;
+    }
+
     public void show() {
         initDialog();
         initView();
@@ -69,9 +75,12 @@ public class InfoDialog {
     }
 
     private void initEvent() {
-        binding.url.setOnClickListener(this::onShare);
-        binding.url.setOnLongClickListener(v -> onCopy(url));
-        binding.header.setOnLongClickListener(v -> onCopy(header));
+        binding.url.setOnClickListener(copyable ? this::onShare : null);
+        binding.url.setOnLongClickListener(copyable ? v -> onCopy(url) : null);
+        binding.header.setOnLongClickListener(copyable ? v -> onCopy(header) : null);
+        binding.url.setClickable(copyable);
+        binding.url.setLongClickable(copyable);
+        binding.header.setLongClickable(copyable);
     }
 
     private String fixUrl() {
