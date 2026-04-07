@@ -180,21 +180,43 @@ class BaseSpider(metaclass=ABCMeta):
     def init_api_ext_file(self):
         pass
 
+    @staticmethod
+    def _normalize_proxy_url(value):
+        if value is None:
+            return ''
+        if not isinstance(value, str):
+            value = f'{value}'
+        value = value.strip()
+        if not value:
+            return ''
+        if value.startswith(('http://', 'https://')):
+            return value
+        if 'hikerSkey' in value:
+            return value
+        return ''
+
     def getProxyUrl(self, flag=False):
-        """Return the proxy endpoint compatible with both T3 and T4 runtimes."""
+        """Return a valid proxy endpoint compatible with both T3 and T4 runtimes."""
         env = (self.ENV or "").lower()
+        candidates = []
         if env == 't4':
-            return self.t4_api or ''
+            candidates.append(('t4_api', self.t4_api))
         if PyUtil is not None:
             try:
-                return PyUtil.getProxy(flag)
+                candidates.append(('PyUtil.getProxy', PyUtil.getProxy(flag)))
             except Exception:
                 pass
         if Proxy is not None:
             try:
-                return f'{Proxy.getUrl(flag)}?do=py'
+                candidates.append(('Proxy.getUrl', f'{Proxy.getUrl(flag)}?do=py'))
             except Exception:
                 pass
+        for source, candidate in candidates:
+            proxy_url = self._normalize_proxy_url(candidate)
+            if proxy_url:
+                return proxy_url
+            if candidate not in (None, ''):
+                self.log(f'Ignore invalid proxy url from {source}: {candidate}')
         return ''
 
     def getDependence(self):
