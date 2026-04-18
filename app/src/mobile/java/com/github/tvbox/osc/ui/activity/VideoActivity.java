@@ -1646,8 +1646,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     public void onErrorEvent(ErrorEvent event) {
         if (isRedirect()) return;
         if (addErrorCount() > 20) onErrorEnd(event);
-        else if (mPlayers.addRetry() > event.getRetry()) checkError(event);
         else if (event.isDecode() && mPlayers.canToggleDecode()) onDecode(false);
+        else if (shouldSwitchQualityFirst(event)) switchQualityFirst();
+        else if (shouldSwitchPlayerFirst(event)) switchPlayerFirst();
+        else if (mPlayers.addRetry() > event.getRetry()) checkError(event);
         else if (event.isExo() && mPlayers.isExo()) onExoCheck(event);
         else onRefresh();
     }
@@ -1665,6 +1667,42 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             resetToggle();
             onError(event);
         }
+    }
+
+    private boolean shouldSwitchPlayerFirst(ErrorEvent event) {
+        if (event.getType() != ErrorEvent.Type.TIMEOUT) return false;
+        if (getSite().getPlayerType() != -1 || mPlayers.getPlayer() == Players.SYS || getToggleCount() >= 2) return false;
+        long position = mPlayers.getPosition();
+        long bufferedAhead = Math.max(0, mPlayers.getBuffered() - position);
+        return position <= 0 && bufferedAhead >= 2_000L;
+    }
+
+    private boolean shouldSwitchQualityFirst(ErrorEvent event) {
+        return event.getType() == ErrorEvent.Type.TIMEOUT
+                && mQualityAdapter.getItemCount() > 1
+                && mQualityAdapter.getPosition() < mQualityAdapter.getItemCount() - 1;
+    }
+
+    private void switchQualityFirst() {
+        int nextQuality = mQualityAdapter.getPosition() + 1;
+        long resumePosition = Math.max(0, mPlayers.getPosition());
+        Result result = mQualityAdapter.getResult();
+        mQualityAdapter.setPosition(nextQuality);
+        result.getUrl().set(nextQuality);
+        mPlayers.setPosition(resumePosition);
+        try {
+            mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
+            mBinding.danmaku.hide();
+            notifyItemChanged(mQualityAdapter);
+        } catch (Exception e) {
+            ErrorEvent.extract(e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void switchPlayerFirst() {
+        toggleCount++;
+        nextPlayer();
     }
 
     private void nextPlayer() {

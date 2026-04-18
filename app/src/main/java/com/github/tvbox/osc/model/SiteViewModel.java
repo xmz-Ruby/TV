@@ -43,6 +43,9 @@ import okhttp3.Response;
 
 public class SiteViewModel extends ViewModel {
 
+    private static final int DETAIL_RETRY_COUNT = 3;
+    private static final long DETAIL_RETRY_DELAY_MS = 600L;
+
     public MutableLiveData<Episode> ep;
     public MutableLiveData<Episode> episode;
     public MutableLiveData<Result> result;
@@ -122,36 +125,73 @@ public class SiteViewModel extends ViewModel {
     }
 
     public void detailContent(String key, String id) {
-        execute(result, () -> {
-            Site site = VodConfig.get().getSite(key);
-            if (site.getType() == 3) {
-                Spider spider = site.recent().spider();
-                String detailContent = spider.detailContent(Arrays.asList(id));
-                SpiderDebug.log(detailContent);
-                Result result = Result.fromJson(detailContent);
-                if (!result.getList().isEmpty()) result.getList().get(0).setVodFlags();
-                if (!result.getList().isEmpty()) Source.get().parse(result.getList().get(0).getVodFlags());
-                return result;
-            } else if (site.isEmpty() && "push_agent".equals(key)) {
-                Vod vod = new Vod();
-                vod.setVodId(id);
-                vod.setVodName(id);
-                vod.setVodPic(ResUtil.getString(R.string.push_image));
-                vod.setVodFlags(Flag.create(ResUtil.getString(R.string.push), ResUtil.getString(R.string.play), id));
-                Source.get().parse(vod.getVodFlags());
-                return Result.vod(vod);
-            } else {
-                ArrayMap<String, String> params = new ArrayMap<>();
-                params.put("ac", site.getType() == 0 ? "videolist" : "detail");
-                params.put("ids", id);
-                String detailContent = call(site, params, true);
-                SpiderDebug.log(detailContent);
-                Result result = Result.fromType(site.getType(), detailContent);
-                if (!result.getList().isEmpty()) result.getList().get(0).setVodFlags();
-                if (!result.getList().isEmpty()) Source.get().parse(result.getList().get(0).getVodFlags());
-                return result;
+        execute(result, () -> getDetailResult(key, id));
+    }
+
+    private Result getDetailResult(String key, String id) throws Exception {
+        Site site = VodConfig.get().getSite(key);
+        if (site.isEmpty() && "push_agent".equals(key)) return getPushDetailResult(id);
+        Result lastResult = Result.empty();
+        for (int attempt = 1; attempt <= getDetailRetryCount(site); attempt++) {
+            try {
+                Result result = getDetailResultOnce(site, id);
+                if (!shouldRetryDetail(site, result, attempt)) return result;
+                lastResult = result;
+                SpiderDebug.log("detail retry: site=" + site.getName() + ", key=" + site.getKey() + ", id=" + id + ", attempt=" + attempt);
+            } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted()) throw e;
+                if (attempt >= getDetailRetryCount(site) || !shouldRetryDetail(site)) throw e;
+                SpiderDebug.log("detail retry after error: site=" + site.getName() + ", key=" + site.getKey() + ", id=" + id + ", attempt=" + attempt + ", error=" + e.getMessage());
             }
-        });
+            sleepDetailRetry(attempt);
+        }
+        return lastResult;
+    }
+
+    private Result getDetailResultOnce(Site site, String id) throws Exception {
+        Result result;
+        if (site.getType() == 3) {
+            Spider spider = site.recent().spider();
+            String detailContent = spider.detailContent(Arrays.asList(id));
+            SpiderDebug.log(detailContent);
+            result = Result.fromJson(detailContent);
+        } else {
+            ArrayMap<String, String> params = new ArrayMap<>();
+            params.put("ac", site.getType() == 0 ? "videolist" : "detail");
+            params.put("ids", id);
+            String detailContent = call(site, params, true);
+            SpiderDebug.log(detailContent);
+            result = Result.fromType(site.getType(), detailContent);
+        }
+        if (!result.getList().isEmpty()) result.getList().get(0).setVodFlags();
+        if (!result.getList().isEmpty()) Source.get().parse(result.getList().get(0).getVodFlags());
+        return result;
+    }
+
+    private Result getPushDetailResult(String id) throws Exception {
+        Vod vod = new Vod();
+        vod.setVodId(id);
+        vod.setVodName(id);
+        vod.setVodPic(ResUtil.getString(R.string.push_image));
+        vod.setVodFlags(Flag.create(ResUtil.getString(R.string.push), ResUtil.getString(R.string.play), id));
+        Source.get().parse(vod.getVodFlags());
+        return Result.vod(vod);
+    }
+
+    private int getDetailRetryCount(Site site) {
+        return shouldRetryDetail(site) ? DETAIL_RETRY_COUNT : 1;
+    }
+
+    private boolean shouldRetryDetail(Site site) {
+        return site.getType() == 3 || site.getType() == 4;
+    }
+
+    private boolean shouldRetryDetail(Site site, Result result, int attempt) {
+        return attempt < getDetailRetryCount(site) && result.getList().isEmpty();
+    }
+
+    private void sleepDetailRetry(int attempt) throws InterruptedException {
+        Thread.sleep(DETAIL_RETRY_DELAY_MS * attempt);
     }
 
     private void executePlayer(MutableLiveData<Result> data, String key, String flag, String id) {

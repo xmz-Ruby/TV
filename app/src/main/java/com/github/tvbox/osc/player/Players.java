@@ -65,6 +65,12 @@ import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCallback, DrawHandler.Callback {
 
     private static final String TAG = Players.class.getSimpleName();
+    private static final long BUFFER_STALL_CHECK_INTERVAL = 3_000L;
+    private static final long BUFFER_STALL_STARTUP_TIMEOUT = 15_000L;
+    private static final long BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT = 12_000L;
+    private static final long BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT = 12_000L;
+    private static final long BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT = 18_000L;
+    private static final long BUFFER_STALL_PLAYBACK_TIMEOUT = 25_000L;
 
     public static final int SYS = 0;
     public static final int IJK = 1;
@@ -76,6 +82,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private final StringBuilder builder;
     private final Formatter formatter;
     private final Runnable runnable;
+    private final Runnable stallRunnable;
     private final PlaybackLockManager playbackLockManager;
 
     private Map<String, String> headers;
@@ -93,10 +100,13 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private long position;
     private long prepareStartedAt;
+    private long bufferingStartedAt;
+    private long bufferingStartPosition;
     private int decode;
     private int count;
     private int player;
     private int retry;
+    private boolean buffering;
 
     public static Players create(Activity activity) {
         Players player = new Players(activity);
@@ -133,9 +143,11 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         decode = Setting.getDecode(player);
         builder = new StringBuilder();
         runnable = ErrorEvent::timeout;
+        stallRunnable = this::checkPlaybackStall;
         playbackLockManager = new PlaybackLockManager(activity);
         formatter = new Formatter(builder, Locale.getDefault());
         position = C.TIME_UNSET;
+        bufferingStartPosition = C.TIME_UNSET;
         createSession(activity);
     }
 
@@ -257,6 +269,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         position = C.TIME_UNSET;
         prepareStartedAt = 0;
         removeTimeoutCheck();
+        clearBufferingWatchdog();
         stopParse();
         count = 0;
         retry = 0;
@@ -503,6 +516,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void stop() {
         if (isExo()) stopExo();
         if (isIjk()) stopIjk();
+        clearBufferingWatchdog();
         playbackLockManager.release();
         session.setActive(false);
         if (haveDanmu()) danmuView.stop();
@@ -517,6 +531,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         playbackLockManager.release();
         if (haveDanmu()) danmuView.release();
         removeTimeoutCheck();
+        clearBufferingWatchdog();
         Server.get().setPlayer(null);
         App.execute(() -> Source.get().stop());
     }
@@ -621,6 +636,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private void setMediaSource(Map<String, String> headers, String url, String format, Drm drm, List<Sub> subs, int timeout) {
         prepareStartedAt = System.currentTimeMillis();
+        clearBufferingWatchdog();
         playbackLockManager.acquire();
         long startPosition = position == C.TIME_UNSET ? 0 : position;
         if (isIjk() && ijkPlayer != null) ijkPlayer.setMediaSource(IjkUtil.getSource(this.headers = checkUa(headers), this.url = url), startPosition);
@@ -647,6 +663,55 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private void removeTimeoutCheck() {
         App.removeCallbacks(runnable);
+    }
+
+    private void startBufferingWatchdog() {
+        long now = System.currentTimeMillis();
+        long currentPosition = getPosition();
+        if (!buffering || bufferingStartPosition == C.TIME_UNSET || Math.abs(currentPosition - bufferingStartPosition) > 1000) {
+            bufferingStartedAt = now;
+            bufferingStartPosition = currentPosition;
+        }
+        buffering = true;
+        App.removeCallbacks(stallRunnable);
+        App.post(stallRunnable, BUFFER_STALL_CHECK_INTERVAL);
+    }
+
+    private void clearBufferingWatchdog() {
+        buffering = false;
+        bufferingStartedAt = 0L;
+        bufferingStartPosition = C.TIME_UNSET;
+        App.removeCallbacks(stallRunnable);
+    }
+
+    private void checkPlaybackStall() {
+        if (!buffering || isRelease()) return;
+        long currentPosition = getPosition();
+        if (bufferingStartPosition == C.TIME_UNSET || Math.abs(currentPosition - bufferingStartPosition) > 1000) {
+            bufferingStartedAt = System.currentTimeMillis();
+            bufferingStartPosition = currentPosition;
+            App.post(stallRunnable, BUFFER_STALL_CHECK_INTERVAL);
+            return;
+        }
+        long elapsed = System.currentTimeMillis() - bufferingStartedAt;
+        long bufferedAhead = Math.max(0, getBuffered() - currentPosition);
+        long stallTimeout = getBufferingTimeout(currentPosition, bufferedAhead);
+        Logger.t(TAG).w("buffering stall elapsed=" + elapsed + "ms, timeout=" + stallTimeout + "ms, bufferedAhead=" + bufferedAhead + "ms, position=" + currentPosition + ", url=" + url);
+        if (elapsed >= stallTimeout) {
+            clearBufferingWatchdog();
+            ErrorEvent.timeout();
+            return;
+        }
+        App.post(stallRunnable, BUFFER_STALL_CHECK_INTERVAL);
+    }
+
+    private long getBufferingTimeout(long currentPosition, long bufferedAhead) {
+        if (currentPosition <= 0) {
+            return bufferedAhead >= 2_000L ? BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT : BUFFER_STALL_STARTUP_TIMEOUT;
+        }
+        if (bufferedAhead <= 0) return BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT;
+        if (bufferedAhead < 2_000L) return BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT;
+        return BUFFER_STALL_PLAYBACK_TIMEOUT;
     }
 
     public void setTrack(List<Track> tracks) {
@@ -820,6 +885,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void onPlayerError(@NonNull PlaybackException error) {
         logPrepareElapsed("error");
         removeTimeoutCheck();
+        clearBufferingWatchdog();
         playbackLockManager.release();
         Logger.t(TAG).e(error.errorCode + "," + url);
         ErrorEvent.url(ExoUtil.getRetry(error.errorCode), error.errorCode);
@@ -831,6 +897,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
             long bufferedAheadMs = Math.max(0, exoPlayer.getBufferedPosition() - exoPlayer.getCurrentPosition());
             Logger.t(TAG).i("exo state=" + state + ", bufferedAhead=" + bufferedAheadMs + "ms, bufferedPos=" + exoPlayer.getBufferedPosition() + ", currentPos=" + exoPlayer.getCurrentPosition());
         }
+        if (state == Player.STATE_BUFFERING) startBufferingWatchdog();
+        else clearBufferingWatchdog();
         if (state == Player.STATE_READY) {
             logPrepareElapsed("ready");
             removeTimeoutCheck();
@@ -842,11 +910,14 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void onInfo(IMediaPlayer mp, int what, int extra) {
         switch (what) {
             case IMediaPlayer.MEDIA_INFO_BUFFERING_START:
+                startBufferingWatchdog();
                 PlayerEvent.state(Player.STATE_BUFFERING);
                 break;
+            case IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START:
             case IMediaPlayer.MEDIA_INFO_BUFFERING_END:
             case IMediaPlayer.MEDIA_INFO_VIDEO_SEEK_RENDERING_START:
             case IMediaPlayer.MEDIA_INFO_AUDIO_SEEK_RENDERING_START:
+                clearBufferingWatchdog();
                 PlayerEvent.state(Player.STATE_READY);
                 break;
         }
@@ -856,6 +927,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public boolean onError(IMediaPlayer mp, int what, int extra) {
         logPrepareElapsed("ijk_error");
         removeTimeoutCheck();
+        clearBufferingWatchdog();
         playbackLockManager.release();
         setPlaybackState(PlaybackStateCompat.STATE_ERROR);
         ErrorEvent.url(1);
@@ -866,11 +938,13 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void onPrepared(IMediaPlayer mp) {
         logPrepareElapsed("ijk_ready");
         removeTimeoutCheck();
+        clearBufferingWatchdog();
         PlayerEvent.state(Player.STATE_READY);
     }
 
     @Override
     public void onCompletion(IMediaPlayer mp) {
+        clearBufferingWatchdog();
         playbackLockManager.release();
         PlayerEvent.state(Player.STATE_ENDED);
     }

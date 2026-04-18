@@ -13,10 +13,13 @@ public class Traffic {
     private static final DecimalFormat format = new DecimalFormat("#.0");
     private static final String UNIT_KB = " KB/s";
     private static final String UNIT_MB = " MB/s";
-    private static long lastTotalRxBytes;
+    private static final String DEFAULT_SPEED = "0 KB/s";
+    private static final long MIN_SAMPLE_INTERVAL_MS = 800L;
+    private static long lastTotalRxBytes = -1L;
     private static long lastTimeStamp;
+    private static String lastSpeed = DEFAULT_SPEED;
 
-    public static void setSpeed(TextView view) {
+    public static synchronized void setSpeed(TextView view) {
         if (unsupported()) return;
         view.setText(getSpeed());
         view.setVisibility(View.VISIBLE);
@@ -26,17 +29,32 @@ public class Traffic {
         return TrafficStats.getUidRxBytes(App.get().getApplicationInfo().uid) == TrafficStats.UNSUPPORTED;
     }
 
-    private static String getSpeed() {
-        long nowTimeStamp = System.currentTimeMillis();
-        long nowTotalRxBytes = TrafficStats.getTotalRxBytes() / 1024;
-        long speed = (nowTotalRxBytes - lastTotalRxBytes) * 1000 / Math.max(nowTimeStamp - lastTimeStamp, 1);
-        lastTimeStamp = nowTimeStamp;
-        lastTotalRxBytes = nowTotalRxBytes;
-        return speed < 1000 ? speed + UNIT_KB : format.format(speed / 1024f) + UNIT_MB;
+    private static long getUidRxBytes() {
+        long uidBytes = TrafficStats.getUidRxBytes(App.get().getApplicationInfo().uid);
+        return uidBytes == TrafficStats.UNSUPPORTED ? 0L : uidBytes / 1024;
     }
 
-    public static void reset() {
-        lastTotalRxBytes = 0;
-        lastTimeStamp = 0;
+    private static synchronized String getSpeed() {
+        long nowTimeStamp = System.currentTimeMillis();
+        long nowTotalRxBytes = getUidRxBytes();
+        if (lastTimeStamp <= 0 || lastTotalRxBytes < 0) {
+            lastTimeStamp = nowTimeStamp;
+            lastTotalRxBytes = nowTotalRxBytes;
+            lastSpeed = DEFAULT_SPEED;
+            return lastSpeed;
+        }
+        long elapsed = nowTimeStamp - lastTimeStamp;
+        if (elapsed < MIN_SAMPLE_INTERVAL_MS) return lastSpeed;
+        long speed = Math.max(0, nowTotalRxBytes - lastTotalRxBytes) * 1000 / Math.max(elapsed, 1);
+        lastTimeStamp = nowTimeStamp;
+        lastTotalRxBytes = nowTotalRxBytes;
+        lastSpeed = speed < 1000 ? speed + UNIT_KB : format.format(speed / 1024f) + UNIT_MB;
+        return lastSpeed;
+    }
+
+    public static synchronized void reset() {
+        lastTotalRxBytes = getUidRxBytes();
+        lastTimeStamp = System.currentTimeMillis();
+        lastSpeed = DEFAULT_SPEED;
     }
 }
