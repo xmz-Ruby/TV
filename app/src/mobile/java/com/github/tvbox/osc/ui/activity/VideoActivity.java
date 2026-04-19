@@ -38,9 +38,11 @@ import androidx.media3.ui.SubtitleView;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
 
+import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.github.tvbox.osc.App;
+import com.github.tvbox.osc.BuildConfig;
 import com.github.tvbox.osc.Constant;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.Setting;
@@ -134,6 +136,9 @@ import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 
 public class VideoActivity extends BaseActivity implements Clock.Callback, CustomKeyDownVod.Listener, TrackDialog.Listener, PlayerDialog.Listener, ControlDialog.Listener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, CastDialog.Listener, InfoDialog.Listener {
 
+    private static final long STARTUP_TIMEOUT_GRACE_MS = 12_000L;
+    private static final long STARTUP_RECOVERY_MIN_SPEED_KBPS = 256L;
+
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
     private Observer<Result> mObserveDetail;
@@ -164,6 +169,9 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private boolean rotate;
     private boolean stop;
     private boolean lock;
+    private boolean autoSwitchingFlag;
+    private boolean startupTimeoutGraceGranted;
+    private boolean startupTimeoutLineRetried;
     private int toggleCount;
     private int errorCount;
     private Runnable mR0;
@@ -173,6 +181,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private Runnable mR4;
     private Clock mClock;
     private PiP mPiP;
+    private CustomTarget<Drawable> mArtworkTarget;
+    private boolean destroyed;
 
     // DLNA投屏相关
     private com.android.cast.dlna.dmc.control.DeviceControl mCastControl;
@@ -562,10 +572,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private void setViewModel() {
         mViewModel = new ViewModelProvider(this).get(SiteViewModel.class);
-        mViewModel.result.observeForever(mObserveDetail);
-        mViewModel.player.observeForever(mObservePlayer);
-        mViewModel.search.observeForever(mObserveSearch);
-        mViewModel.download.observeForever(mObserveDownload);
+        mViewModel.result.observe(this, mObserveDetail);
+        mViewModel.player.observe(this, mObservePlayer);
+        mViewModel.search.observe(this, mObserveSearch);
+        mViewModel.download.observe(this, mObserveDownload);
         mViewModel.episode.observe(this, episode -> {
             onItemClick(episode);
             hideSheet();
@@ -602,6 +612,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setDetail(Result result) {
+        if (!isActivityAlive()) return;
         mBinding.swipeLayout.setRefreshing(false);
         if (result.getList().isEmpty()) setEmpty(result.hasMsg());
         else setDetail(result.getList().get(0));
@@ -628,6 +639,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setDetail(Vod item) {
+        if (!isActivityAlive()) return;
         mBinding.progressLayout.showContent();
         if (isFromDownload()) item.setVodName("");
         if (isFromDownload()) item.setVodPic("");
@@ -701,6 +713,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void getPlayer(Flag flag, Episode episode, boolean replay) {
+        startupTimeoutGraceGranted = false;
+        startupTimeoutLineRetried = false;
         mBinding.control.title.setText(getString(R.string.detail_title, mBinding.name.getText(), episode.getName()));
         mBinding.display.title.setText(mBinding.control.title.getText());
         mViewModel.playerContent(getKey(), flag.getFlag(), episode.getUrl());
@@ -714,6 +728,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setPlayer(Result result) {
+        if (!isActivityAlive()) return;
         result.getUrl().set(mQualityAdapter.getPosition());
         setUseParse(VodConfig.hasParse() && ((result.getPlayUrl().isEmpty() && VodConfig.get().getFlags().contains(result.getFlag())) || result.getJx() == 1));
         if (mControlDialog != null && mControlDialog.isVisible()) mControlDialog.setParseVisible(isUseParse());
@@ -733,17 +748,22 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setDownload(Result result) {
+        if (!isActivityAlive()) return;
         Downloader.get().result(result).start(this);
     }
 
     private void checkDanmu(String danmu) {
+        if (!isActivityAlive()) return;
         mBinding.danmaku.release();
         if (!Setting.isDanmuLoad() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) return;
         mBinding.danmaku.setVisibility(danmu.isEmpty() ? View.GONE : View.VISIBLE);
         if (danmu.length() > 0) {
             // 在prepare之前设置同步器到DanmakuContext，确保弹幕时间与视频时间同步
             mDanmakuContext.setDanmakuSync(new com.github.tvbox.osc.player.VideoPlayerSync(mPlayers));
-            App.execute(() -> mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext));
+            App.execute(() -> {
+                if (!isActivityAlive()) return;
+                mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext);
+            });
         }
     }
 
@@ -844,8 +864,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     @Override
     public void onItemClick(Result result) {
         try {
-            mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
-            mBinding.danmaku.hide();
+            restartPlayerWithResult(result, Math.max(0, mPlayers.getPosition()));
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
             e.printStackTrace();
@@ -881,17 +900,24 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void seamless(Flag flag) {
+        boolean forcePlayActivatedEpisode = autoSwitchingFlag;
+        autoSwitchingFlag = false;
         Episode episode = flag.find(mHistory.getVodRemarks(), getMark().isEmpty());
         setQualityVisible(episode != null && episode.isActivated() && mQualityAdapter.getItemCount() > 1);
-        if (episode == null || episode.isActivated()) return;
-        if (Setting.getFlag() == 1) {
+        if (episode == null) return;
+        if (Setting.getFlag() == 1 && !forcePlayActivatedEpisode) {
             episode.setSelected(true);
             mBinding.episode.scrollToPosition(mEpisodeAdapter.getPosition(episode));
-        } else {
-            mHistory.setVodRemarks(episode.getName());
-            onItemClick(episode);
-            hidePreview();
+            if (!episode.isActivated()) return;
         }
+        mHistory.setVodRemarks(episode.getName());
+        mHistory.setEpisodeUrl(episode.getUrl());
+        if (episode.isActivated()) {
+            onRefresh();
+        } else {
+            onItemClick(episode);
+        }
+        hidePreview();
     }
 
     private void setQualityVisible(boolean visible) {
@@ -1380,9 +1406,11 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setArtwork(String url) {
-        ImgUtil.load(url, R.drawable.radio, new CustomTarget<>() {
+        clearArtworkTarget();
+        mArtworkTarget = new CustomTarget<>() {
             @Override
             public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                if (!isActivityAlive()) return;
                 getExo().setDefaultArtwork(resource);
                 getIjk().setDefaultArtwork(resource);
                 showPreview(resource);
@@ -1390,6 +1418,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
             @Override
             public void onLoadFailed(@Nullable Drawable error) {
+                if (!isActivityAlive()) return;
                 getExo().setDefaultArtwork(error);
                 getIjk().setDefaultArtwork(error);
                 hidePreview();
@@ -1398,7 +1427,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             @Override
             public void onLoadCleared(@Nullable Drawable placeholder) {
             }
-        });
+        };
+        ImgUtil.load(url, R.drawable.radio, mArtworkTarget);
     }
 
     private void checkFlag(Vod item) {
@@ -1647,6 +1677,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         if (isRedirect()) return;
         if (addErrorCount() > 20) onErrorEnd(event);
         else if (event.isDecode() && mPlayers.canToggleDecode()) onDecode(false);
+        else if (shouldRetryCurrentLineAfterGrace(event)) retryCurrentLineAfterGrace();
+        else if (shouldGrantStartupTimeoutGrace(event)) grantStartupTimeoutGrace();
         else if (shouldSwitchQualityFirst(event)) switchQualityFirst();
         else if (shouldSwitchPlayerFirst(event)) switchPlayerFirst();
         else if (mPlayers.addRetry() > event.getRetry()) checkError(event);
@@ -1677,6 +1709,44 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         return position <= 0 && bufferedAhead >= 2_000L;
     }
 
+    private boolean shouldGrantStartupTimeoutGrace(ErrorEvent event) {
+        if (!isMobileMode()) return false;
+        if (event.getType() != ErrorEvent.Type.TIMEOUT || startupTimeoutGraceGranted || !startupTimeoutLineRetried) return false;
+        if (mQualityAdapter.getResult() == null) return false;
+        return hasStartupRecoverySignal();
+    }
+
+    private void grantStartupTimeoutGrace() {
+        startupTimeoutGraceGranted = true;
+        resetError();
+        resetToggle();
+        mPlayers.continueLoadingGrace(STARTUP_TIMEOUT_GRACE_MS);
+        Notify.show("加载较慢，继续等待...");
+    }
+
+    private boolean shouldRetryCurrentLineAfterGrace(ErrorEvent event) {
+        if (!isMobileMode()) return false;
+        if (event.getType() != ErrorEvent.Type.TIMEOUT || startupTimeoutLineRetried) return false;
+        if (mQualityAdapter.getResult() == null) return false;
+        return hasStartupRecoverySignal();
+    }
+
+    private void retryCurrentLineAfterGrace() {
+        Result result = mQualityAdapter.getResult();
+        if (result == null) return;
+        startupTimeoutLineRetried = true;
+        long resumePosition = Math.max(0, mPlayers.getPosition());
+        try {
+            resetError();
+            resetToggle();
+            restartPlayerWithResult(result, resumePosition);
+            Notify.show("长时间缓冲未出画面，重试当前线路...");
+        } catch (Exception e) {
+            ErrorEvent.extract(e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     private boolean shouldSwitchQualityFirst(ErrorEvent event) {
         return event.getType() == ErrorEvent.Type.TIMEOUT
                 && mQualityAdapter.getItemCount() > 1
@@ -1689,15 +1759,27 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         Result result = mQualityAdapter.getResult();
         mQualityAdapter.setPosition(nextQuality);
         result.getUrl().set(nextQuality);
-        mPlayers.setPosition(resumePosition);
         try {
-            mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
-            mBinding.danmaku.hide();
+            resetError();
+            resetToggle();
+            restartPlayerWithResult(result, resumePosition);
             notifyItemChanged(mQualityAdapter);
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private void restartPlayerWithResult(Result result, long resumePosition) throws Exception {
+        long safeResumePosition = Math.max(0, resumePosition);
+        mHistory.setPosition(safeResumePosition);
+        mPlayers.clear();
+        mPlayers.reset();
+        mPlayers.stop();
+        showProgress();
+        mPlayers.setPosition(safeResumePosition);
+        mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
+        mBinding.danmaku.hide();
     }
 
     private void switchPlayerFirst() {
@@ -1796,6 +1878,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setSearch(Result result) {
+        if (!isActivityAlive()) return;
         List<Vod> items = result.getList();
         Iterator<Vod> iterator = items.iterator();
         while (iterator.hasNext()) if (mismatch(iterator.next())) iterator.remove();
@@ -1823,6 +1906,11 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private void nextFlag(int position) {
         Flag flag = mFlagAdapter.get(position + 1);
         Notify.show(getString(R.string.play_switch_flag, flag.getFlag()));
+        autoSwitchingFlag = true;
+        mQualityAdapter.setPosition(0);
+        resetError();
+        resetToggle();
+        notifyItemChanged(mQualityAdapter);
         onItemClick(flag);
     }
 
@@ -1854,6 +1942,24 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     public void setForeground(boolean foreground) {
         this.foreground = foreground;
+    }
+
+    private boolean isActivityAlive() {
+        return !destroyed && !isFinishing() && (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1 || !isDestroyed());
+    }
+
+    private void clearArtworkTarget() {
+        if (mArtworkTarget == null) return;
+        Glide.with(App.get()).clear(mArtworkTarget);
+        mArtworkTarget = null;
+    }
+
+    private boolean isMobileMode() {
+        return "mobile".equals(BuildConfig.FLAVOR_mode);
+    }
+
+    private boolean hasStartupRecoverySignal() {
+        return mPlayers.hasStartupBufferingProgress() || Traffic.getLastSpeedKiloBytesPerSecond() >= STARTUP_RECOVERY_MIN_SPEED_KBPS;
     }
 
     private boolean isFullscreen() {
@@ -2953,7 +3059,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
+        destroyed = true;
+        clearArtworkTarget();
         stopSearch();
 
         // 清理投屏资源
@@ -2971,5 +3078,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mViewModel.result.removeObserver(mObserveDetail);
         mViewModel.player.removeObserver(mObservePlayer);
         mViewModel.search.removeObserver(mObserveSearch);
+        mViewModel.download.removeObserver(mObserveDownload);
+        super.onDestroy();
     }
 }

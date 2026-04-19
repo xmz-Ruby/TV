@@ -17,6 +17,7 @@ public class Traffic {
     private static final long MIN_SAMPLE_INTERVAL_MS = 800L;
     private static long lastTotalRxBytes = -1L;
     private static long lastTimeStamp;
+    private static long lastSpeedKiloBytesPerSecond;
     private static String lastSpeed = DEFAULT_SPEED;
 
     public static synchronized void setSpeed(TextView view) {
@@ -48,13 +49,19 @@ public class Traffic {
         long speed = Math.max(0, nowTotalRxBytes - lastTotalRxBytes) * 1000 / Math.max(elapsed, 1);
         lastTimeStamp = nowTimeStamp;
         lastTotalRxBytes = nowTotalRxBytes;
+        lastSpeedKiloBytesPerSecond = speed;
         lastSpeed = speed < 1000 ? speed + UNIT_KB : format.format(speed / 1024f) + UNIT_MB;
         return lastSpeed;
+    }
+
+    public static synchronized long getLastSpeedKiloBytesPerSecond() {
+        return lastSpeedKiloBytesPerSecond;
     }
 
     public static synchronized void reset() {
         lastTotalRxBytes = getUidRxBytes();
         lastTimeStamp = System.currentTimeMillis();
+        lastSpeedKiloBytesPerSecond = 0L;
         lastSpeed = DEFAULT_SPEED;
     }
 }

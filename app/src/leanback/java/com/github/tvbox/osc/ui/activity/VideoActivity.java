@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Build;
 import android.text.Html;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -35,6 +36,7 @@ import androidx.media3.ui.SubtitleView;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
 
+import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.github.tvbox.osc.App;
@@ -127,6 +129,8 @@ import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 
 public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback, com.github.tvbox.osc.impl.DanmuSettingCallback, com.github.tvbox.osc.ui.dialog.QualityDialog.Listener {
 
+    private static final long STARTUP_RECOVERY_MIN_SPEED_KBPS = 256L;
+
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
     private EpisodePresenter mEpisodePresenter;
@@ -154,6 +158,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private boolean initTrack;
     private boolean initAuto;
     private boolean autoMode;
+    private boolean autoSwitchingFlag;
+    private boolean startupTimeoutLineRetried;
     private boolean useParse;
     private int toggleCount;
     private int errorCount;
@@ -167,6 +173,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private View mFocus2;
     private boolean hasKeyEvent;
     private String mCurrentDanmaku;
+    private CustomTarget<Drawable> mArtworkTarget;
+    private boolean destroyed;
 
     public static void push(FragmentActivity activity, String text) {
         if (FileChooser.isValid(activity, Uri.parse(text))) file(activity, FileChooser.getPathFromUri(activity, Uri.parse(text)));
@@ -602,12 +610,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setDetail(Result result) {
+        if (!isActivityAlive()) return;
         if (result.getList().isEmpty()) setEmpty(result.hasMsg());
         else setDetail(result.getList().get(0));
         Notify.show(result.getMsg());
     }
 
     private void getPlayer(Flag flag, Episode episode, boolean replay) {
+        startupTimeoutLineRetried = false;
         mBinding.widget.title.setText(getString(R.string.detail_title, mBinding.name.getText(), episode.getName()));
         mBinding.display.title.setText(mBinding.widget.title.getText());
         mViewModel.playerContent(getKey(), flag.getFlag(), episode.getUrl());
@@ -622,6 +632,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setPlayer(Result result) {
+        if (!isActivityAlive()) return;
         result.getUrl().set(mQualityAdapter.getPosition());
         setUseParse(VodConfig.hasParse() && ((result.getPlayUrl().isEmpty() && VodConfig.get().getFlags().contains(result.getFlag())) || result.getJx() == 1));
 
@@ -644,6 +655,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void checkDanmu(String danmu) {
+        if (!isActivityAlive()) return;
         mCurrentDanmaku = danmu;
         mBinding.danmaku.release();
         updateDanmuControlsVisibility();
@@ -652,7 +664,10 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (danmu.length() > 0) {
             // 在prepare之前设置同步器到DanmakuContext，确保弹幕时间与视频时间同步
             mDanmakuContext.setDanmakuSync(new com.github.tvbox.osc.player.VideoPlayerSync(mPlayers));
-            App.execute(() -> mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext));
+            App.execute(() -> {
+                if (!isActivityAlive()) return;
+                mBinding.danmaku.prepare(new Parser(danmu), mDanmakuContext);
+            });
         }
     }
 
@@ -696,6 +711,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setDetail(Vod item) {
+        if (!isActivityAlive()) return;
         String currentName = mBinding.name.getText().toString();
         String newName = item.getVodName(getName());
 
@@ -963,6 +979,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void seamless(Flag flag) {
+        boolean forceFirstQuality = autoSwitchingFlag;
+        autoSwitchingFlag = false;
         // 从PlayStatus表恢复播放状态
         String vodName = mBinding.name.getText().toString();
         android.util.Log.d("VideoActivity.seamless", "====== 换源/换线路 ======");
@@ -1015,7 +1033,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                 episode = flag.find(status.getEpisodeName(), -1, true);
                 android.util.Log.d("VideoActivity.seamless", "匹配结果: " + (episode != null ? episode.getName() : "未匹配到"));
 
-                if (episode != null && !episode.isActivated()) {
+                if (episode != null) {
                     mHistory.setVodRemarks(episode.getName());
                     mHistory.setEpisodeUrl(episode.getUrl());
                     // 只有当历史位置有效时才恢复
@@ -1027,12 +1045,16 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                     }
 
                     // 恢复画质索引
-                    if (status.getQualityIndex() >= 0) {
+                    if (forceFirstQuality) {
+                        mQualityAdapter.setPosition(0);
+                        android.util.Log.d("VideoActivity.seamless", "自动切线路，画质索引重置为0");
+                    } else if (status.getQualityIndex() >= 0) {
                         mQualityAdapter.setPosition(status.getQualityIndex());
                         android.util.Log.d("VideoActivity.seamless", "恢复画质索引: " + status.getQualityIndex());
                     }
 
-                    setEpisodeActivated(episode);
+                    if (episode.isActivated()) onRefresh();
+                    else setEpisodeActivated(episode);
                     hidePreview();
                     Notify.show(getString(R.string.play_auto_match_episode, 0, episode.getName()));
                 }
@@ -1046,18 +1068,17 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (episode == null && flag.getEpisodes().size() > 0) {
             android.util.Log.d("VideoActivity.seamless", "PlayStatus表中没有记录或匹配失败，默认选第一集");
             Episode firstEpisode = flag.getEpisodes().get(0);
-            if (!firstEpisode.isActivated()) {
-                mHistory.setVodRemarks(firstEpisode.getName());
-                mHistory.setEpisodeUrl(firstEpisode.getUrl());
-                mHistory.setPosition(0);
-                mPendingResumePosition = 0;
+            mHistory.setVodRemarks(firstEpisode.getName());
+            mHistory.setEpisodeUrl(firstEpisode.getUrl());
+            mHistory.setPosition(0);
+            mPendingResumePosition = 0;
 
-                // 画质索引重置为0
-                mQualityAdapter.setPosition(0);
+            // 画质索引重置为0
+            mQualityAdapter.setPosition(0);
 
-                setEpisodeActivated(firstEpisode);
-                hidePreview();
-            }
+            if (firstEpisode.isActivated()) onRefresh();
+            else setEpisodeActivated(firstEpisode);
+            hidePreview();
         }
     }
 
@@ -1126,17 +1147,28 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
             // 在启动播放器之前设置position，确保播放器从正确的位置开始（关键！）
             if (mPendingResumePosition > 0) {
-                mPlayers.setPosition(mPendingResumePosition);
                 android.util.Log.d("VideoActivity.setQualityActivated", "已设置播放器位置: " + mPendingResumePosition + "ms");
             }
 
-            mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
-            mBinding.danmaku.hide();
+            restartPlayerWithResult(result, mPendingResumePosition);
             mQualityAdapter.notifyDataSetChanged();
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private void restartPlayerWithResult(Result result, long resumePosition) throws Exception {
+        long safeResumePosition = Math.max(0, resumePosition);
+        mPendingResumePosition = safeResumePosition;
+        mHistory.setPosition(safeResumePosition);
+        mPlayers.clear();
+        mPlayers.reset();
+        mPlayers.stop();
+        showProgress();
+        mPlayers.setPosition(safeResumePosition);
+        mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
+        if (mBinding.danmaku != null) mBinding.danmaku.hide();
     }
 
     private void reverseEpisode(boolean scroll) {
@@ -1677,9 +1709,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setArtwork(String url) {
-        ImgUtil.load(url, R.drawable.radio, new CustomTarget<>() {
+        clearArtworkTarget();
+        mArtworkTarget = new CustomTarget<>() {
             @Override
             public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                if (!isActivityAlive()) return;
                 getExo().setDefaultArtwork(resource);
                 getIjk().setDefaultArtwork(resource);
                 showPreview(resource);
@@ -1687,6 +1721,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
             @Override
             public void onLoadFailed(@Nullable Drawable error) {
+                if (!isActivityAlive()) return;
                 getExo().setDefaultArtwork(error);
                 getIjk().setDefaultArtwork(error);
                 hidePreview();
@@ -1695,7 +1730,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             @Override
             public void onLoadCleared(@Nullable Drawable placeholder) {
             }
-        });
+        };
+        ImgUtil.load(url, R.drawable.radio, mArtworkTarget);
     }
 
     private void getPart(String source) {
@@ -1716,6 +1752,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setPartAdapter(List<String> items) {
+        if (!isActivityAlive()) return;
         mBinding.part.setVisibility(View.VISIBLE);
         mPartAdapter.setItems(items, null);
         setR2Callback(1000);
@@ -1992,6 +2029,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (isBackground()) return;
         if (addErrorCount() > 20) onErrorEnd(event);
         else if (event.isDecode() && mPlayers.canToggleDecode()) onDecode(false);
+        else if (shouldRetryCurrentLineOnStartupTimeout(event)) retryCurrentLineOnStartupTimeout();
         else if (shouldSwitchQualityFirst(event)) switchQualityFirst();
         else if (shouldSwitchPlayerFirst(event)) switchPlayerFirst();
         else if (mPlayers.addRetry() > event.getRetry()) checkError(event);
@@ -2022,6 +2060,28 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         return position <= 0 && bufferedAhead >= 2_000L;
     }
 
+    private boolean shouldRetryCurrentLineOnStartupTimeout(ErrorEvent event) {
+        if (event.getType() != ErrorEvent.Type.TIMEOUT || startupTimeoutLineRetried) return false;
+        if (mQualityAdapter.getResult() == null) return false;
+        return mPlayers.hasStartupBufferingProgress() || Traffic.getLastSpeedKiloBytesPerSecond() >= STARTUP_RECOVERY_MIN_SPEED_KBPS;
+    }
+
+    private void retryCurrentLineOnStartupTimeout() {
+        Result result = mQualityAdapter.getResult();
+        if (result == null) return;
+        startupTimeoutLineRetried = true;
+        long resumePosition = Math.max(0, mPlayers.getPosition());
+        try {
+            resetError();
+            resetToggle();
+            restartPlayerWithResult(result, resumePosition);
+            Notify.show("长时间缓冲未出画面，重试当前线路...");
+        } catch (Exception e) {
+            ErrorEvent.extract(e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     private boolean shouldSwitchQualityFirst(ErrorEvent event) {
         int qualityCount = mQualityAdapter.getResult().getUrl().getValues().size();
         return event.getType() == ErrorEvent.Type.TIMEOUT
@@ -2035,10 +2095,10 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         Result result = mQualityAdapter.getResult();
         mQualityAdapter.setPosition(nextQuality);
         result.getUrl().set(nextQuality);
-        mPlayers.setPosition(resumePosition);
         try {
-            mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
-            if (mBinding.danmaku != null) mBinding.danmaku.hide();
+            resetError();
+            resetToggle();
+            restartPlayerWithResult(result, resumePosition);
             notifyItemChanged(mBinding.quality, mQualityAdapter);
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
@@ -2148,6 +2208,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setSearch(Result result) {
+        if (!isActivityAlive()) return;
         List<Vod> items = result.getList();
         Iterator<Vod> iterator = items.iterator();
         while (iterator.hasNext()) if (mismatch(iterator.next())) iterator.remove();
@@ -2159,8 +2220,19 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void setSearch(Vod item) {
+        if (!isActivityAlive()) return;
         setAutoMode(false);
         getDetail(item);
+    }
+
+    private boolean isActivityAlive() {
+        return !destroyed && !isFinishing() && (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1 || !isDestroyed());
+    }
+
+    private void clearArtworkTarget() {
+        if (mArtworkTarget == null) return;
+        Glide.with(App.get()).clear(mArtworkTarget);
+        mArtworkTarget = null;
     }
 
     private boolean mismatch(Vod item) {
@@ -2181,7 +2253,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private void nextFlag(int position) {
         Flag flag = (Flag) mFlagAdapter.get(position + 1);
         Notify.show(getString(R.string.play_switch_flag, flag.getFlag()));
+        autoSwitchingFlag = true;
+        mQualityAdapter.setPosition(0);
         resetError(); // 重置错误计数，允许新线路重试
+        resetToggle();
+        notifyItemChanged(mBinding.quality, mQualityAdapter);
         setFlagActivated(flag);
     }
 
@@ -2495,12 +2571,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
+        destroyed = true;
+        clearArtworkTarget();
         stopSearch();
         mClock.release();
         mPlayers.release();
         Source.get().stop();
         RefreshEvent.history();
         App.removeCallbacks(mR1, mR2, mR3, mR4);
+        super.onDestroy();
     }
 }

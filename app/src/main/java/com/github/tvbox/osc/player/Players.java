@@ -12,6 +12,7 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.media3.common.AudioAttributes;
@@ -23,6 +24,7 @@ import androidx.media3.exoplayer.util.EventLogger;
 import androidx.media3.ui.PlayerView;
 
 import com.github.tvbox.osc.App;
+import com.github.tvbox.osc.BuildConfig;
 import com.github.tvbox.osc.Constant;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.Setting;
@@ -66,11 +68,34 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private static final String TAG = Players.class.getSimpleName();
     private static final long BUFFER_STALL_CHECK_INTERVAL = 3_000L;
+    private static final long STARTUP_BUFFERED_AHEAD_THRESHOLD_MS = 1_500L;
+    private static final long BUFFER_PROGRESS_RESET_THRESHOLD_MS = 1_000L;
+    private static final long BUFFER_PROGRESS_RESET_THRESHOLD_BYTES = 512 * 1024L;
     private static final long BUFFER_STALL_STARTUP_TIMEOUT = 15_000L;
     private static final long BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT = 12_000L;
     private static final long BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT = 12_000L;
     private static final long BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT = 18_000L;
     private static final long BUFFER_STALL_PLAYBACK_TIMEOUT = 25_000L;
+    private static final long MOBILE_BUFFER_STALL_STARTUP_TIMEOUT = 20_000L;
+    private static final long MOBILE_BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT = 18_000L;
+    private static final long MOBILE_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT = 16_000L;
+    private static final long MOBILE_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT = 22_000L;
+    private static final long MOBILE_BUFFER_STALL_PLAYBACK_TIMEOUT = 30_000L;
+    private static final long LEANBACK_BUFFER_STALL_STARTUP_TIMEOUT = 24_000L;
+    private static final long LEANBACK_BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT = 21_000L;
+    private static final long LEANBACK_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT = 20_000L;
+    private static final long LEANBACK_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT = 28_000L;
+    private static final long LEANBACK_BUFFER_STALL_PLAYBACK_TIMEOUT = 36_000L;
+    private static final long LOW_PERFORMANCE_TV_BUFFER_STALL_STARTUP_TIMEOUT = 22_000L;
+    private static final long LOW_PERFORMANCE_TV_BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT = 18_000L;
+    private static final long LOW_PERFORMANCE_TV_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT = 18_000L;
+    private static final long LOW_PERFORMANCE_TV_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT = 24_000L;
+    private static final long LOW_PERFORMANCE_TV_BUFFER_STALL_PLAYBACK_TIMEOUT = 32_000L;
+    private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_STARTUP_TIMEOUT = 30_000L;
+    private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT = 26_000L;
+    private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT = 24_000L;
+    private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT = 34_000L;
+    private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_PLAYBACK_TIMEOUT = 42_000L;
 
     public static final int SYS = 0;
     public static final int IJK = 1;
@@ -88,9 +113,11 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private Map<String, String> headers;
     private MediaSessionCompat session;
     private IjkVideoView ijkPlayer;
+    private IjkVideoView ijkView;
     private DanmakuView danmuView;
     private VideoPlayerSync danmuSync;
     private ExoPlayer exoPlayer;
+    private PlayerView exoView;
     private ParseJob parseJob;
     private List<Sub> subs;
     private String format;
@@ -102,6 +129,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private long prepareStartedAt;
     private long bufferingStartedAt;
     private long bufferingStartPosition;
+    private long bufferingStartBufferedPosition;
+    private long bufferingStartCachedBytes;
     private int decode;
     private int count;
     private int player;
@@ -148,6 +177,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         formatter = new Formatter(builder, Locale.getDefault());
         position = C.TIME_UNSET;
         bufferingStartPosition = C.TIME_UNSET;
+        bufferingStartBufferedPosition = C.TIME_UNSET;
         createSession(activity);
     }
 
@@ -162,8 +192,10 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void init(PlayerView exo, IjkVideoView ijk) {
         releaseExo();
         releaseIjk();
-        initExo(exo);
-        initIjk(ijk);
+        exoView = exo;
+        ijkView = ijk;
+        initExo(exoView);
+        initIjk(ijkView);
     }
 
     private void initExo(PlayerView view) {
@@ -326,6 +358,12 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public long getCachedBytes() {
         if (isIjk() && ijkPlayer != null) return ijkPlayer.getCachedBytes();
         return 0;
+    }
+
+    public boolean hasStartupBufferingProgress() {
+        long currentPosition = Math.max(0, getPosition());
+        long bufferedAhead = Math.max(0, getBuffered() - currentPosition);
+        return currentPosition <= 0 && (bufferedAhead >= STARTUP_BUFFERED_AHEAD_THRESHOLD_MS || getCachedBytes() >= BUFFER_PROGRESS_RESET_THRESHOLD_BYTES);
     }
 
     private boolean haveDanmu() {
@@ -514,8 +552,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public void stop() {
-        if (isExo()) stopExo();
-        if (isIjk()) stopIjk();
+        stopExo();
+        stopIjk();
         clearBufferingWatchdog();
         playbackLockManager.release();
         session.setActive(false);
@@ -526,8 +564,10 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void release() {
         stopParse();
         session.release();
-        if (isExo()) releaseExo();
-        if (isIjk()) releaseIjk();
+        releaseExo();
+        releaseIjk();
+        exoView = null;
+        ijkView = null;
         playbackLockManager.release();
         if (haveDanmu()) danmuView.release();
         removeTimeoutCheck();
@@ -582,26 +622,41 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private void stopExo() {
         if (exoPlayer == null) return;
-        exoPlayer.stop();
-        exoPlayer.clearMediaItems();
+        runPlayerAction("stopExo", () -> {
+            exoPlayer.stop();
+            exoPlayer.clearMediaItems();
+        });
     }
 
     private void stopIjk() {
         if (ijkPlayer == null) return;
-        ijkPlayer.stop();
+        runPlayerAction("stopIjk", ijkPlayer::stop);
     }
 
     private void releaseExo() {
         if (exoPlayer == null) return;
-        exoPlayer.removeListener(this);
-        exoPlayer.release();
+        ExoPlayer player = exoPlayer;
         exoPlayer = null;
+        runPlayerAction("releaseExo", () -> {
+            player.removeListener(this);
+            if (exoView != null && exoView.getPlayer() == player) exoView.setPlayer(null);
+            player.release();
+        });
     }
 
     private void releaseIjk() {
         if (ijkPlayer == null) return;
-        ijkPlayer.release();
+        IjkVideoView player = ijkPlayer;
         ijkPlayer = null;
+        runPlayerAction("releaseIjk", player::release);
+    }
+
+    private void runPlayerAction(String action, Runnable runnable) {
+        try {
+            runnable.run();
+        } catch (Throwable e) {
+            Log.w(TAG, action + " failed", e);
+        }
     }
 
     private void startParse(Result result, boolean useParse) {
@@ -620,6 +675,14 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     public void setMediaSource(String url) {
         setMediaSource(new HashMap<>(), url);
+    }
+
+    public void continueLoadingGrace(long timeout) {
+        if (isRelease()) return;
+        prepareStartedAt = System.currentTimeMillis();
+        removeTimeoutCheck();
+        App.post(runnable, timeout);
+        startBufferingWatchdog();
     }
 
     private void setMediaSource(Map<String, String> headers, String url) {
@@ -649,8 +712,14 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private long getPrepareTimeout(int timeout) {
         long prepareTimeout = timeout;
-        if (isExo() && ExoUtil.isArmeabiV7aOnly()) {
-            prepareTimeout = Math.max(timeout, 30_000L);
+        if (isMobileMode()) {
+            prepareTimeout = Math.max(timeout, 25_000L);
+        }
+        if (isLeanbackMode()) {
+            prepareTimeout = Math.max(prepareTimeout, 35_000L);
+        }
+        if (isExo() && isLowPerformanceTv()) {
+            prepareTimeout = Math.max(prepareTimeout, 45_000L);
         }
         return prepareTimeout;
     }
@@ -668,9 +737,13 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private void startBufferingWatchdog() {
         long now = System.currentTimeMillis();
         long currentPosition = getPosition();
-        if (!buffering || bufferingStartPosition == C.TIME_UNSET || Math.abs(currentPosition - bufferingStartPosition) > 1000) {
+        long currentBufferedPosition = getBuffered();
+        long currentCachedBytes = getCachedBytes();
+        if (!buffering || hasBufferingProgress(currentPosition, currentBufferedPosition, currentCachedBytes)) {
             bufferingStartedAt = now;
             bufferingStartPosition = currentPosition;
+            bufferingStartBufferedPosition = currentBufferedPosition;
+            bufferingStartCachedBytes = currentCachedBytes;
         }
         buffering = true;
         App.removeCallbacks(stallRunnable);
@@ -681,22 +754,28 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         buffering = false;
         bufferingStartedAt = 0L;
         bufferingStartPosition = C.TIME_UNSET;
+        bufferingStartBufferedPosition = C.TIME_UNSET;
+        bufferingStartCachedBytes = 0L;
         App.removeCallbacks(stallRunnable);
     }
 
     private void checkPlaybackStall() {
         if (!buffering || isRelease()) return;
         long currentPosition = getPosition();
-        if (bufferingStartPosition == C.TIME_UNSET || Math.abs(currentPosition - bufferingStartPosition) > 1000) {
+        long currentBufferedPosition = getBuffered();
+        long currentCachedBytes = getCachedBytes();
+        if (hasBufferingProgress(currentPosition, currentBufferedPosition, currentCachedBytes)) {
             bufferingStartedAt = System.currentTimeMillis();
             bufferingStartPosition = currentPosition;
+            bufferingStartBufferedPosition = currentBufferedPosition;
+            bufferingStartCachedBytes = currentCachedBytes;
             App.post(stallRunnable, BUFFER_STALL_CHECK_INTERVAL);
             return;
         }
         long elapsed = System.currentTimeMillis() - bufferingStartedAt;
-        long bufferedAhead = Math.max(0, getBuffered() - currentPosition);
+        long bufferedAhead = Math.max(0, currentBufferedPosition - currentPosition);
         long stallTimeout = getBufferingTimeout(currentPosition, bufferedAhead);
-        Logger.t(TAG).w("buffering stall elapsed=" + elapsed + "ms, timeout=" + stallTimeout + "ms, bufferedAhead=" + bufferedAhead + "ms, position=" + currentPosition + ", url=" + url);
+        Logger.t(TAG).w("buffering stall elapsed=" + elapsed + "ms, timeout=" + stallTimeout + "ms, bufferedAhead=" + bufferedAhead + "ms, position=" + currentPosition + ", bufferedPos=" + currentBufferedPosition + ", cachedBytes=" + currentCachedBytes + ", url=" + url);
         if (elapsed >= stallTimeout) {
             clearBufferingWatchdog();
             ErrorEvent.timeout();
@@ -705,13 +784,57 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         App.post(stallRunnable, BUFFER_STALL_CHECK_INTERVAL);
     }
 
+    private boolean hasBufferingProgress(long currentPosition, long currentBufferedPosition, long currentCachedBytes) {
+        if (bufferingStartPosition == C.TIME_UNSET) return true;
+        if (Math.abs(currentPosition - bufferingStartPosition) > BUFFER_PROGRESS_RESET_THRESHOLD_MS) return true;
+        if (bufferingStartBufferedPosition != C.TIME_UNSET && currentBufferedPosition - bufferingStartBufferedPosition > BUFFER_PROGRESS_RESET_THRESHOLD_MS) return true;
+        return currentCachedBytes - bufferingStartCachedBytes > BUFFER_PROGRESS_RESET_THRESHOLD_BYTES;
+    }
+
     private long getBufferingTimeout(long currentPosition, long bufferedAhead) {
+        boolean mobileMode = isMobileMode();
+        boolean leanbackMode = isLeanbackMode();
+        boolean lowPerformanceTv = isLowPerformanceTv();
         if (currentPosition <= 0) {
+            if (lowPerformanceTv) {
+                return bufferedAhead >= 2_000L ? VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT : VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_STARTUP_TIMEOUT;
+            }
+            if (leanbackMode) {
+                return bufferedAhead >= 2_000L ? LEANBACK_BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT : LEANBACK_BUFFER_STALL_STARTUP_TIMEOUT;
+            }
+            if (mobileMode) {
+                return bufferedAhead >= 2_000L ? MOBILE_BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT : MOBILE_BUFFER_STALL_STARTUP_TIMEOUT;
+            }
             return bufferedAhead >= 2_000L ? BUFFER_STALL_BUFFERED_STARTUP_TIMEOUT : BUFFER_STALL_STARTUP_TIMEOUT;
         }
-        if (bufferedAhead <= 0) return BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT;
-        if (bufferedAhead < 2_000L) return BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT;
+        if (bufferedAhead <= 0) {
+            if (lowPerformanceTv) return VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT;
+            if (leanbackMode) return LEANBACK_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT;
+            if (mobileMode) return MOBILE_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT;
+            return BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT;
+        }
+        if (bufferedAhead < 2_000L) {
+            if (lowPerformanceTv) return VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT;
+            if (leanbackMode) return LEANBACK_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT;
+            if (mobileMode) return MOBILE_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT;
+            return BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT;
+        }
+        if (lowPerformanceTv) return VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_PLAYBACK_TIMEOUT;
+        if (leanbackMode) return LEANBACK_BUFFER_STALL_PLAYBACK_TIMEOUT;
+        if (mobileMode) return MOBILE_BUFFER_STALL_PLAYBACK_TIMEOUT;
         return BUFFER_STALL_PLAYBACK_TIMEOUT;
+    }
+
+    private boolean isMobileMode() {
+        return "mobile".equals(BuildConfig.FLAVOR_mode);
+    }
+
+    private boolean isLeanbackMode() {
+        return "leanback".equals(BuildConfig.FLAVOR_mode);
+    }
+
+    private boolean isLowPerformanceTv() {
+        return isLeanbackMode() && ExoUtil.isArmeabiV7aOnly();
     }
 
     public void setTrack(List<Track> tracks) {
