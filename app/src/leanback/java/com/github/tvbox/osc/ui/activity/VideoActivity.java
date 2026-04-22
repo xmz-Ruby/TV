@@ -130,6 +130,7 @@ import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 public class VideoActivity extends BaseActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, TrackDialog.ChooserListener, PlayerDialog.Listener, ArrayPresenter.OnClickListener, Clock.Callback, com.github.tvbox.osc.impl.DanmuSettingCallback, com.github.tvbox.osc.ui.dialog.QualityDialog.Listener {
 
     private static final long STARTUP_RECOVERY_MIN_SPEED_KBPS = 256L;
+    private static final int RETRY_TIMEOUT_MULTIPLIER = 2;
 
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
@@ -602,6 +603,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         getIntent().putExtra("key", item.getSiteKey());
         getIntent().putExtra("pic", item.getVodPic());
         getIntent().putExtra("id", item.getVodId());
+        mQualityAdapter.setPosition(0);
         mBinding.scroll.scrollTo(0, 0);
         mClock.setCallback(null);
         mPlayers.reset();
@@ -907,6 +909,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private void setFlagActivated(Flag item) {
         if (mFlagAdapter.size() == 0 || item.isActivated()) return;
         if (mFlagAdapter.indexOf(item) == -1) item.setFlag(((Flag) mFlagAdapter.get(0)).getFlag());
+        if (mPlayers.getPosition() <= 0) {
+            autoSwitchingFlag = true;
+            mQualityAdapter.setPosition(0);
+            android.util.Log.d("VideoActivity.setFlagActivated", "当前未成功起播，切线路时强制从第一个画质开始");
+        }
 
         android.util.Log.d("VideoActivity.setFlagActivated", "手动切换线路: " + item.getFlag());
 
@@ -1159,6 +1166,10 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void restartPlayerWithResult(Result result, long resumePosition) throws Exception {
+        restartPlayerWithResult(result, resumePosition, getPlayTimeout());
+    }
+
+    private void restartPlayerWithResult(Result result, long resumePosition, int timeout) throws Exception {
         long safeResumePosition = Math.max(0, resumePosition);
         mPendingResumePosition = safeResumePosition;
         mHistory.setPosition(safeResumePosition);
@@ -1167,8 +1178,19 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mPlayers.stop();
         showProgress();
         mPlayers.setPosition(safeResumePosition);
-        mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
+        mPlayers.start(result, isUseParse(), timeout);
         if (mBinding.danmaku != null) mBinding.danmaku.hide();
+    }
+
+    private int getPlayTimeout() {
+        return getSite().isChangeable() ? getSite().getTimeout() : -1;
+    }
+
+    private int getRetryPlayTimeout() {
+        int timeout = getPlayTimeout();
+        if (timeout <= 0) return Constant.TIMEOUT_PLAY * RETRY_TIMEOUT_MULTIPLIER;
+        long retryTimeout = (long) timeout * RETRY_TIMEOUT_MULTIPLIER;
+        return retryTimeout > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) retryTimeout;
     }
 
     private void reverseEpisode(boolean scroll) {
@@ -2074,7 +2096,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         try {
             resetError();
             resetToggle();
-            restartPlayerWithResult(result, resumePosition);
+            restartPlayerWithResult(result, resumePosition, getRetryPlayTimeout());
             Notify.show("长时间缓冲未出画面，重试当前线路...");
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());

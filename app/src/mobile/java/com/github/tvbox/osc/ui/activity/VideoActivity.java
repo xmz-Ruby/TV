@@ -138,6 +138,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private static final long STARTUP_TIMEOUT_GRACE_MS = 12_000L;
     private static final long STARTUP_RECOVERY_MIN_SPEED_KBPS = 256L;
+    private static final int RETRY_TIMEOUT_MULTIPLIER = 2;
 
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
@@ -601,6 +602,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         getIntent().putExtra("key", item.getSiteKey());
         getIntent().putExtra("pic", item.getVodPic());
         getIntent().putExtra("id", item.getVodId());
+        mQualityAdapter.setPosition(0);
         updateDownloadView();
         mBinding.swipeLayout.setRefreshing(true);
         mBinding.swipeLayout.setEnabled(false);
@@ -838,6 +840,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     @Override
     public void onItemClick(Flag item) {
         if (item.isActivated()) return;
+        if (mPlayers.getPosition() <= 0) {
+            autoSwitchingFlag = true;
+            mQualityAdapter.setPosition(0);
+        }
         mFlagAdapter.setActivated(item);
         mBinding.flag.scrollToPosition(mFlagAdapter.getPosition());
         setEpisodeAdapter(item.getEpisodes());
@@ -1739,7 +1745,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         try {
             resetError();
             resetToggle();
-            restartPlayerWithResult(result, resumePosition);
+            restartPlayerWithResult(result, resumePosition, getRetryPlayTimeout());
             Notify.show("长时间缓冲未出画面，重试当前线路...");
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
@@ -1771,6 +1777,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void restartPlayerWithResult(Result result, long resumePosition) throws Exception {
+        restartPlayerWithResult(result, resumePosition, getPlayTimeout());
+    }
+
+    private void restartPlayerWithResult(Result result, long resumePosition, int timeout) throws Exception {
         long safeResumePosition = Math.max(0, resumePosition);
         mHistory.setPosition(safeResumePosition);
         mPlayers.clear();
@@ -1778,7 +1788,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mPlayers.stop();
         showProgress();
         mPlayers.setPosition(safeResumePosition);
-        mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
+        mPlayers.start(result, isUseParse(), timeout);
         mBinding.danmaku.hide();
     }
 
@@ -1960,6 +1970,17 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private boolean hasStartupRecoverySignal() {
         return mPlayers.hasStartupBufferingProgress() || Traffic.getLastSpeedKiloBytesPerSecond() >= STARTUP_RECOVERY_MIN_SPEED_KBPS;
+    }
+
+    private int getPlayTimeout() {
+        return getSite().isChangeable() ? getSite().getTimeout() : -1;
+    }
+
+    private int getRetryPlayTimeout() {
+        int timeout = getPlayTimeout();
+        if (timeout <= 0) return Constant.TIMEOUT_PLAY * RETRY_TIMEOUT_MULTIPLIER;
+        long retryTimeout = (long) timeout * RETRY_TIMEOUT_MULTIPLIER;
+        return retryTimeout > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) retryTimeout;
     }
 
     private boolean isFullscreen() {
