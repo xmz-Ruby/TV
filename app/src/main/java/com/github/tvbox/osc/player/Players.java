@@ -218,8 +218,10 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         }
         exoPlayer = builder.build();
         exoPlayer.setAudioAttributes(AudioAttributes.DEFAULT, !Setting.isPlayWithOthers());
-        if (!ExoUtil.isLowPerformanceTv()) exoPlayer.addAnalyticsListener(new EventLogger());
-        exoPlayer.addAnalyticsListener(new DroppedFrameListener());
+        if (!ExoUtil.isLowPerformanceTv()) {
+            exoPlayer.addAnalyticsListener(new EventLogger());
+            exoPlayer.addAnalyticsListener(new DroppedFrameListener());
+        }
         exoPlayer.setHandleAudioBecomingNoisy(true);
         // Note: Media3 1.9.2 no longer supports dynamic surface type switching at runtime
         // Surface type is now set via XML attribute or during view creation
