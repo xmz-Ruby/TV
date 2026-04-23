@@ -129,10 +129,16 @@ public class ExoUtil {
 
     public static TrackSelector buildTrackSelector() {
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(App.get());
-        trackSelector.setParameters(trackSelector.buildUponParameters()
+        DefaultTrackSelector.Parameters.Builder params = trackSelector.buildUponParameters()
                 .setPreferredTextLanguage(Locale.getDefault().getISO3Language())
                 .setForceHighestSupportedBitrate(shouldForceHighestSupportedBitrate())
-                .setTunnelingEnabled(Setting.isTunnel() && !isArmeabiV7aOnly()));
+                .setTunnelingEnabled(Setting.isTunnel() && !isArmeabiV7aOnly());
+        if (isLowPerformanceTv()) {
+            params.setMaxVideoSize(1280, 720)
+                    .setMaxVideoFrameRate(30)
+                    .setExceedVideoConstraintsIfNecessary(true);
+        }
+        trackSelector.setParameters(params);
         return trackSelector;
     }
 

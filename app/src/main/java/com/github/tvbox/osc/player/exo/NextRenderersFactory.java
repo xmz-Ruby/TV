@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.player.exo;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
 
 import androidx.annotation.NonNull;
@@ -9,6 +10,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.Renderer;
 import androidx.media3.exoplayer.audio.AudioRendererEventListener;
 import androidx.media3.exoplayer.audio.AudioSink;
+import androidx.media3.exoplayer.mediacodec.DefaultMediaCodecAdapterFactory;
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer;
 import androidx.media3.exoplayer.video.VideoRendererEventListener;
@@ -24,13 +26,18 @@ public class NextRenderersFactory extends DefaultRenderersFactory {
 
     private static final String TAG = NextRenderersFactory.class.getSimpleName();
     private static final int DROPPED_FRAME_NOTIFY_THRESHOLD = 5;
+    private static final long LOW_PERF_TV_LATE_THRESHOLD_US = 10_000L;
+
+    private final boolean lowPerfTv;
 
     public NextRenderersFactory(@NonNull Context context, int decode) {
         super(context);
+        lowPerfTv = ExoUtil.isLowPerformanceTv();
         setEnableDecoderFallback(true);
         setExtensionRendererMode(Players.isHard(decode) ? EXTENSION_RENDERER_MODE_ON : EXTENSION_RENDERER_MODE_PREFER);
-        if (ExoUtil.isLowPerformanceTv()) {
+        if (lowPerfTv) {
             setEnableMediaCodecVideoRendererDurationToProgressUs(true);
+            experimentalSetLateThresholdToDropDecoderInputUs(LOW_PERF_TV_LATE_THRESHOLD_US);
         }
     }
 
@@ -52,16 +59,20 @@ public class NextRenderersFactory extends DefaultRenderersFactory {
 
     @Override
     protected void buildVideoRenderers(@NonNull Context context, int extensionRendererMode, @NonNull MediaCodecSelector mediaCodecSelector, boolean enableDecoderFallback, @NonNull Handler eventHandler, @NonNull VideoRendererEventListener eventListener, long allowedVideoJoiningTimeMs, @NonNull ArrayList<Renderer> out) {
-        MediaCodecVideoRenderer videoRenderer = new MediaCodecVideoRenderer.Builder(context)
-                .setCodecAdapterFactory(getCodecAdapterFactory())
+        MediaCodecVideoRenderer.Builder videoRendererBuilder = new MediaCodecVideoRenderer.Builder(context)
+                .setCodecAdapterFactory(buildCodecAdapterFactory(context))
                 .setMediaCodecSelector(mediaCodecSelector)
                 .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
                 .setEnableDecoderFallback(enableDecoderFallback)
                 .setEventHandler(eventHandler)
                 .setEventListener(eventListener)
-                .setMaxDroppedFramesToNotify(DROPPED_FRAME_NOTIFY_THRESHOLD)
-                .build();
-        out.add(videoRenderer);
+                .setMaxDroppedFramesToNotify(DROPPED_FRAME_NOTIFY_THRESHOLD);
+        if (lowPerfTv) {
+            videoRendererBuilder
+                    .experimentalSetLateThresholdToDropDecoderInputUs(LOW_PERF_TV_LATE_THRESHOLD_US)
+                    .setEnableDurationToProgressUs(true);
+        }
+        out.add(videoRendererBuilder.build());
         if (extensionRendererMode == EXTENSION_RENDERER_MODE_ON) return;
         int extensionRendererIndex = out.size();
         try {
@@ -71,5 +82,13 @@ public class NextRenderersFactory extends DefaultRenderersFactory {
         } catch (Exception e) {
             throw new RuntimeException("Error instantiating Ffmpeg extension", e);
         }
+    }
+
+    private DefaultMediaCodecAdapterFactory buildCodecAdapterFactory(Context context) {
+        DefaultMediaCodecAdapterFactory factory = new DefaultMediaCodecAdapterFactory(context);
+        if (lowPerfTv && Build.VERSION.SDK_INT >= 23) {
+            factory.forceEnableAsynchronous();
+        }
+        return factory;
     }
 }

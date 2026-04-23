@@ -213,6 +213,9 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
                 .setMediaSourceFactory(ExoUtil.buildMediaSourceFactory())
                 .setPlaybackLooper(playbackThread.getLooper())
                 .experimentalSetDynamicSchedulingEnabled(true);
+        if (ExoUtil.isLowPerformanceTv()) {
+            builder.setStuckPlayingDetectionTimeoutMs(30_000);
+        }
         exoPlayer = builder.build();
         exoPlayer.setAudioAttributes(AudioAttributes.DEFAULT, !Setting.isPlayWithOthers());
         exoPlayer.addAnalyticsListener(new EventLogger());
