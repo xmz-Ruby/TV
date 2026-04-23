@@ -7,6 +7,8 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.HandlerThread;
+import android.os.Process;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
@@ -20,6 +22,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.util.EventLogger;
 import androidx.media3.ui.PlayerView;
 
@@ -118,6 +121,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private VideoPlayerSync danmuSync;
     private ExoPlayer exoPlayer;
     private PlayerView exoView;
+    private HandlerThread playbackThread;
     private ParseJob parseJob;
     private List<Sub> subs;
     private String format;
@@ -199,9 +203,20 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     private void initExo(PlayerView view) {
-        exoPlayer = new ExoPlayer.Builder(App.get()).setLoadControl(ExoUtil.buildLoadControl()).setTrackSelector(ExoUtil.buildTrackSelector()).setRenderersFactory(ExoUtil.buildRenderersFactory(decode)).setMediaSourceFactory(ExoUtil.buildMediaSourceFactory()).build();
+        quitPlaybackThread();
+        playbackThread = new HandlerThread("ExoPlayback", Process.THREAD_PRIORITY_URGENT_DISPLAY);
+        playbackThread.start();
+        ExoPlayer.Builder builder = new ExoPlayer.Builder(App.get())
+                .setLoadControl(ExoUtil.buildLoadControl())
+                .setTrackSelector(ExoUtil.buildTrackSelector())
+                .setRenderersFactory(ExoUtil.buildRenderersFactory(decode))
+                .setMediaSourceFactory(ExoUtil.buildMediaSourceFactory())
+                .setPlaybackLooper(playbackThread.getLooper())
+                .experimentalSetDynamicSchedulingEnabled(true);
+        exoPlayer = builder.build();
         exoPlayer.setAudioAttributes(AudioAttributes.DEFAULT, !Setting.isPlayWithOthers());
         exoPlayer.addAnalyticsListener(new EventLogger());
+        exoPlayer.addAnalyticsListener(new DroppedFrameListener());
         exoPlayer.setHandleAudioBecomingNoisy(true);
         // Note: Media3 1.9.2 no longer supports dynamic surface type switching at runtime
         // Surface type is now set via XML attribute or during view creation
@@ -650,6 +665,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
             player.removeListener(this);
             if (exoView != null && exoView.getPlayer() == player) exoView.setPlayer(null);
             player.release();
+            quitPlaybackThread();
         });
     }
 
@@ -658,6 +674,12 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         IjkVideoView player = ijkPlayer;
         ijkPlayer = null;
         runPlayerAction("releaseIjk", player::release);
+    }
+
+    private void quitPlaybackThread() {
+        if (playbackThread == null) return;
+        playbackThread.quit();
+        playbackThread = null;
     }
 
     private void runPlayerAction(String action, Runnable runnable) {
@@ -1108,5 +1130,12 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     @Override
     public void drawingFinished() {
+    }
+
+    private static class DroppedFrameListener implements AnalyticsListener {
+        @Override
+        public void onDroppedVideoFrames(@NonNull EventTime eventTime, int droppedFrames, long elapsedMs) {
+            Logger.w("Dropped %d video frames in %dms (position=%dms)", droppedFrames, elapsedMs, eventTime.eventPlaybackPositionMs);
+        }
     }
 }
