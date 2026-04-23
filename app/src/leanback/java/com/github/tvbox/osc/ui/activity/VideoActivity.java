@@ -4,6 +4,8 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
@@ -115,6 +117,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -131,6 +134,13 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private static final long STARTUP_RECOVERY_MIN_SPEED_KBPS = 256L;
     private static final int RETRY_TIMEOUT_MULTIPLIER = 2;
+    private static final long PLAYBACK_BUFFERING_INDICATOR_DELAY_MS = 400L;
+    private static final long PLAYBACK_BUFFERING_INDICATOR_THRESHOLD_MS = 2_000L;
+    private static final long DISPLAY_INFO_UPDATE_INTERVAL_MS = 1_000L;
+    private static final long HISTORY_SAVE_INTERVAL_MS = 2_000L;
+    private static final long HISTORY_SAVE_POSITION_DELTA_MS = 2_000L;
+    private static final long PLAY_STATUS_SAVE_INTERVAL_MS = 2_000L;
+    private static final long PLAY_STATUS_SAVE_POSITION_DELTA_MS = 2_000L;
 
     private ActivityVideoBinding mBinding;
     private ViewGroup.LayoutParams mFrameParams;
@@ -169,13 +179,60 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private Runnable mR2;
     private Runnable mR3;
     private Runnable mR4;
+    private Runnable mR5;
     private Clock mClock;
     private View mFocus1;
     private View mFocus2;
     private boolean hasKeyEvent;
+    private boolean hasPlaybackStarted;
     private String mCurrentDanmaku;
-    private CustomTarget<Drawable> mArtworkTarget;
+    private CustomTarget<?> mArtworkTarget;
     private boolean destroyed;
+    private long mLastDisplayInfoUpdatedAt;
+    private long mLastHistorySavedAt;
+    private long mLastHistorySavedPosition = C.TIME_UNSET;
+    private long mLastPlayStatusSavedAt;
+    private long mLastPlayStatusSavedPosition = C.TIME_UNSET;
+    private final AtomicBoolean mHistoryPersistInFlight = new AtomicBoolean();
+    private final AtomicBoolean mPlayStatusPersistInFlight = new AtomicBoolean();
+    private final Object mHistoryPersistLock = new Object();
+    private final Object mPlayStatusPersistLock = new Object();
+    @Nullable
+    private PendingHistoryPersist mPendingHistoryPersist;
+    @Nullable
+    private PendingPlayStatusPersist mPendingPlayStatusPersist;
+
+    private static final class PendingHistoryPersist {
+        private final History history;
+
+        private PendingHistoryPersist(History history) {
+            this.history = history;
+        }
+    }
+
+    private static final class PendingPlayStatusPersist {
+        private final String vodName;
+        private final String vodId;
+        private final String sourceKey;
+        private final String flagName;
+        private final int qualityIndex;
+        private final String episodeName;
+        private final String episodeUrl;
+        private final long position;
+        private final long updateTime;
+
+        private PendingPlayStatusPersist(String vodName, String vodId, String sourceKey, String flagName, int qualityIndex, String episodeName, String episodeUrl, long position, long updateTime) {
+            this.vodName = vodName;
+            this.vodId = vodId;
+            this.sourceKey = sourceKey;
+            this.flagName = flagName;
+            this.qualityIndex = qualityIndex;
+            this.episodeName = episodeName;
+            this.episodeUrl = episodeUrl;
+            this.position = position;
+            this.updateTime = updateTime;
+        }
+    }
 
     public static void push(FragmentActivity activity, String text) {
         if (FileChooser.isValid(activity, Uri.parse(text))) file(activity, FileChooser.getPathFromUri(activity, Uri.parse(text)));
@@ -354,6 +411,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mR2 = this::updateFocus;
         mR3 = this::setTraffic;
         mR4 = this::showEmpty;
+        mR5 = this::showPlaybackBufferingProgress;
         setBackground(false);
         setRecyclerView();
         setEpisodeView();
@@ -620,6 +678,18 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void getPlayer(Flag flag, Episode episode, boolean replay) {
         startupTimeoutLineRetried = false;
+        hasPlaybackStarted = false;
+        mLastDisplayInfoUpdatedAt = 0L;
+        mLastHistorySavedAt = 0L;
+        mLastHistorySavedPosition = C.TIME_UNSET;
+        mLastPlayStatusSavedAt = 0L;
+        mLastPlayStatusSavedPosition = C.TIME_UNSET;
+        synchronized (mHistoryPersistLock) {
+            mPendingHistoryPersist = null;
+        }
+        synchronized (mPlayStatusPersistLock) {
+            mPendingPlayStatusPersist = null;
+        }
         mBinding.widget.title.setText(getString(R.string.detail_title, mBinding.name.getText(), episode.getName()));
         mBinding.display.title.setText(mBinding.widget.title.getText());
         mViewModel.playerContent(getKey(), flag.getFlag(), episode.getUrl());
@@ -1133,21 +1203,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             // 但要检查线路是否有效
             String flagName = getFlag().getFlag();
             if (!isInvalidFlag(flagName)) {
-                App.execute(() -> {
-                    String vodName = mBinding.name.getText().toString();
-                    PlayStatus status = PlayStatus.find(vodName);
-                    if (status == null) status = PlayStatus.create(vodName);
-                    status.setVodId(getId());
-                    status.setSourceKey(getSite().getKey());
-                    status.setFlagName(getFlag().getFlag());
-                    status.setQualityIndex(mQualityAdapter.getPosition());
-                    status.setEpisodeName(mHistory.getVodRemarks());
-                    status.setEpisodeUrl(mHistory.getEpisodeUrl());
-                    status.setPosition(finalPosition);
-                    status.setUpdateTime(System.currentTimeMillis());
-                    status.save();
-                    android.util.Log.d("VideoActivity.setQualityActivated", "切换画质并保存PlayStatus: 剧名=" + vodName + ", 画质索引=" + mQualityAdapter.getPosition() + ", 进度=" + finalPosition + "ms");
-                });
+                persistPlayStatus(finalPosition, true);
+                android.util.Log.d("VideoActivity.setQualityActivated", "切换画质并保存PlayStatus: 画质索引=" + mQualityAdapter.getPosition() + ", 进度=" + finalPosition + "ms");
             } else {
                 android.util.Log.d("VideoActivity.setQualityActivated", "跳过保存无效线路到PlayStatus: " + flagName);
             }
@@ -1256,11 +1313,16 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private void showDisplayInfo() {
         boolean hasDialog = false;
         for (Fragment f : getSupportFragmentManager().getFragments()) if (f instanceof BottomSheetDialogFragment) hasDialog = true;
-        mBinding.display.clock.setVisibility(Setting.isDisplayTime() || isVisible(mBinding.widget.info)  ? View.VISIBLE : View.GONE);
-        mBinding.display.titleLayout.setVisibility(Setting.isDisplayVideoTitle() && !isVisible(mBinding.control.getRoot()) ? View.VISIBLE : View.GONE);
-        mBinding.display.netspeed.setVisibility(Setting.isDisplaySpeed() && !isVisible(mBinding.control.getRoot()) && !hasDialog ? View.VISIBLE : View.GONE);
-        mBinding.display.duration.setVisibility(Setting.isDisplayDuration() && !isVisible(mBinding.control.getRoot()) && (mPlayers.isVod()) && !hasDialog ? View.VISIBLE : View.GONE);
-        mBinding.display.progress.setVisibility(Setting.isDisplayMiniProgress() && !isVisible(mBinding.control.getRoot()) && (mPlayers.isVod()) && !hasDialog ? View.VISIBLE : View.GONE);
+        setVisibilityIfChanged(mBinding.display.clock, Setting.isDisplayTime() || isVisible(mBinding.widget.info));
+        setVisibilityIfChanged(mBinding.display.titleLayout, Setting.isDisplayVideoTitle() && !isVisible(mBinding.control.getRoot()));
+        setVisibilityIfChanged(mBinding.display.netspeed, Setting.isDisplaySpeed() && !isVisible(mBinding.control.getRoot()) && !hasDialog);
+        setVisibilityIfChanged(mBinding.display.duration, Setting.isDisplayDuration() && !isVisible(mBinding.control.getRoot()) && (mPlayers.isVod()) && !hasDialog);
+        setVisibilityIfChanged(mBinding.display.progress, Setting.isDisplayMiniProgress() && !isVisible(mBinding.control.getRoot()) && (mPlayers.isVod()) && !hasDialog);
+    }
+
+    private void setVisibilityIfChanged(View view, boolean visible) {
+        int targetVisibility = visible ? View.VISIBLE : View.GONE;
+        if (view.getVisibility() != targetVisibility) view.setVisibility(targetVisibility);
     }
 
     private void onTimeChangeDisplaySpeed() {
@@ -1624,15 +1686,29 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void showProgress() {
+        App.removeCallbacks(mR5);
         mBinding.widget.progress.setVisibility(View.VISIBLE);
         App.post(mR3, 0);
         hideError();
     }
 
     private void hideProgress() {
+        App.removeCallbacks(mR5);
         mBinding.widget.progress.setVisibility(View.GONE);
         App.removeCallbacks(mR3);
         Traffic.reset();
+    }
+
+    private void schedulePlaybackBufferingProgress() {
+        App.removeCallbacks(mR5);
+        App.post(mR5, PLAYBACK_BUFFERING_INDICATOR_DELAY_MS);
+    }
+
+    private void showPlaybackBufferingProgress() {
+        if (destroyed || !hasPlaybackStarted) return;
+        if (!mPlayers.isBuffering()) return;
+        if (mPlayers.getBufferedAhead() >= PLAYBACK_BUFFERING_INDICATOR_THRESHOLD_MS) return;
+        showProgress();
     }
 
     private void showError(String text) {
@@ -1732,7 +1808,38 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void setArtwork(String url) {
         clearArtworkTarget();
-        mArtworkTarget = new CustomTarget<>() {
+        if (ExoUtil.isLowPerformanceTv()) {
+            int width = ResUtil.dp2px(320);
+            int height = ResUtil.dp2px(180);
+            CustomTarget<Bitmap> target = new CustomTarget<>(width, height) {
+                @Override
+                public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
+                    if (!isActivityAlive()) return;
+                    Drawable drawable = new BitmapDrawable(getResources(), resource);
+                    getExo().setDefaultArtwork(drawable);
+                    getIjk().setDefaultArtwork(drawable);
+                    showPreview(drawable);
+                }
+
+                @Override
+                public void onLoadFailed(@Nullable Drawable error) {
+                    if (!isActivityAlive()) return;
+                    Drawable fallback = error != null ? error : ResUtil.getDrawable(R.drawable.radio);
+                    getExo().setDefaultArtwork(fallback);
+                    getIjk().setDefaultArtwork(fallback);
+                    hidePreview();
+                }
+
+                @Override
+                public void onLoadCleared(@Nullable Drawable placeholder) {
+                }
+            };
+            mArtworkTarget = target;
+            if (TextUtils.isEmpty(url)) target.onLoadFailed(ResUtil.getDrawable(R.drawable.radio));
+            else Glide.with(App.get()).asBitmap().load(ImgUtil.getUrl(url)).dontAnimate().into(target);
+            return;
+        }
+        CustomTarget<Drawable> target = new CustomTarget<>() {
             @Override
             public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
                 if (!isActivityAlive()) return;
@@ -1744,8 +1851,9 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             @Override
             public void onLoadFailed(@Nullable Drawable error) {
                 if (!isActivityAlive()) return;
-                getExo().setDefaultArtwork(error);
-                getIjk().setDefaultArtwork(error);
+                Drawable fallback = error != null ? error : ResUtil.getDrawable(R.drawable.radio);
+                getExo().setDefaultArtwork(fallback);
+                getIjk().setDefaultArtwork(fallback);
                 hidePreview();
             }
 
@@ -1753,7 +1861,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             public void onLoadCleared(@Nullable Drawable placeholder) {
             }
         };
-        ImgUtil.load(url, R.drawable.radio, mArtworkTarget);
+        mArtworkTarget = target;
+        ImgUtil.load(url, R.drawable.radio, target);
     }
 
     private void getPart(String source) {
@@ -1900,7 +2009,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     @Override
     public void onTimeChanged() {
-        onTimeChangeDisplaySpeed();
+        long now = System.currentTimeMillis();
+        if (now - mLastDisplayInfoUpdatedAt >= DISPLAY_INFO_UPDATE_INTERVAL_MS) {
+            mLastDisplayInfoUpdatedAt = now;
+            onTimeChangeDisplaySpeed();
+        }
         long position = mPlayers.getPosition();
         long duration = mPlayers.getDuration();
         boolean waitingResume = mPendingResumePosition > 0 && position >= 0;
@@ -1915,36 +2028,160 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         }
         mHistory.setPosition(position);
         mHistory.setDuration(duration);
-        if (position >= 0 && duration > 0 && !Setting.isIncognito()) {
-            App.execute(() -> {
-                mHistory.update();
-
-                // 检查线路是否有效，避免保存错误线路到PlayStatus
-                String flagName = getFlag().getFlag();
-                if (isInvalidFlag(flagName)) {
-                    android.util.Log.d("VideoActivity.onTimeChanged", "跳过保存无效线路到PlayStatus: " + flagName);
-                    return;
-                }
-
-                // 同时更新PlayStatus表
-                String vodName = mBinding.name.getText().toString();
-                PlayStatus status = PlayStatus.find(vodName);
-                if (status == null) status = PlayStatus.create(vodName);
-                status.setVodId(getId());
-                status.setSourceKey(getSite().getKey());
-                status.setFlagName(getFlag().getFlag());
-                status.setQualityIndex(mQualityAdapter.getPosition());
-                status.setEpisodeName(mHistory.getVodRemarks());
-                status.setEpisodeUrl(mHistory.getEpisodeUrl());
-                status.setPosition(position);
-                status.setUpdateTime(System.currentTimeMillis());
-                status.save();
-            });
-        }
+        persistHistory(position, duration, false);
+        persistPlayStatus(position, false);
         if (mHistory.getEnding() > 0 && duration > 0 && mHistory.getEnding() + position >= duration) {
             mClock.setCallback(null);
             checkNext();
         }
+    }
+
+    private void persistHistory(long position, long duration, boolean force) {
+        if (Setting.isIncognito() || position < 0 || duration <= 0) return;
+
+        long now = System.currentTimeMillis();
+        boolean shouldSave = force
+                || mLastHistorySavedAt <= 0
+                || mLastHistorySavedPosition == C.TIME_UNSET
+                || now - mLastHistorySavedAt >= HISTORY_SAVE_INTERVAL_MS
+                || Math.abs(position - mLastHistorySavedPosition) >= HISTORY_SAVE_POSITION_DELTA_MS;
+        if (!shouldSave) return;
+
+        boolean shouldDrain;
+        synchronized (mHistoryPersistLock) {
+            mLastHistorySavedAt = now;
+            mLastHistorySavedPosition = position;
+            mPendingHistoryPersist = new PendingHistoryPersist(copyHistoryForPersist(position, duration));
+            shouldDrain = mHistoryPersistInFlight.compareAndSet(false, true);
+        }
+        if (shouldDrain) drainPendingHistoryPersist();
+    }
+
+    private void persistPlayStatus(long position, boolean force) {
+        if (Setting.isIncognito() || position < 0) return;
+        String flagName = getFlag().getFlag();
+        if (isInvalidFlag(flagName)) return;
+
+        long now = System.currentTimeMillis();
+        boolean shouldSave = force
+                || mLastPlayStatusSavedAt <= 0
+                || mLastPlayStatusSavedPosition == C.TIME_UNSET
+                || now - mLastPlayStatusSavedAt >= PLAY_STATUS_SAVE_INTERVAL_MS
+                || Math.abs(position - mLastPlayStatusSavedPosition) >= PLAY_STATUS_SAVE_POSITION_DELTA_MS;
+        if (!shouldSave) return;
+
+        boolean shouldDrain;
+        synchronized (mPlayStatusPersistLock) {
+            mLastPlayStatusSavedAt = now;
+            mLastPlayStatusSavedPosition = position;
+            mPendingPlayStatusPersist = new PendingPlayStatusPersist(
+                    mBinding.name.getText().toString(),
+                    getId(),
+                    getSite().getKey(),
+                    flagName,
+                    mQualityAdapter.getPosition(),
+                    mHistory.getVodRemarks(),
+                    mHistory.getEpisodeUrl(),
+                    position,
+                    now
+            );
+            shouldDrain = mPlayStatusPersistInFlight.compareAndSet(false, true);
+        }
+        if (shouldDrain) drainPendingPlayStatusPersist();
+    }
+
+    private History copyHistoryForPersist(long position, long duration) {
+        History history = new History();
+        history.setKey(mHistory.getKey());
+        history.setVodPic(mHistory.getVodPic());
+        history.setVodName(mHistory.getVodName());
+        history.setVodFlag(mHistory.getVodFlag());
+        history.setVodRemarks(mHistory.getVodRemarks());
+        history.setEpisodeUrl(mHistory.getEpisodeUrl());
+        history.setRevSort(mHistory.isRevSort());
+        history.setRevPlay(mHistory.isRevPlay());
+        history.setCreateTime(mHistory.getCreateTime());
+        history.setOpening(mHistory.getOpening());
+        history.setEnding(mHistory.getEnding());
+        history.setPosition(position);
+        history.setDuration(duration);
+        history.setSpeed(mHistory.getSpeed());
+        history.setPlayer(mHistory.getPlayer());
+        history.setScale(mHistory.getScale());
+        history.setCid(mHistory.getCid());
+        return history;
+    }
+
+    private void drainPendingHistoryPersist() {
+        PendingHistoryPersist request;
+        synchronized (mHistoryPersistLock) {
+            request = mPendingHistoryPersist;
+            mPendingHistoryPersist = null;
+            if (request == null) {
+                mHistoryPersistInFlight.set(false);
+                return;
+            }
+        }
+        App.execute(() -> {
+            try {
+                request.history.update();
+            } finally {
+                finishHistoryPersist();
+            }
+        });
+    }
+
+    private void finishHistoryPersist() {
+        boolean hasPending;
+        synchronized (mHistoryPersistLock) {
+            hasPending = mPendingHistoryPersist != null;
+            if (!hasPending) {
+                mHistoryPersistInFlight.set(false);
+                return;
+            }
+        }
+        drainPendingHistoryPersist();
+    }
+
+    private void drainPendingPlayStatusPersist() {
+        PendingPlayStatusPersist request;
+        synchronized (mPlayStatusPersistLock) {
+            request = mPendingPlayStatusPersist;
+            mPendingPlayStatusPersist = null;
+            if (request == null) {
+                mPlayStatusPersistInFlight.set(false);
+                return;
+            }
+        }
+        App.execute(() -> {
+            try {
+                PlayStatus status = PlayStatus.find(request.vodName);
+                if (status == null) status = PlayStatus.create(request.vodName);
+                status.setVodId(request.vodId);
+                status.setSourceKey(request.sourceKey);
+                status.setFlagName(request.flagName);
+                status.setQualityIndex(request.qualityIndex);
+                status.setEpisodeName(request.episodeName);
+                status.setEpisodeUrl(request.episodeUrl);
+                status.setPosition(request.position);
+                status.setUpdateTime(request.updateTime);
+                status.save();
+            } finally {
+                finishPlayStatusPersist();
+            }
+        });
+    }
+
+    private void finishPlayStatusPersist() {
+        boolean hasPending;
+        synchronized (mPlayStatusPersistLock) {
+            hasPending = mPendingPlayStatusPersist != null;
+            if (!hasPending) {
+                mPlayStatusPersistInFlight.set(false);
+                return;
+            }
+        }
+        drainPendingPlayStatusPersist();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -1987,9 +2224,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             case Player.STATE_IDLE:
                 break;
             case Player.STATE_BUFFERING:
-                showProgress();
+                if (hasPlaybackStarted && isGone(mBinding.widget.progress)) schedulePlaybackBufferingProgress();
+                else showProgress();
                 break;
             case Player.STATE_READY:
+                hasPlaybackStarted = true;
                 stopSearch();
                 setMetadata();
                 resetToggle();
@@ -2311,6 +2550,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mBinding.widget.exoPosition.setText(mPlayers.getPositionTime(0));
         if (isFullscreen()) showInfoAndCenter();
         else hideInfoAndCenter();
+        persistHistory(Math.max(mPlayers.getPosition(), mHistory.getPosition()), Math.max(mPlayers.getDuration(), mHistory.getDuration()), true);
+        persistPlayStatus(Math.max(mPlayers.getPosition(), mHistory.getPosition()), true);
         mPlayers.pause();
     }
 
@@ -2560,6 +2801,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     protected void onPause() {
         super.onPause();
         setBackground(true);
+        persistHistory(Math.max(mPlayers.getPosition(), mHistory.getPosition()), Math.max(mPlayers.getDuration(), mHistory.getDuration()), true);
+        persistPlayStatus(Math.max(mPlayers.getPosition(), mHistory.getPosition()), true);
         mPlayers.pause();
         mClock.stop();
     }
@@ -2594,13 +2837,15 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     @Override
     protected void onDestroy() {
         destroyed = true;
+        persistHistory(Math.max(mPlayers.getPosition(), mHistory.getPosition()), Math.max(mPlayers.getDuration(), mHistory.getDuration()), true);
+        persistPlayStatus(Math.max(mPlayers.getPosition(), mHistory.getPosition()), true);
         clearArtworkTarget();
         stopSearch();
         mClock.release();
         mPlayers.release();
         Source.get().stop();
         RefreshEvent.history();
-        App.removeCallbacks(mR1, mR2, mR3, mR4);
+        App.removeCallbacks(mR1, mR2, mR3, mR4, mR5);
         super.onDestroy();
     }
 }

@@ -3,6 +3,7 @@ package com.github.tvbox.osc.ui.custom;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
@@ -23,6 +24,7 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
 
     private static final int MAX_UPDATE_INTERVAL_MS = 1000;
     private static final int MIN_UPDATE_INTERVAL_MS = 200;
+    private static final int HIDDEN_UPDATE_INTERVAL_MS = 2000;
     // 估算视频码率用于计算内存使用（默认5Mbps，会根据实际情况调整）
     private static final int DEFAULT_BITRATE_KBPS = 5000;
     // 音频码率约128Kbps
@@ -118,10 +120,19 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
     }
 
     private void refresh() {
+        if (player == null) return;
         if (player.isRelease()) return;
         long duration = player.getDuration();
         long position = player.getPosition();
         long buffered = player.getBuffered();
+        boolean visible = isActuallyVisible();
+
+        if (!visible && !scrubbing) {
+            removeCallbacks(refresh);
+            postDelayed(refresh, HIDDEN_UPDATE_INTERVAL_MS);
+            return;
+        }
+
         boolean positionChanged = position != currentPosition;
         boolean durationChanged = duration != currentDuration;
         currentDuration = duration;
@@ -178,6 +189,10 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
         }
     }
 
+    private boolean isActuallyVisible() {
+        return isShown() && getWindowVisibility() == VISIBLE;
+    }
+
     private void setKeyTimeIncrement(long duration) {
         if (duration > TimeUnit.HOURS.toMillis(2)) {
             timeBar.setKeyTimeIncrement(TimeUnit.MINUTES.toMillis(5));
@@ -212,6 +227,12 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         removeCallbacks(refresh);
+    }
+
+    @Override
+    protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        if (visibility == VISIBLE && changedView == this) start();
     }
 
     @Override

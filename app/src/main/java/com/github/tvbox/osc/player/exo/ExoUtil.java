@@ -27,6 +27,7 @@ import androidx.media3.ui.CaptionStyleCompat;
 import androidx.media3.ui.PlayerView;
 
 import com.github.tvbox.osc.App;
+import com.github.tvbox.osc.BuildConfig;
 import com.github.tvbox.osc.Setting;
 import com.github.tvbox.osc.bean.Drm;
 import com.github.tvbox.osc.bean.Sub;
@@ -48,8 +49,9 @@ public class ExoUtil {
     public static final long MAX_DISK_CACHE_BYTES = 256L * 1024 * 1024;
     private static final int MIN_BUFFER_FLOOR_MS = 15_000;
     private static final int MIN_REBUFFER_FLOOR_MS = 3_000;
-    private static final int LOW_PERF_STARTUP_BUFFER_CAP_MS = 2_500;
-    private static final int LOW_PERF_REBUFFER_CAP_MS = 2_000;
+    private static final int LOW_PERFORMANCE_TV_STARTUP_BUFFER_FLOOR_MS = 4_000;
+    private static final int LOW_PERFORMANCE_TV_REBUFFER_FLOOR_MS = 6_000;
+    private static final int LOW_PERFORMANCE_TV_MIN_BUFFER_FLOOR_MS = 20_000;
     private static final int LOW_MEMORY_CLASS_MB = 128;
     private static final int MID_MEMORY_CLASS_MB = 192;
     private static final int HIGH_MEMORY_CLASS_MB = 256;
@@ -70,10 +72,11 @@ public class ExoUtil {
      */
     public static LoadControl buildLoadControl() {
         int playbackBufferMs = Setting.getBuffer() * 1000;
-        if (isArmeabiV7aOnly()) playbackBufferMs = Math.min(playbackBufferMs, LOW_PERF_STARTUP_BUFFER_CAP_MS);
-        int minBufferMs = Math.max(MIN_BUFFER_FLOOR_MS, playbackBufferMs * 2);
+        if (isLowPerformanceTv()) playbackBufferMs = Math.max(playbackBufferMs, LOW_PERFORMANCE_TV_STARTUP_BUFFER_FLOOR_MS);
         int bufferForPlaybackAfterRebufferMs = Math.max(MIN_REBUFFER_FLOOR_MS, playbackBufferMs);
-        if (isArmeabiV7aOnly()) bufferForPlaybackAfterRebufferMs = Math.min(bufferForPlaybackAfterRebufferMs, LOW_PERF_REBUFFER_CAP_MS);
+        if (isLowPerformanceTv()) bufferForPlaybackAfterRebufferMs = Math.max(bufferForPlaybackAfterRebufferMs, LOW_PERFORMANCE_TV_REBUFFER_FLOOR_MS);
+        int minBufferMs = Math.max(MIN_BUFFER_FLOOR_MS, playbackBufferMs * 2);
+        if (isLowPerformanceTv()) minBufferMs = Math.max(minBufferMs, LOW_PERFORMANCE_TV_MIN_BUFFER_FLOOR_MS);
         int memoryClassMb = getMemoryClassMb();
         int maxBufferMs = Math.max(getTieredMaxBufferMs(memoryClassMb), minBufferMs);
         int targetBufferBytes = getTargetBufferBytes();
@@ -128,7 +131,7 @@ public class ExoUtil {
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(App.get());
         trackSelector.setParameters(trackSelector.buildUponParameters()
                 .setPreferredTextLanguage(Locale.getDefault().getISO3Language())
-                .setForceHighestSupportedBitrate(!isArmeabiV7aOnly())
+                .setForceHighestSupportedBitrate(shouldForceHighestSupportedBitrate())
                 .setTunnelingEnabled(Setting.isTunnel() && !isArmeabiV7aOnly()));
         return trackSelector;
     }
@@ -139,6 +142,18 @@ public class ExoUtil {
             if ("armeabi-v7a".equals(abi)) return true;
         }
         return false;
+    }
+
+    public static boolean isLowPerformanceTv() {
+        return isArmeabiV7aOnly() && isLeanbackMode();
+    }
+
+    private static boolean shouldForceHighestSupportedBitrate() {
+        return !isLowPerformanceTv();
+    }
+
+    private static boolean isLeanbackMode() {
+        return "leanback".equals(BuildConfig.FLAVOR_mode);
     }
 
     public static RenderersFactory buildRenderersFactory(int decode) {

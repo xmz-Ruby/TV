@@ -355,9 +355,18 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         return 0;
     }
 
+    public long getBufferedAhead() {
+        return Math.max(0, getBuffered() - getPosition());
+    }
+
     public long getCachedBytes() {
         if (isIjk() && ijkPlayer != null) return ijkPlayer.getCachedBytes();
         return 0;
+    }
+
+    public boolean isBuffering() {
+        if (isExo() && exoPlayer != null) return exoPlayer.getPlaybackState() == Player.STATE_BUFFERING;
+        return buffering;
     }
 
     public boolean hasStartupBufferingProgress() {

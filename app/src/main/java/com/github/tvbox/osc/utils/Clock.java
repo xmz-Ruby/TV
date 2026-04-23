@@ -70,8 +70,10 @@ public class Clock {
         try {
             date.setTime(System.currentTimeMillis());
             if (callback != null) callback.onTimeChanged();
+            String formatted = format == null ? null : format.format(date);
             for(TextView view : views) {
-                if (view != null) view.setText(format.format(date));
+                if (view == null || !view.isShown()) continue;
+                if (formatted != null && !formatted.contentEquals(view.getText())) view.setText(formatted);
             }
         } catch (Exception ignored) {
         }

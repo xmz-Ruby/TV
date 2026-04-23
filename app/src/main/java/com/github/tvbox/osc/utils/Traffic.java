@@ -22,7 +22,8 @@ public class Traffic {
 
     public static synchronized void setSpeed(TextView view) {
         if (unsupported()) return;
-        view.setText(getSpeed());
+        String speed = getSpeed();
+        if (!speed.contentEquals(view.getText())) view.setText(speed);
         view.setVisibility(View.VISIBLE);
     }
 
