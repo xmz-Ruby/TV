@@ -32,6 +32,7 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
     private float bright;
     private float volume;
     private int holdTime;
+    private Runnable seekRunnable;
 
     public static CustomKeyDownVod create(Activity activity, View videoView) {
         return new CustomKeyDownVod(activity, videoView);
@@ -67,11 +68,19 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
 
     private void check(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN && KeyUtil.isLeftKey(event)) {
+            cancelSeek();
             listener.onSeeking(subTime());
         } else if (event.getAction() == KeyEvent.ACTION_DOWN && KeyUtil.isRightKey(event)) {
+            cancelSeek();
             listener.onSeeking(addTime());
         } else if (event.getAction() == KeyEvent.ACTION_UP && (KeyUtil.isLeftKey(event) || KeyUtil.isRightKey(event))) {
-            App.post(() -> listener.onSeekTo(holdTime), 250);
+            if (seekRunnable != null) App.removeCallbacks(seekRunnable);
+            int time = holdTime;
+            seekRunnable = () -> {
+                seekRunnable = null;
+                listener.onSeekTo(time);
+            };
+            App.post(seekRunnable, 400);
         } else if (event.getAction() == KeyEvent.ACTION_UP && KeyUtil.isUpKey(event)) {
             if (changeSpeed) listener.onSpeedEnd();
             else listener.onKeyUp();
@@ -129,6 +138,13 @@ public class CustomKeyDownVod extends GestureDetector.SimpleOnGestureListener {
 
     public void resetTime() {
         holdTime = 0;
+    }
+
+    private void cancelSeek() {
+        if (seekRunnable != null) {
+            App.removeCallbacks(seekRunnable);
+            seekRunnable = null;
+        }
     }
 
     private void checkFunc(float distanceX, float distanceY, MotionEvent e2) {
