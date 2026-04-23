@@ -220,6 +220,7 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
 
     private void seekToTimeBarPosition(long positionMs) {
         player.seekTo(positionMs);
+        if (seekListener != null) seekListener.onSeekComplete(positionMs);
         refresh();
     }
 
@@ -254,9 +255,6 @@ public class CustomSeekView extends FrameLayout implements TimeBar.OnScrubListen
         scrubbing = false;
         if (!canceled) {
             seekToTimeBarPosition(position);
-            if (seekListener != null) {
-                seekListener.onSeekComplete(position);
-            }
         }
     }
 }
