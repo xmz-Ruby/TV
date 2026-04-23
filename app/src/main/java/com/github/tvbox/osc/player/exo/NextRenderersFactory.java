@@ -29,14 +29,19 @@ public class NextRenderersFactory extends DefaultRenderersFactory {
     private static final long LOW_PERF_TV_LATE_THRESHOLD_US = 10_000L;
 
     private final boolean lowPerfTv;
+    private final boolean enableVideoDurationToProgressUs;
 
     public NextRenderersFactory(@NonNull Context context, int decode) {
         super(context);
         lowPerfTv = ExoUtil.isLowPerformanceTv();
+        // Mobile benefits on API 31+ where async MediaCodec is the default; old phones keep the safer sync path.
+        enableVideoDurationToProgressUs = lowPerfTv || ExoUtil.isMobileMode();
         setEnableDecoderFallback(true);
         setExtensionRendererMode(Players.isHard(decode) ? EXTENSION_RENDERER_MODE_ON : EXTENSION_RENDERER_MODE_PREFER);
-        if (lowPerfTv) {
+        if (enableVideoDurationToProgressUs) {
             setEnableMediaCodecVideoRendererDurationToProgressUs(true);
+        }
+        if (lowPerfTv) {
             experimentalSetLateThresholdToDropDecoderInputUs(LOW_PERF_TV_LATE_THRESHOLD_US);
         }
     }
@@ -67,10 +72,11 @@ public class NextRenderersFactory extends DefaultRenderersFactory {
                 .setEventHandler(eventHandler)
                 .setEventListener(eventListener)
                 .setMaxDroppedFramesToNotify(DROPPED_FRAME_NOTIFY_THRESHOLD);
+        if (enableVideoDurationToProgressUs) {
+            videoRendererBuilder.setEnableDurationToProgressUs(true);
+        }
         if (lowPerfTv) {
-            videoRendererBuilder
-                    .experimentalSetLateThresholdToDropDecoderInputUs(LOW_PERF_TV_LATE_THRESHOLD_US)
-                    .setEnableDurationToProgressUs(true);
+            videoRendererBuilder.experimentalSetLateThresholdToDropDecoderInputUs(LOW_PERF_TV_LATE_THRESHOLD_US);
         }
         out.add(videoRendererBuilder.build());
         if (extensionRendererMode == EXTENSION_RENDERER_MODE_ON) return;

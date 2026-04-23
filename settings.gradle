@@ -119,6 +119,8 @@ include ':lib-effect'
 project(':lib-effect').projectDir = new File("${media3SourceDir}/libraries/effect")
 include ':lib-inspector'
 project(':lib-inspector').projectDir = new File("${media3SourceDir}/libraries/inspector")
+include ':lib-inspector-frame'
+project(':lib-inspector-frame').projectDir = new File("${media3SourceDir}/libraries/inspector_frame")
 include ':lib-transformer'
 project(':lib-transformer').projectDir = new File("${media3SourceDir}/libraries/transformer")
 include ':lib-muxer'

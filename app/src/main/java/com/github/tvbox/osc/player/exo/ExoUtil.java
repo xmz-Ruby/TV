@@ -154,6 +154,10 @@ public class ExoUtil {
         return isArmeabiV7aOnly() && isLeanbackMode();
     }
 
+    public static boolean isMobileMode() {
+        return "mobile".equals(BuildConfig.FLAVOR_mode);
+    }
+
     private static boolean shouldForceHighestSupportedBitrate() {
         return !isLowPerformanceTv();
     }

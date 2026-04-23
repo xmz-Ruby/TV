@@ -5,16 +5,16 @@ plugins {
 android {
     namespace 'com.github.tvbox.osc'
 
-    compileSdk 35
+    compileSdk 36
     flavorDimensions = ["mode", "api", "abi"]
 
     defaultConfig {
         applicationId "com.github.tvbox.osc"
-        minSdk 21
+        minSdk 23
         //noinspection ExpiredTargetSdkVersion
         targetSdk 28
-        versionCode 109
-        versionName "1.0.9"
+        versionCode 217
+        versionName "2.1.7"
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments = ["room.schemaLocation": "$projectDir/schemas".toString()]
