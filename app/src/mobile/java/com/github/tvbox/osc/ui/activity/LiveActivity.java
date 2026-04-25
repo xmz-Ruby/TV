@@ -47,6 +47,7 @@ import com.github.tvbox.osc.impl.LiveCallback;
 import com.github.tvbox.osc.impl.PassCallback;
 import com.github.tvbox.osc.model.LiveViewModel;
 import com.github.tvbox.osc.player.IjkUtil;
+import com.github.tvbox.osc.player.LiveLineProbe;
 import com.github.tvbox.osc.player.exo.ExoUtil;
 import com.github.tvbox.osc.player.Players;
 import com.github.tvbox.osc.server.Server;
@@ -96,6 +97,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     private LiveViewModel mViewModel;
     private List<Group> mHides;
     private Players mPlayers;
+    private LiveLineProbe mLineProbe;
     private Channel mChannel;
     private Group mGroup;
     private Runnable mR0;
@@ -108,9 +110,11 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     private boolean rotate;
     private boolean stop;
     private boolean lock;
+    private boolean catchupPlaying;
     private int toggleCount;
     private int errorCount;
     private int passCount;
+    private int mLineProbeToken;
     private PiP mPiP;
     private int mInitialLine; // 记录开始播放时的线路索引，用于判断是否已尝试所有线路
     private int mInitialPlayer; // 记录开始播放时的播放器类型
@@ -172,6 +176,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         setPadding(mBinding.widget.epg, true);
         setPadding(mBinding.recycler, true);
         mPlayers = Players.create(this);
+        mLineProbe = new LiveLineProbe();
         mObserveEpg = this::setEpg;
         mObserveUrl = this::start;
         mHides = new ArrayList<>();
@@ -636,10 +641,12 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         if (item.getData().getList().size() > 0 && item.isSelected() && mChannel != null && mChannel.equals(item) && mChannel.getGroup().equals(mGroup)) {
             showEpg(item);
         } else {
+            stopLineProbe();
             mGroup.setPosition(mChannelAdapter.setSelected(item.group(mGroup)));
 
             // 每次切换频道时，重置线路到第一个
             item.setLine(0);
+            catchupPlaying = false;
 
             // 每次切换频道时，从站点配置或 App 设置重新开始尝试
             int playerType = getPlayerType(item.getPlayerType());
@@ -675,6 +682,8 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     public void onItemClick(EpgData item) {
         if (item.isFuture() || !mChannel.hasCatchup()) return;
         Notify.show(getString(R.string.play_ready, item.getTitle()));
+        stopLineProbe();
+        catchupPlaying = true;
         mEpgDataAdapter.setSelected(item);
         mViewModel.getUrl(mChannel, item);
         mPlayers.clear();
@@ -752,6 +761,45 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         mPlayers.start(result, getTimeout());
     }
 
+    private void startLineProbeIfNeeded() {
+        if (mLineProbe == null || mChannel == null || mChannel.isOnly() || catchupPlaying) return;
+        if (mLineProbe.isRunning(mLineProbeToken, mChannel)) {
+            mLineProbe.updateBaseline(mChannel.getLine(), mPlayers.getVideoWidth(), mPlayers.getVideoHeight());
+            return;
+        }
+        int token = ++mLineProbeToken;
+        mLineProbe.start(mChannel, mChannel.getLine(), mPlayers.getVideoWidth(), mPlayers.getVideoHeight(), token, new LiveLineProbe.Callback() {
+            @Override
+            public void onBetterLine(Channel channel, int line, int width, int height, int token) {
+                switchToBetterLine(channel, line, width, height, token);
+            }
+
+            @Override
+            public void onFinished(Channel channel, int token) {
+            }
+        });
+    }
+
+    private void stopLineProbe() {
+        mLineProbeToken++;
+        if (mLineProbe != null) mLineProbe.stop();
+    }
+
+    private void switchToBetterLine(Channel channel, int line, int width, int height, int token) {
+        if (token != mLineProbeToken || channel != mChannel || mChannel == null || line == mChannel.getLine()) return;
+        if (!isBetterResolution(width, height, mPlayers.getVideoWidth(), mPlayers.getVideoHeight())) return;
+        mChannel.setLine(line);
+        catchupPlaying = false;
+        showInfo();
+        fetch();
+    }
+
+    private boolean isBetterResolution(int width, int height, int currentWidth, int currentHeight) {
+        long score = Math.max(width, 0L) * Math.max(height, 0L);
+        long currentScore = Math.max(currentWidth, 0L) * Math.max(currentHeight, 0L);
+        return score > currentScore || score == currentScore && width > currentWidth;
+    }
+
     private void checkPlayImg(boolean playing) {
         mPiP.update(this, playing);
         ActionEvent.update();
@@ -793,6 +841,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     @Override
     public void setLive(Live item) {
         if (item.isActivated()) item.getGroups().clear();
+        stopLineProbe();
         LiveConfig.get().setHome(item);
         mPlayers.reset();
         mPlayers.stop();
@@ -871,6 +920,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
                 checkPlayImg(mPlayers.isPlaying());
                 mBinding.control.size.setText(mPlayers.getSizeText());
                 mBinding.display.size.setText(mPlayers.getSizeText());
+                startLineProbeIfNeeded();
                 if (isVisible(mBinding.control.getRoot())) showControl();
                 break;
             case Player.STATE_ENDED:
@@ -1048,14 +1098,18 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
 
     private void prevLine() {
         if (mChannel == null || mChannel.isOnly()) return;
+        stopLineProbe();
         mChannel.prevLine();
+        catchupPlaying = false;
         showInfo();
         fetch();
     }
 
     private void nextLine(boolean show) {
         if (mChannel == null || mChannel.isOnly()) return;
+        stopLineProbe();
         mChannel.nextLine();
+        catchupPlaying = false;
         if (show) showInfo();
         else setInfo();
         fetch();
@@ -1353,6 +1407,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        stopLineProbe();
         mClock.release();
         mPlayers.release();
         App.post(mR0, 1000);
