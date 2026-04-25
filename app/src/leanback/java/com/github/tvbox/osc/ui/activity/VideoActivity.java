@@ -783,7 +783,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         String newName = item.getVodName(getName());
 
         // 1. 剧名精准匹配检查（无论自动还是手动模式都检查并自动跳过）
-        if (!currentName.isEmpty() && !currentName.equals(newName)) {
+        if (!currentName.isEmpty() && !VodNameMatcher.same(currentName, newName)) {
             android.util.Log.d("VideoActivity.setDetail", "剧名不匹配，自动跳过该源: 当前=" + currentName + ", 新=" + newName);
             mBroken.add(item.getVodId()); // 记录为不可用源，避免重复尝试
             Notify.show("剧名不匹配，自动跳过：《" + newName + "》");
