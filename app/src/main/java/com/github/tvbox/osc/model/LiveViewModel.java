@@ -5,6 +5,7 @@ import android.net.Uri;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.Constant;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.EpgParser;
