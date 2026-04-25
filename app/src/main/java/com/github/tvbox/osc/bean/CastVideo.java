@@ -17,30 +17,36 @@ public class CastVideo {
     private final String name;
     private final String url;
     private final String originalUrl;
+    private final String format;
     private final Map<String, String> headers;
 
     public static CastVideo get(String name, String url) {
-        return new CastVideo(name, url, 0, 0, null);
+        return new CastVideo(name, url, 0, 0, null, null);
     }
 
     public static CastVideo get(String name, String url, long position) {
-        return new CastVideo(name, url, position, 0, null);
+        return new CastVideo(name, url, position, 0, null, null);
     }
 
     public static CastVideo get(String name, String url, long position, long duration) {
-        return new CastVideo(name, url, position, duration, null);
+        return new CastVideo(name, url, position, duration, null, null);
     }
 
     public static CastVideo get(String name, String url, long position, Map<String, String> headers) {
-        return new CastVideo(name, url, position, 0, headers);
+        return new CastVideo(name, url, position, 0, headers, null);
     }
 
     public static CastVideo get(String name, String url, long position, long duration, Map<String, String> headers) {
-        return new CastVideo(name, url, position, duration, headers);
+        return new CastVideo(name, url, position, duration, headers, null);
     }
 
-    private CastVideo(String name, String url, long position, long duration, Map<String, String> headers) {
+    public static CastVideo get(String name, String url, long position, long duration, Map<String, String> headers, String format) {
+        return new CastVideo(name, url, position, duration, headers, format);
+    }
+
+    private CastVideo(String name, String url, long position, long duration, Map<String, String> headers, String format) {
         this.originalUrl = url;
+        this.format = inferFormat(format, url);
         this.headers = headers;
         this.position = position;
         this.duration = duration;
@@ -107,6 +113,17 @@ public class CastVideo {
         }
     }
 
+    private String inferFormat(String format, String url) {
+        if (format != null && !format.isEmpty()) return format;
+        if (url == null) return "";
+        String lower = url.toLowerCase();
+        if (lower.contains(".mpd") || lower.contains("type=dash")) return "application/dash+xml";
+        if (lower.contains(".m3u8") || lower.contains("type=hls")) return "application/x-mpegURL";
+        if (lower.contains(".ts") || lower.contains("type=ts")) return "video/mp2t";
+        if (lower.contains(".mp4") || lower.contains("type=mp4")) return "video/mp4";
+        return "";
+    }
+
     public String getName() {
         return name;
     }
@@ -117,6 +134,10 @@ public class CastVideo {
 
     public String getOriginalUrl() {
         return originalUrl;
+    }
+
+    public String getFormat() {
+        return format;
     }
 
     public Map<String, String> getHeaders() {

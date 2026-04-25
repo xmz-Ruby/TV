@@ -25,6 +25,7 @@ import com.github.tvbox.osc.bean.History;
 import com.github.tvbox.osc.databinding.DialogDeviceBinding;
 import com.github.tvbox.osc.server.Server;
 import com.github.tvbox.osc.ui.adapter.DeviceAdapter;
+import com.github.tvbox.osc.utils.CastDlna;
 import com.github.tvbox.osc.utils.DLNADevice;
 import com.github.tvbox.osc.utils.Notify;
 import com.github.tvbox.osc.utils.ScanTask;
@@ -192,7 +193,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         onCasted();
 
         // 后台设置播放URL
-        control.setAVTransportURI(video.getUrl(), video.getName(), this);
+        CastDlna.setAVTransportURI(control, video.getUrl(), video.getName(), video.getFormat(), this);
     }
 
     @Override

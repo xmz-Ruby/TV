@@ -96,6 +96,7 @@ import com.github.tvbox.osc.ui.dialog.InfoDialog;
 import com.github.tvbox.osc.ui.dialog.QualityListDialog;
 import com.github.tvbox.osc.ui.dialog.ReceiveDialog;
 import com.github.tvbox.osc.ui.dialog.TrackDialog;
+import com.github.tvbox.osc.utils.CastDlna;
 import com.github.tvbox.osc.utils.Clock;
 import com.github.tvbox.osc.utils.FileChooser;
 import com.github.tvbox.osc.utils.IDMUtil;
@@ -991,7 +992,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                     // 切换设备 - 停止当前投屏并打开设备选择对话框
                     stopCasting();
                     App.post(() -> {
-                        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders())).fm(true).show(this);
+                        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).fm(true).show(this);
                     }, 500);
                 }
             });
@@ -999,7 +1000,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             builder.show();
         } else {
             // 未投屏，打开设备选择对话框
-            CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders())).fm(true).show(this);
+            CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).fm(true).show(this);
         }
     }
 
@@ -2805,7 +2806,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             originalUrl,
             0,  // position 从 0 开始
             mPlayers.getDuration(),  // 获取视频时长
-            mPlayers.getHeaders()  // 获取请求头
+            mPlayers.getHeaders(),  // 获取请求头
+            mPlayers.getFormat()
         );
 
         String url = castVideo.getUrl();
@@ -2847,7 +2849,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                 android.util.Log.d("VideoActivity", "[CAST] Previous cast stopped, setting new URL immediately");
                 // 立即设置新的播放URL，无需额外延迟
                 android.util.Log.d("VideoActivity", "[CAST] Calling setAVTransportURI with URL: " + url);
-                mCastControl.setAVTransportURI(url, title, new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
+                CastDlna.setAVTransportURI(mCastControl, url, title, castVideo.getFormat(), new com.android.cast.dlna.dmc.control.ServiceActionCallback<kotlin.Unit>() {
                         @Override
                         public void onSuccess(kotlin.Unit result) {
                             android.util.Log.d("VideoActivity", "[CAST] URL set successfully, starting playback");
@@ -2984,7 +2986,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                 mPlayers.getUrl(),
                 currentPosition,  // 使用当前进度
                 mCastDuration > 0 ? mCastDuration : mPlayers.getDuration(),
-                mPlayers.getHeaders()
+                mPlayers.getHeaders(),
+                mPlayers.getFormat()
             ))
             .fm(true)
             .show(this);

@@ -362,7 +362,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     }
 
     private void onCast() {
-        CastDialog.create().video(CastVideo.get(mBinding.control.title.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders())).fm(false).show(this);
+        CastDialog.create().video(CastVideo.get(mBinding.control.title.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).fm(false).show(this);
     }
 
     private void onInfo() {

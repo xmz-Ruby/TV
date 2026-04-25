@@ -277,6 +277,10 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         this.format = format;
     }
 
+    public String getFormat() {
+        return format;
+    }
+
     public void setMetadata(MediaMetadataCompat metadata) {
         session.setMetadata(metadata);
     }
