@@ -1943,6 +1943,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     @Override
     public void onTimeChanged() {
+        if (mHistory == null) return;
         long now = System.currentTimeMillis();
         if (now - mLastDisplayInfoUpdatedAt >= DISPLAY_INFO_UPDATE_INTERVAL_MS) {
             mLastDisplayInfoUpdatedAt = now;
@@ -1971,7 +1972,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void persistHistory(long position, long duration, boolean force) {
-        if (Setting.isIncognito() || position < 0 || duration <= 0) return;
+        if (mHistory == null || Setting.isIncognito() || position < 0 || duration <= 0) return;
 
         long now = System.currentTimeMillis();
         boolean shouldSave = force
@@ -1992,7 +1993,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void persistPlayStatus(long position, boolean force) {
-        if (Setting.isIncognito() || position < 0) return;
+        if (mHistory == null || Setting.isIncognito() || position < 0 || mFlagAdapter.size() == 0) return;
         String flagName = getFlag().getFlag();
         if (isInvalidFlag(flagName)) return;
 
@@ -2022,6 +2023,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             shouldDrain = mPlayStatusPersistInFlight.compareAndSet(false, true);
         }
         if (shouldDrain) drainPendingPlayStatusPersist();
+    }
+
+    private void persistCurrentPlaybackState(boolean force) {
+        if (mHistory == null || mPlayers == null) return;
+        long position = Math.max(mPlayers.getPosition(), mHistory.getPosition());
+        long duration = Math.max(mPlayers.getDuration(), mHistory.getDuration());
+        persistHistory(position, duration, force);
+        persistPlayStatus(position, force);
     }
 
     private History copyHistoryForPersist(long position, long duration) {
@@ -2484,8 +2493,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mBinding.widget.exoPosition.setText(mPlayers.getPositionTime(0));
         if (isFullscreen()) showInfoAndCenter();
         else hideInfoAndCenter();
-        persistHistory(Math.max(mPlayers.getPosition(), mHistory.getPosition()), Math.max(mPlayers.getDuration(), mHistory.getDuration()), true);
-        persistPlayStatus(Math.max(mPlayers.getPosition(), mHistory.getPosition()), true);
+        persistCurrentPlaybackState(true);
         mPlayers.pause();
     }
 
@@ -2736,8 +2744,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     protected void onPause() {
         super.onPause();
         setBackground(true);
-        persistHistory(Math.max(mPlayers.getPosition(), mHistory.getPosition()), Math.max(mPlayers.getDuration(), mHistory.getDuration()), true);
-        persistPlayStatus(Math.max(mPlayers.getPosition(), mHistory.getPosition()), true);
+        persistCurrentPlaybackState(true);
         mPlayers.pause();
         mClock.stop();
     }
@@ -2772,8 +2779,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     @Override
     protected void onDestroy() {
         destroyed = true;
-        persistHistory(Math.max(mPlayers.getPosition(), mHistory.getPosition()), Math.max(mPlayers.getDuration(), mHistory.getDuration()), true);
-        persistPlayStatus(Math.max(mPlayers.getPosition(), mHistory.getPosition()), true);
+        persistCurrentPlaybackState(true);
         clearArtworkTarget();
         stopSearch();
         mClock.release();
