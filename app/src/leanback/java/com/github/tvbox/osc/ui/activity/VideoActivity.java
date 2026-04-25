@@ -98,6 +98,7 @@ import com.github.tvbox.osc.utils.Notify;
 import com.github.tvbox.osc.utils.ResUtil;
 import com.github.tvbox.osc.utils.Sniffer;
 import com.github.tvbox.osc.utils.Traffic;
+import com.github.tvbox.osc.utils.VodNameMatcher;
 import com.github.bassaer.library.MDColor;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Trans;
@@ -117,10 +118,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 
 import master.flame.danmaku.danmaku.model.BaseDanmaku;
@@ -823,7 +824,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         }
 
         // 3. 集数合理性检查（无论手动还是自动都检查）
-        PlayStatus status = PlayStatus.find(currentName);
+        PlayStatus status = findPlayStatus(currentName);
         if (status != null && !item.getVodFlags().isEmpty()) {
             // 获取PlayStatus中记录的集数名称，提取集数编号
             String recordedEpisodeName = status.getEpisodeName();
@@ -1088,7 +1089,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             android.util.Log.d("VideoActivity.seamless", "  记录: 剧名=" + s.getVodName() + ", vodId=" + s.getVodId() + ", 源=" + s.getSourceKey() + ", 集=" + s.getEpisodeName());
         }
 
-        PlayStatus status = PlayStatus.find(vodName);
+        PlayStatus status = findPlayStatus(vodName, allStatus);
         android.util.Log.d("VideoActivity.seamless", "PlayStatus查询结果: " + (status != null ? "存在" : "不存在"));
 
         Episode episode = null;
@@ -2098,7 +2099,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         }
         App.execute(() -> {
             try {
-                PlayStatus status = PlayStatus.find(request.vodName);
+                PlayStatus status = findPlayStatus(request.vodName);
                 if (status == null) status = PlayStatus.create(request.vodName);
                 status.setVodId(request.vodId);
                 status.setSourceKey(request.sourceKey);
@@ -2443,8 +2444,25 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (getId().equals(item.getVodId())) return true;
         if (mBroken.contains(item.getVodId())) return true;
         String keyword = Objects.toString(mBinding.part.getTag(), "");
-        if (isAutoMode()) return !item.getVodName().equals(keyword);
-        else return !item.getVodName().contains(keyword);
+        if (isAutoMode()) return !VodNameMatcher.same(item.getVodName(), keyword);
+        else return !item.getVodName().contains(keyword) && !VodNameMatcher.contains(item.getVodName(), keyword);
+    }
+
+    private PlayStatus findPlayStatus(String vodName) {
+        return findPlayStatus(vodName, AppDatabase.get().getPlayStatusDao().getAll());
+    }
+
+    private PlayStatus findPlayStatus(String vodName, List<PlayStatus> items) {
+        PlayStatus status = PlayStatus.find(vodName);
+        if (status != null) return status;
+        String target = VodNameMatcher.normalize(vodName);
+        if (target.isEmpty()) return null;
+        PlayStatus latest = null;
+        for (PlayStatus item : items) {
+            if (!VodNameMatcher.normalize(item.getVodName()).equals(target)) continue;
+            if (latest == null || item.getUpdateTime() > latest.getUpdateTime()) latest = item;
+        }
+        return latest;
     }
 
     private void nextParse(int position) {

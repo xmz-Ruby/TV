@@ -107,6 +107,7 @@ import com.github.tvbox.osc.utils.Sniffer;
 import com.github.tvbox.osc.utils.Traffic;
 import com.github.tvbox.osc.utils.UrlUtil;
 import com.github.tvbox.osc.utils.Util;
+import com.github.tvbox.osc.utils.VodNameMatcher;
 import com.github.bassaer.library.MDColor;
 import com.github.catvod.utils.Trans;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
@@ -1903,8 +1904,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         if (getId().equals(item.getVodId())) return true;
         if (mBroken.contains(item.getVodId())) return true;
         String keyword = mBinding.name.getText().toString();
-        if (isAutoMode()) return !item.getVodName().equals(keyword);
-        else return !item.getVodName().contains(keyword);
+        if (isAutoMode()) return !VodNameMatcher.same(item.getVodName(), keyword);
+        else return !item.getVodName().contains(keyword) && !VodNameMatcher.contains(item.getVodName(), keyword);
     }
 
     private void nextParse(int position) {
