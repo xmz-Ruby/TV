@@ -18,6 +18,27 @@ public class LiveLineSelector {
         heights = new int[count];
     }
 
+    public void sync(Channel channel) {
+        int newCount = channel == null ? 0 : channel.getUrls().size();
+        if (newCount == count && failed != null) return;
+        boolean[] oldFailed = failed;
+        boolean[] oldUsable = usable;
+        int[] oldWidths = widths;
+        int[] oldHeights = heights;
+        failed = new boolean[newCount];
+        usable = new boolean[newCount];
+        widths = new int[newCount];
+        heights = new int[newCount];
+        int copy = Math.min(count, newCount);
+        for (int i = 0; i < copy; i++) {
+            failed[i] = oldFailed != null && oldFailed[i];
+            usable[i] = oldUsable != null && oldUsable[i];
+            widths[i] = oldWidths == null ? 0 : oldWidths[i];
+            heights[i] = oldHeights == null ? 0 : oldHeights[i];
+        }
+        count = newCount;
+    }
+
     public void markUsable(int line, int width, int height) {
         if (!isValid(line)) return;
         usable[line] = true;
@@ -57,6 +78,17 @@ public class LiveLineSelector {
         if (count == 0) return true;
         for (int i = 0; i < count; i++) if (!failed[i]) return false;
         return true;
+    }
+
+    public int getUsableCount() {
+        int result = 0;
+        if (usable == null) return result;
+        for (int i = 0; i < count; i++) if (usable[i] && !failed[i]) result++;
+        return result;
+    }
+
+    public int getTotalCount() {
+        return count;
     }
 
     public boolean isBetterThanCurrent(int line, int currentLine) {

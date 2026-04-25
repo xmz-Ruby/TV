@@ -35,6 +35,7 @@ public class LiveViewModel extends ViewModel {
     private static final int EPG = 1;
     private static final int URL = 2;
     private static final int XML = 3;
+    private static final int UPDATE = 4;
 
     private final SimpleDateFormat formatDate;
     private final SimpleDateFormat formatTime;
@@ -42,6 +43,7 @@ public class LiveViewModel extends ViewModel {
     public MutableLiveData<Channel> url;
     public MutableLiveData<Boolean> xml;
     public MutableLiveData<Live> live;
+    public MutableLiveData<Live> update;
     public MutableLiveData<Epg> epg;
 
     private ExecutorService executor1;
@@ -53,6 +55,7 @@ public class LiveViewModel extends ViewModel {
         this.formatTime = new SimpleDateFormat("yyyy-MM-ddHH:mm", Locale.getDefault());
         this.formatDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         this.live = new MutableLiveData<>();
+        this.update = new MutableLiveData<>();
         this.epg = new MutableLiveData<>();
         this.url = new MutableLiveData<>();
         this.xml = new MutableLiveData<>();
@@ -64,6 +67,14 @@ public class LiveViewModel extends ViewModel {
             setTimeZone(item.getEpg());
             verify(item);
             return item;
+        });
+    }
+
+    public void updateLive(Live item) {
+        execute(UPDATE, () -> {
+            Live result = LiveParser.reload(item.recent());
+            verify(result);
+            return result;
         });
     }
 
@@ -136,6 +147,9 @@ public class LiveViewModel extends ViewModel {
                 executor4 = Executors.newFixedThreadPool(2);
                 executor4.execute(runnable(type, callable, executor4));
                 break;
+            case UPDATE:
+                App.execute(runnable(type, callable, null));
+                break;
         }
     }
 
@@ -147,11 +161,13 @@ public class LiveViewModel extends ViewModel {
                 if (type == LIVE) live.postValue((Live) executor.submit(callable).get(Constant.TIMEOUT_LIVE, TimeUnit.MILLISECONDS));
                 if (type == XML) xml.postValue((Boolean) executor.submit(callable).get(Constant.TIMEOUT_XML, TimeUnit.MILLISECONDS));
                 if (type == URL) url.postValue((Channel) executor.submit(callable).get(Constant.TIMEOUT_PARSE_LIVE, TimeUnit.MILLISECONDS));
+                if (type == UPDATE) update.postValue((Live) callable.call());
             } catch (Throwable e) {
                 if (e instanceof InterruptedException || Thread.interrupted()) return;
                 if (e.getCause() instanceof ExtractException) url.postValue(Channel.error(e.getCause().getMessage()));
                 else if (type == URL) url.postValue(new Channel());
                 if (type == LIVE) live.postValue(new Live());
+                if (type == UPDATE) update.postValue(new Live());
                 if (type == EPG) epg.postValue(new Epg());
                 if (type == XML) xml.postValue(false);
                 e.printStackTrace();

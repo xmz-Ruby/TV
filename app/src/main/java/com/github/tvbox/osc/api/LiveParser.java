@@ -4,6 +4,7 @@ import android.util.Base64;
 
 import androidx.media3.common.MimeTypes;
 
+import com.github.tvbox.osc.App;
 import com.github.tvbox.osc.bean.Catchup;
 import com.github.tvbox.osc.bean.Channel;
 import com.github.tvbox.osc.bean.ClearKey;
@@ -43,6 +44,13 @@ public class LiveParser {
         if (live.getType() == 0) text(live, getText(live));
         if (live.getType() == 1) json(live, getText(live));
         if (live.getType() == 3) spider(live, getText(live));
+    }
+
+    public static Live reload(Live live) throws Exception {
+        Live result = App.gson().fromJson(App.gson().toJson(live), Live.class);
+        result.getGroups().clear();
+        start(result);
+        return result;
     }
 
     public static void text(Live live, String text) {

@@ -88,6 +88,8 @@ import tv.danmaku.ijk.media.player.ui.IjkVideoView;
 
 public class LiveActivity extends BaseActivity implements Clock.Callback, CustomKeyDownLive.Listener, TrackDialog.Listener, PlayerDialog.Listener, Biometric.Callback, PassCallback, LiveCallback, GroupAdapter.OnClickListener, ChannelAdapter.OnClickListener, EpgDataAdapter.OnClickListener, CastDialog.Listener, InfoDialog.Listener {
 
+    private static final long LIVE_UPDATE_INTERVAL_MS = 6 * 60 * 1000L;
+
     private ActivityLiveBinding mBinding;
     private ChannelAdapter mChannelAdapter;
     private EpgDataAdapter mEpgDataAdapter;
@@ -106,6 +108,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     private Runnable mR1;
     private Runnable mR2;
     private Runnable mR3;
+    private Runnable mR4;
     private Clock mClock;
     private boolean foreground;
     private boolean redirect;
@@ -187,6 +190,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         mR1 = this::hideControl;
         mR2 = this::setTraffic;
         mR3 = this::hideInfo;
+        mR4 = this::checkLiveUpdate;
         mPiP = new PiP();
         Server.get().start();
         setForeground(true);
@@ -195,6 +199,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         setDisplayView();
         setViewModel();
         checkLive();
+        scheduleLiveUpdate();
     }
 
     @Override
@@ -276,6 +281,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         mViewModel.url.observeForever(mObserveUrl);
         mViewModel.xml.observe(this, this::setEpg);
         mViewModel.epg.observeForever(mObserveEpg);
+        mViewModel.update.observe(this, this::mergeLiveUpdate);
         mViewModel.live.observe(this, live -> {
             mViewModel.getXml(live);
             hideProgress();
@@ -588,6 +594,15 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         App.post(mR2, Constant.INTERVAL_TRAFFIC);
     }
 
+    private void scheduleLiveUpdate() {
+        App.post(mR4, LIVE_UPDATE_INTERVAL_MS);
+    }
+
+    private void checkLiveUpdate() {
+        if (mChannel != null && !getHome().isEmpty()) mViewModel.updateLive(getHome());
+        scheduleLiveUpdate();
+    }
+
     private void setR1Callback() {
         App.post(mR1, Constant.INTERVAL_HIDE);
     }
@@ -725,6 +740,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         mBinding.widget.line.setVisibility(mChannel.getLineVisible());
         mBinding.control.action.line.setText(mBinding.widget.line.getText());
         mBinding.control.action.line.setVisibility(mBinding.widget.line.getVisibility());
+        updateLineStatus();
     }
 
     private void setEpg() {
@@ -767,7 +783,9 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
 
     private void startLineProbeIfNeeded() {
         if (mLineProbe == null || mChannel == null || mChannel.isOnly() || catchupPlaying) return;
+        mLineSelector.sync(mChannel);
         mLineSelector.markUsable(mChannel.getLine(), mPlayers.getVideoWidth(), mPlayers.getVideoHeight());
+        updateLineStatus();
         if (mLineProbe.isRunning(mLineProbeToken, mChannel)) {
             mLineProbe.updateBaseline(mChannel.getLine(), mPlayers.getVideoWidth(), mPlayers.getVideoHeight());
             return;
@@ -778,6 +796,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
             public void onLineReady(Channel channel, int line, int width, int height, int token) {
                 if (token != mLineProbeToken || channel != mChannel || mChannel == null) return;
                 mLineSelector.markUsable(line, width, height);
+                updateLineStatus();
                 switchToBestUsableLine(channel, token);
             }
 
@@ -785,6 +804,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
             public void onLineFailed(Channel channel, int line, int token) {
                 if (token != mLineProbeToken || channel != mChannel || mChannel == null || line == mChannel.getLine()) return;
                 mLineSelector.markFailed(line);
+                updateLineStatus();
             }
 
             @Override
@@ -806,6 +826,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
     private void switchToBetterLine(Channel channel, int line, int width, int height, int token) {
         if (token != mLineProbeToken || channel != mChannel || mChannel == null || line == mChannel.getLine()) return;
         mLineSelector.markUsable(line, width, height);
+        updateLineStatus();
         if (mLineSelector.isBetterThanCurrent(line, mChannel.getLine())) switchToLine(line);
     }
 
@@ -822,9 +843,26 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         fetch();
     }
 
+    private void updateLineStatus() {
+        if (mChannel == null) return;
+        String text = getLineStatusText();
+        mBinding.widget.line.setText(text);
+        mBinding.control.action.line.setText(text);
+        mBinding.widget.line.setVisibility(mChannel.getLineVisible());
+        mBinding.control.action.line.setVisibility(mChannel.getLineVisible());
+    }
+
+    private String getLineStatusText() {
+        if (mChannel == null || mChannel.isOnly()) return "";
+        int usable = mLineSelector.getUsableCount();
+        int total = Math.max(mLineSelector.getTotalCount(), mChannel.getUrls().size());
+        return mChannel.getLineText() + " · 可用 " + usable + "/" + total;
+    }
+
     private void onLineFailed(String msg) {
         if (mChannel == null) return;
         mLineSelector.markFailed(mChannel.getLine());
+        updateLineStatus();
         int line = mLineSelector.bestCandidate(mChannel.getLine());
         if (line == -1 || mLineSelector.allFailed()) {
             stopLineProbe();
@@ -856,6 +894,63 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         mHides.clear();
         mChannel = null;
         mGroup = null;
+    }
+
+    private void mergeLiveUpdate(Live update) {
+        if (update == null || update.isEmpty() || mChannel == null) return;
+        Live home = getHome();
+        boolean currentChanged = false;
+        boolean currentGroupChanged = false;
+        for (Group sourceGroup : update.getGroups()) {
+            Group targetGroup = findGroup(home, sourceGroup.getName());
+            if (targetGroup == null) {
+                targetGroup = sourceGroup;
+                home.getGroups().add(targetGroup);
+                if (targetGroup.isHidden()) mHides.add(targetGroup);
+                else mGroupAdapter.add(targetGroup);
+            }
+            for (Channel sourceChannel : sourceGroup.getChannel()) {
+                Channel targetChannel = findChannel(targetGroup, sourceChannel);
+                if (targetChannel == null) {
+                    targetChannel = sourceChannel.group(targetGroup);
+                    targetGroup.getChannel().add(targetChannel);
+                    if (targetGroup == mGroup) currentGroupChanged = true;
+                }
+                int added = appendUrls(targetChannel, sourceChannel);
+                if (targetChannel == mChannel && added > 0) currentChanged = true;
+            }
+        }
+        if (currentGroupChanged && mGroup != null) {
+            setWidth(mGroup);
+            mChannelAdapter.addAll(mGroup.getChannel());
+            mChannelAdapter.setSelected(mGroup.getPosition());
+        }
+        if (currentChanged) {
+            mLineSelector.sync(mChannel);
+            updateLineStatus();
+            stopLineProbe();
+            startLineProbeIfNeeded();
+        }
+    }
+
+    private Group findGroup(Live live, String name) {
+        for (Group group : live.getGroups()) if (group.getName().equals(name)) return group;
+        return null;
+    }
+
+    private Channel findChannel(Group group, Channel channel) {
+        for (Channel item : group.getChannel()) if (item.equals(channel)) return item;
+        return null;
+    }
+
+    private int appendUrls(Channel target, Channel source) {
+        int count = 0;
+        for (String url : source.getUrls()) {
+            if (target.getUrls().contains(url)) continue;
+            target.getUrls().add(url);
+            count++;
+        }
+        return count;
     }
 
     @Override
@@ -1453,7 +1548,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
         mClock.release();
         mPlayers.release();
         App.post(mR0, 1000);
-        App.removeCallbacks(mR1, mR2, mR3);
+        App.removeCallbacks(mR1, mR2, mR3, mR4);
         mViewModel.url.removeObserver(mObserveUrl);
         mViewModel.epg.removeObserver(mObserveEpg);
     }
