@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.bean;
 
 import android.net.Uri;
+import android.text.TextUtils;
 import android.util.Base64;
 
 import com.github.tvbox.osc.server.Server;
@@ -61,13 +62,9 @@ public class CastVideo {
             url = Uri.parse(url).getQueryParameter("url");
         }
 
-        // 检查是否已经是本地代理 URL
-        boolean isLocalProxy = url.contains("127.0.0.1:" + Server.get().getPort()) ||
-                              url.contains(Util.getIp() + ":" + Server.get().getPort());
-
-        // 如果有 headers 且是网络 URL，且不是本地代理，通过 cast_proxy
-        if (headers != null && !headers.isEmpty() &&
-            (url.startsWith("http://") || url.startsWith("https://"))) {
+        // 有些本地代理 URL 会把请求头塞进 query，例如 :1314?url=...&header=...
+        // DLNA 设备直接消费这种 URL 时元数据和回传都不稳定，统一再套一层 cast_proxy。
+        if (shouldUseCastProxy(url, headers)) {
             url = buildProxyUrl(url, headers);
         }
 
@@ -83,9 +80,11 @@ public class CastVideo {
         try {
             // 将 headers 编码为 Base64
             StringBuilder headerStr = new StringBuilder();
-            for (Map.Entry<String, String> entry : headers.entrySet()) {
-                if (headerStr.length() > 0) headerStr.append("&");
-                headerStr.append(entry.getKey()).append("=").append(entry.getValue());
+            if (headers != null) {
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    if (headerStr.length() > 0) headerStr.append("&");
+                    headerStr.append(entry.getKey()).append("=").append(entry.getValue());
+                }
             }
             String headersBase64 = Base64.encodeToString(headerStr.toString().getBytes(), Base64.URL_SAFE | Base64.NO_WRAP);
 
@@ -110,6 +109,48 @@ public class CastVideo {
         } catch (Exception e) {
             android.util.Log.e("CastVideo", "Failed to build proxy URL", e);
             return originalUrl;
+        }
+    }
+
+    private boolean shouldUseCastProxy(String url, Map<String, String> headers) {
+        if (!isNetworkUrl(url) || isCastProxyUrl(url)) return false;
+        if (headers != null && !headers.isEmpty()) return true;
+        if (hasEmbeddedHeaders(url)) return true;
+        return isLocalHelperProxy(url);
+    }
+
+    private boolean isNetworkUrl(String url) {
+        return url != null && (url.startsWith("http://") || url.startsWith("https://"));
+    }
+
+    private boolean isCastProxyUrl(String url) {
+        try {
+            Uri uri = Uri.parse(url);
+            return "/cast_proxy".equals(uri.getPath());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean hasEmbeddedHeaders(String url) {
+        try {
+            Uri uri = Uri.parse(url);
+            return !TextUtils.isEmpty(uri.getQueryParameter("header")) || !TextUtils.isEmpty(uri.getQueryParameter("headers"));
+        } catch (Exception e) {
+            return url != null && (url.contains("&header=") || url.contains("?header=") || url.contains("&headers=") || url.contains("?headers="));
+        }
+    }
+
+    private boolean isLocalHelperProxy(String url) {
+        try {
+            Uri uri = Uri.parse(url);
+            String host = uri.getHost();
+            int port = uri.getPort();
+            if (TextUtils.isEmpty(host) || port <= 0) return false;
+            boolean isLocalHost = "127.0.0.1".equals(host) || "localhost".equalsIgnoreCase(host) || Util.getIp().equals(host);
+            return isLocalHost && port != Server.get().getPort();
+        } catch (Exception e) {
+            return false;
         }
     }
 
