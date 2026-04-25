@@ -47,6 +47,7 @@ import com.github.tvbox.osc.impl.PassCallback;
 import com.github.tvbox.osc.model.LiveViewModel;
 import com.github.tvbox.osc.player.IjkUtil;
 import com.github.tvbox.osc.player.LiveLineProbe;
+import com.github.tvbox.osc.player.LiveLineSelector;
 import com.github.tvbox.osc.player.exo.ExoUtil;
 import com.github.tvbox.osc.player.Players;
 import com.github.tvbox.osc.server.Server;
@@ -89,6 +90,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     private List<Group> mHides;
     private Players mPlayers;
     private LiveLineProbe mLineProbe;
+    private LiveLineSelector mLineSelector;
     private Channel mChannel;
     private View mOldView;
     private Group mGroup;
@@ -155,6 +157,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
         mKeyDown = CustomKeyDownLive.create(this);
         mPlayers = Players.create(this);
         mLineProbe = new LiveLineProbe();
+        mLineSelector = new LiveLineSelector();
         mHides = new ArrayList<>();
         mR0 = this::setActivated;
         mR1 = this::hideControl;
@@ -659,6 +662,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
         // 每次切换频道时，重置线路到第一个
         item.setLine(0);
         catchupPlaying = false;
+        mLineSelector.reset(item);
 
         // 每次切换频道时，从站点配置或 App 设置重新开始尝试
         int playerType = getPlayerType(item.getPlayerType());
@@ -725,12 +729,26 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
 
     private void startLineProbeIfNeeded() {
         if (mLineProbe == null || mChannel == null || mChannel.isOnly() || catchupPlaying) return;
+        mLineSelector.markUsable(mChannel.getLine(), mPlayers.getVideoWidth(), mPlayers.getVideoHeight());
         if (mLineProbe.isRunning(mLineProbeToken, mChannel)) {
             mLineProbe.updateBaseline(mChannel.getLine(), mPlayers.getVideoWidth(), mPlayers.getVideoHeight());
             return;
         }
         int token = ++mLineProbeToken;
         mLineProbe.start(mChannel, mChannel.getLine(), mPlayers.getVideoWidth(), mPlayers.getVideoHeight(), token, new LiveLineProbe.Callback() {
+            @Override
+            public void onLineReady(Channel channel, int line, int width, int height, int token) {
+                if (token != mLineProbeToken || channel != mChannel || mChannel == null) return;
+                mLineSelector.markUsable(line, width, height);
+                switchToBestUsableLine(channel, token);
+            }
+
+            @Override
+            public void onLineFailed(Channel channel, int line, int token) {
+                if (token != mLineProbeToken || channel != mChannel || mChannel == null || line == mChannel.getLine()) return;
+                mLineSelector.markFailed(line);
+            }
+
             @Override
             public void onBetterLine(Channel channel, int line, int width, int height, int token) {
                 switchToBetterLine(channel, line, width, height, token);
@@ -749,17 +767,35 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
 
     private void switchToBetterLine(Channel channel, int line, int width, int height, int token) {
         if (token != mLineProbeToken || channel != mChannel || mChannel == null || line == mChannel.getLine()) return;
-        if (!isBetterResolution(width, height, mPlayers.getVideoWidth(), mPlayers.getVideoHeight())) return;
+        mLineSelector.markUsable(line, width, height);
+        if (mLineSelector.isBetterThanCurrent(line, mChannel.getLine())) switchToLine(line);
+    }
+
+    private void switchToBestUsableLine(Channel channel, int token) {
+        if (token != mLineProbeToken || channel != mChannel || mChannel == null) return;
+        int line = mLineSelector.bestUsable(mChannel.getLine());
+        if (mLineSelector.isBetterThanCurrent(line, mChannel.getLine())) switchToLine(line);
+    }
+
+    private void switchToLine(int line) {
         mChannel.setLine(line);
         catchupPlaying = false;
         showInfo();
         fetch();
     }
 
-    private boolean isBetterResolution(int width, int height, int currentWidth, int currentHeight) {
-        long score = Math.max(width, 0L) * Math.max(height, 0L);
-        long currentScore = Math.max(currentWidth, 0L) * Math.max(currentHeight, 0L);
-        return score > currentScore || score == currentScore && width > currentWidth;
+    private void onLineFailed(String msg) {
+        if (mChannel == null) return;
+        mLineSelector.markFailed(mChannel.getLine());
+        int line = mLineSelector.bestCandidate(mChannel.getLine());
+        if (line == -1 || mLineSelector.allFailed()) {
+            stopLineProbe();
+            showError("当前频道播放失败");
+            mPlayers.reset();
+            mPlayers.stop();
+            return;
+        }
+        switchToLine(line);
     }
 
     private void resetAdapter() {
@@ -892,6 +928,10 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onErrorEvent(ErrorEvent event) {
+        if (mChannel != null && !catchupPlaying) {
+            onLineFailed(event.getMsg());
+            return;
+        }
         if (addErrorCount() > 20) {
             onErrorEnd(event);
         } else if (mPlayers.addRetry() > event.getRetry()) {
@@ -983,18 +1023,12 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
 
     private void startFlow() {
         if (!Setting.isChange()) return;
-
-        int nextLine = mChannel.getLine() + 1;
-        if (nextLine >= mChannel.getUrls().size()) {
-            nextLine = 0;
-        }
-
-        if (nextLine == mInitialLine) {
-            showError("所有线路均播放失败");
+        if (!catchupPlaying) {
+            onLineFailed("当前频道播放失败");
             return;
         }
 
-        mChannel.setLine(nextLine);
+        mChannel.tryNextLine();
         showInfo();
         fetch();
     }

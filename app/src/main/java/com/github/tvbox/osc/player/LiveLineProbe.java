@@ -107,7 +107,7 @@ public class LiveLineProbe {
         service.execute(() -> {
             Channel probe = buildProbeChannel(currentProbeLine);
             if (probe == null) {
-                handler.post(this::completeCurrent);
+                handler.post(this::failCurrent);
                 return;
             }
             handler.post(() -> prepare(probe));
@@ -156,13 +156,13 @@ public class LiveLineProbe {
             startTimeout();
         } catch (Throwable e) {
             Logger.t(TAG).w("probe prepare failed line=" + currentProbeLine + ", " + e.getMessage());
-            completeCurrent();
+            failCurrent();
         }
     }
 
     private void startTimeout() {
         removeTimeout();
-        timeoutRunnable = this::completeCurrent;
+        timeoutRunnable = this::failCurrent;
         handler.postDelayed(timeoutRunnable, PROBE_TIMEOUT_MS);
     }
 
@@ -178,6 +178,16 @@ public class LiveLineProbe {
         releasePlayer();
         currentProbeLine = -1;
         probeNext();
+    }
+
+    private void failCurrent() {
+        if (stopped) return;
+        Callback cb = callback;
+        Channel item = source;
+        int line = currentProbeLine;
+        int currentToken = token;
+        if (cb != null && item != null && line != -1) cb.onLineFailed(item, line, currentToken);
+        completeCurrent();
     }
 
     private void finish() {
@@ -205,14 +215,19 @@ public class LiveLineProbe {
     private void onReady() {
         if (stopped || player == null) return;
         Size size = getBestSize(player);
-        if (size.isValid() && isBetter(size.width, size.height, bestWidth, bestHeight)) {
+        if (!size.isValid()) {
+            failCurrent();
+            return;
+        }
+        Callback cb = callback;
+        Channel item = source;
+        int line = currentProbeLine;
+        int currentToken = token;
+        if (cb != null && item != null) cb.onLineReady(item, line, size.width, size.height, currentToken);
+        if (isBetter(size.width, size.height, bestWidth, bestHeight)) {
             bestLine = currentProbeLine;
             bestWidth = size.width;
             bestHeight = size.height;
-            Callback cb = callback;
-            Channel item = source;
-            int line = currentProbeLine;
-            int currentToken = token;
             if (cb != null && item != null) cb.onBetterLine(item, line, size.width, size.height, currentToken);
         }
         completeCurrent();
@@ -254,7 +269,7 @@ public class LiveLineProbe {
         @Override
         public void onPlayerError(@NonNull PlaybackException error) {
             Logger.t(TAG).w("probe player error line=" + currentProbeLine + ", code=" + error.errorCode);
-            completeCurrent();
+            failCurrent();
         }
     }
 
@@ -273,6 +288,10 @@ public class LiveLineProbe {
     }
 
     public interface Callback {
+        void onLineReady(Channel channel, int line, int width, int height, int token);
+
+        void onLineFailed(Channel channel, int line, int token);
+
         void onBetterLine(Channel channel, int line, int width, int height, int token);
 
         void onFinished(Channel channel, int token);
