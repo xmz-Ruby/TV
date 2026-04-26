@@ -99,6 +99,9 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_EMPTY_PLAYBACK_TIMEOUT = 24_000L;
     private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_LOW_BUFFER_PLAYBACK_TIMEOUT = 34_000L;
     private static final long VERY_LOW_PERFORMANCE_TV_BUFFER_STALL_PLAYBACK_TIMEOUT = 42_000L;
+    private static final long EXO_SEEK_FRAME_TIMEOUT_MS = 2_500L;
+    private static final long EXO_SEEK_FRAME_RECHECK_MS = 1_500L;
+    private static final int EXO_SEEK_SURFACE_RECOVERY_LIMIT = 1;
 
     public static final int SYS = 0;
     public static final int IJK = 1;
@@ -111,6 +114,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private final Formatter formatter;
     private final Runnable runnable;
     private final Runnable stallRunnable;
+    private final Runnable seekFrameRunnable;
     private final PlaybackLockManager playbackLockManager;
 
     private Map<String, String> headers;
@@ -139,7 +143,11 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private int count;
     private int player;
     private int retry;
+    private int exoSeekSurfaceRecoveryCount;
     private boolean buffering;
+    private boolean exoAwaitingSeekFrame;
+    private long exoPendingSeekPosition;
+    private long exoSeekGeneration;
 
     public static Players create(Activity activity) {
         Players player = new Players(activity);
@@ -177,9 +185,11 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         builder = new StringBuilder();
         runnable = ErrorEvent::timeout;
         stallRunnable = this::checkPlaybackStall;
+        seekFrameRunnable = this::checkExoSeekFrame;
         playbackLockManager = new PlaybackLockManager(activity);
         formatter = new Formatter(builder, Locale.getDefault());
         position = C.TIME_UNSET;
+        exoPendingSeekPosition = C.TIME_UNSET;
         bufferingStartPosition = C.TIME_UNSET;
         bufferingStartBufferedPosition = C.TIME_UNSET;
         createSession(activity);
@@ -211,8 +221,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
                 .setTrackSelector(ExoUtil.buildTrackSelector())
                 .setRenderersFactory(ExoUtil.buildRenderersFactory(decode))
                 .setMediaSourceFactory(ExoUtil.buildMediaSourceFactory())
-                .setPlaybackLooper(playbackThread.getLooper())
-                .experimentalSetDynamicSchedulingEnabled(true);
+                .setPlaybackLooper(playbackThread.getLooper());
         if (ExoUtil.isLowPerformanceTv()) {
             builder.setStuckPlayingDetectionTimeoutMs(30_000);
         }
@@ -551,7 +560,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         // 先让视频播放器seek，然后弹幕再同步
         // 这样可以避免弹幕时间领先于视频时间
         boolean wasPlaying = isPlaying();
-        if (isExo() && exoPlayer != null) exoPlayer.seekTo(time);
+        if (isExo() && exoPlayer != null) seekExo(time, wasPlaying);
         if (isIjk() && ijkPlayer != null) ijkPlayer.seekTo(time);
         // 视频seek完成后，弹幕再跟随
         if (haveDanmu()) danmuView.seekTo(time);
@@ -564,6 +573,70 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
                 danmuView.resume();
             }
         }
+    }
+
+    private void seekExo(long time, boolean wasPlaying) {
+        boolean wasEnded = exoPlayer.getPlaybackState() == Player.STATE_ENDED;
+        startExoSeekFrameWatch(time);
+        if (wasEnded || wasPlaying || exoPlayer.getPlayWhenReady()) exoPlayer.setPlayWhenReady(true);
+        exoPlayer.seekTo(time);
+    }
+
+    private void startExoSeekFrameWatch(long time) {
+        if (!hasExoVideoTrack()) return;
+        exoAwaitingSeekFrame = true;
+        exoPendingSeekPosition = time;
+        exoSeekSurfaceRecoveryCount = 0;
+        exoSeekGeneration++;
+        App.removeCallbacks(seekFrameRunnable);
+        App.post(seekFrameRunnable, EXO_SEEK_FRAME_TIMEOUT_MS);
+    }
+
+    private void clearExoSeekFrameWatch() {
+        exoAwaitingSeekFrame = false;
+        exoPendingSeekPosition = C.TIME_UNSET;
+        exoSeekSurfaceRecoveryCount = 0;
+        exoSeekGeneration++;
+        App.removeCallbacks(seekFrameRunnable);
+    }
+
+    private boolean hasExoVideoTrack() {
+        return exoPlayer != null && (ExoUtil.haveTrack(exoPlayer.getCurrentTracks(), C.TRACK_TYPE_VIDEO) || exoPlayer.getVideoSize().width > 0 || exoPlayer.getVideoSize().height > 0);
+    }
+
+    private void checkExoSeekFrame() {
+        if (!exoAwaitingSeekFrame || exoPlayer == null || !isExo()) return;
+        if (!hasExoVideoTrack()) {
+            clearExoSeekFrameWatch();
+            return;
+        }
+        if (exoPlayer.getPlaybackState() == Player.STATE_BUFFERING) {
+            App.post(seekFrameRunnable, EXO_SEEK_FRAME_RECHECK_MS);
+            return;
+        }
+        if (exoSeekSurfaceRecoveryCount++ >= EXO_SEEK_SURFACE_RECOVERY_LIMIT) {
+            Logger.t(TAG).w("exo seek frame not rendered after recovery, position=" + exoPendingSeekPosition + ", state=" + exoPlayer.getPlaybackState());
+            clearExoSeekFrameWatch();
+            return;
+        }
+        long generation = exoSeekGeneration;
+        long seekPosition = exoPendingSeekPosition;
+        Logger.t(TAG).w("exo seek frame timeout, rebind surface, position=" + seekPosition + ", state=" + exoPlayer.getPlaybackState());
+        rebindExoSurface();
+        if (exoAwaitingSeekFrame && generation == exoSeekGeneration && exoPlayer != null && seekPosition != C.TIME_UNSET) {
+            exoPlayer.seekTo(seekPosition);
+            exoPlayer.setPlayWhenReady(true);
+            App.post(seekFrameRunnable, EXO_SEEK_FRAME_RECHECK_MS);
+        }
+    }
+
+    private void rebindExoSurface() {
+        if (exoView == null || exoPlayer == null) return;
+        ExoPlayer player = exoPlayer;
+        runPlayerAction("rebindExoSurface", () -> {
+            exoView.setPlayer(null);
+            exoView.setPlayer(player);
+        });
     }
 
     public void play() {
@@ -655,6 +728,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private void stopExo() {
         if (exoPlayer == null) return;
+        clearExoSeekFrameWatch();
         runPlayerAction("stopExo", () -> {
             exoPlayer.stop();
             exoPlayer.clearMediaItems();
@@ -668,6 +742,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     private void releaseExo() {
         if (exoPlayer == null) return;
+        clearExoSeekFrameWatch();
         ExoPlayer player = exoPlayer;
         exoPlayer = null;
         runPlayerAction("releaseExo", () -> {
@@ -740,6 +815,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private void setMediaSource(Map<String, String> headers, String url, String format, Drm drm, List<Sub> subs, int timeout) {
         prepareStartedAt = System.currentTimeMillis();
         clearBufferingWatchdog();
+        clearExoSeekFrameWatch();
         playbackLockManager.acquire();
         long startPosition = position == C.TIME_UNSET ? 0 : position;
         if (isIjk() && ijkPlayer != null) ijkPlayer.setMediaSource(IjkUtil.getSource(this.headers = checkUa(headers), this.url = url), startPosition);
@@ -1049,9 +1125,16 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         logPrepareElapsed("error");
         removeTimeoutCheck();
         clearBufferingWatchdog();
+        clearExoSeekFrameWatch();
         playbackLockManager.release();
         Logger.t(TAG).e(error.errorCode + "," + url);
         ErrorEvent.url(ExoUtil.getRetry(error.errorCode), error.errorCode);
+    }
+
+    @Override
+    public void onRenderedFirstFrame() {
+        if (exoAwaitingSeekFrame) Logger.t(TAG).i("exo seek frame rendered, position=" + getPosition());
+        clearExoSeekFrameWatch();
     }
 
     @Override
