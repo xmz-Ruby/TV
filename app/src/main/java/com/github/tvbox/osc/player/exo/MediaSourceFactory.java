@@ -124,7 +124,7 @@ public class MediaSourceFactory implements MediaSource.Factory {
     }
 
     private boolean shouldBypassCache(MediaItem mediaItem) {
-        if (MimeTypes.APPLICATION_M3U8.equals(getMimeType(mediaItem)) || isM3u8Uri(mediaItem)) return true;
+        if (MimeTypes.APPLICATION_M3U8.equals(getMimeType(mediaItem)) || isM3u8Uri(mediaItem) || isEmbyDirectStreamUri(mediaItem)) return true;
         Uri uri = mediaItem.localConfiguration != null ? mediaItem.localConfiguration.uri : null;
         if (uri == null) uri = mediaItem.requestMetadata.mediaUri;
         if (ExoUtil.isArmeabiV7aOnly()) {
@@ -146,5 +146,14 @@ public class MediaSourceFactory implements MediaSource.Factory {
         if (raw == null || raw.isEmpty()) return false;
         String decoded = Uri.decode(raw).toLowerCase(Locale.US);
         return decoded.contains(".m3u8");
+    }
+
+    private boolean isEmbyDirectStreamUri(MediaItem mediaItem) {
+        Uri uri = mediaItem.requestMetadata.mediaUri;
+        String raw = uri == null ? mediaItem.mediaId : uri.toString();
+        if (raw == null || raw.isEmpty()) return false;
+        String decoded = Uri.decode(raw).toLowerCase(Locale.US);
+        if (!decoded.contains("/emby/")) return false;
+        return decoded.contains("/videos/") || decoded.contains("/audio/") || decoded.contains("mediasourceid=");
     }
 }

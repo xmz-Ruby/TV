@@ -175,6 +175,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private boolean autoSwitchingFlag;
     private boolean startupTimeoutGraceGranted;
     private boolean startupTimeoutLineRetried;
+    private int embyPlaybackTimeoutRetryCount;
     private int toggleCount;
     private int errorCount;
     private Runnable mR0;
@@ -744,6 +745,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             mBinding.control.title.getText().toString()
         );
 
+        embyPlaybackTimeoutRetryCount = 0;
         mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
         mQualityAdapter.addAll(result);
         setQualityVisible(result.getUrl().isMulti());
@@ -1605,6 +1607,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                 setMetadata();
                 resetToggle();
                 resetError();
+                embyPlaybackTimeoutRetryCount = 0;
                 hideProgress();
                 mPlayers.reset();
                 setDefaultTrack();
@@ -1687,6 +1690,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         else if (event.isDecode() && mPlayers.canToggleDecode()) onDecode(false);
         else if (shouldRetryCurrentLineAfterGrace(event)) retryCurrentLineAfterGrace();
         else if (shouldGrantStartupTimeoutGrace(event)) grantStartupTimeoutGrace();
+        else if (shouldRetryEmbyPlaybackTimeout(event)) retryEmbyPlaybackTimeout();
         else if (shouldSwitchQualityFirst(event)) switchQualityFirst();
         else if (shouldSwitchPlayerFirst(event)) switchPlayerFirst();
         else if (mPlayers.addRetry() > event.getRetry()) checkError(event);
@@ -1749,6 +1753,29 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             resetToggle();
             restartPlayerWithResult(result, resumePosition, getRetryPlayTimeout());
             Notify.show("长时间缓冲未出画面，重试当前线路...");
+        } catch (Exception e) {
+            ErrorEvent.extract(e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private boolean shouldRetryEmbyPlaybackTimeout(ErrorEvent event) {
+        if (!isEmbyPySource()) return false;
+        if (event.getType() != ErrorEvent.Type.TIMEOUT || mQualityAdapter.getResult() == null) return false;
+        if (embyPlaybackTimeoutRetryCount >= 1) return false;
+        return Math.max(0, mPlayers.getPosition()) > 0;
+    }
+
+    private void retryEmbyPlaybackTimeout() {
+        Result result = mQualityAdapter.getResult();
+        if (result == null) return;
+        embyPlaybackTimeoutRetryCount++;
+        long resumePosition = Math.max(0, mPlayers.getPosition());
+        try {
+            resetError();
+            resetToggle();
+            restartPlayerWithResult(result, resumePosition, getRetryPlayTimeout());
+            Notify.show("Emby 缓存停滞，重试当前线路...");
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
             e.printStackTrace();

@@ -172,6 +172,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     private boolean autoMode;
     private boolean autoSwitchingFlag;
     private boolean startupTimeoutLineRetried;
+    private int embyPlaybackTimeoutRetryCount;
     private boolean useParse;
     private int toggleCount;
     private int errorCount;
@@ -297,6 +298,11 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private boolean isCast() {
         return getIntent().getBooleanExtra("cast", false);
+    }
+
+    private boolean isEmbyPySource() {
+        String api = getSite().getApi();
+        return !TextUtils.isEmpty(api) && api.toLowerCase(java.util.Locale.US).contains("emby.py");
     }
 
     private String getName() {
@@ -714,6 +720,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             mPlayers.setPosition(mPendingResumePosition);
         }
 
+        embyPlaybackTimeoutRetryCount = 0;
         mPlayers.start(result, isUseParse(), getSite().isChangeable() ? getSite().getTimeout() : -1);
         mBinding.control.parse.setVisibility(isUseParse() ? View.VISIBLE : View.GONE);
         setQualityVisible(result.getUrl().isMulti());
@@ -2177,6 +2184,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
                 setMetadata();
                 resetToggle();
                 resetError();
+                embyPlaybackTimeoutRetryCount = 0;
                 hideProgress();
                 mPlayers.reset();
                 setDefaultTrack();
@@ -2235,6 +2243,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (addErrorCount() > 20) onErrorEnd(event);
         else if (event.isDecode() && mPlayers.canToggleDecode()) onDecode(false);
         else if (shouldRetryCurrentLineOnStartupTimeout(event)) retryCurrentLineOnStartupTimeout();
+        else if (shouldRetryEmbyPlaybackTimeout(event)) retryEmbyPlaybackTimeout();
         else if (shouldSwitchQualityFirst(event)) switchQualityFirst();
         else if (shouldSwitchPlayerFirst(event)) switchPlayerFirst();
         else if (mPlayers.addRetry() > event.getRetry()) checkError(event);
@@ -2281,6 +2290,29 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             resetToggle();
             restartPlayerWithResult(result, resumePosition, getRetryPlayTimeout());
             Notify.show("长时间缓冲未出画面，重试当前线路...");
+        } catch (Exception e) {
+            ErrorEvent.extract(e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private boolean shouldRetryEmbyPlaybackTimeout(ErrorEvent event) {
+        if (!isEmbyPySource()) return false;
+        if (event.getType() != ErrorEvent.Type.TIMEOUT || mQualityAdapter.getResult() == null) return false;
+        if (embyPlaybackTimeoutRetryCount >= 1) return false;
+        return Math.max(0, mPlayers.getPosition()) > 0;
+    }
+
+    private void retryEmbyPlaybackTimeout() {
+        Result result = mQualityAdapter.getResult();
+        if (result == null) return;
+        embyPlaybackTimeoutRetryCount++;
+        long resumePosition = Math.max(0, mPlayers.getPosition());
+        try {
+            resetError();
+            resetToggle();
+            restartPlayerWithResult(result, resumePosition, getRetryPlayTimeout());
+            Notify.show("Emby 缓存停滞，重试当前线路...");
         } catch (Exception e) {
             ErrorEvent.extract(e.getMessage());
             e.printStackTrace();
