@@ -799,6 +799,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     }
 
     private void switchToLine(int line) {
+        stopLineProbe();
         mChannel.setLine(line);
         catchupPlaying = false;
         showInfo();
