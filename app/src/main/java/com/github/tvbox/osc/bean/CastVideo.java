@@ -68,9 +68,10 @@ public class CastVideo {
             url = buildProxyUrl(url, headers);
         }
 
-        // 替换 127.0.0.1 为实际 IP（确保 DLNA 设备可以访问）
-        if (url.contains("127.0.0.1")) {
-            url = url.replace("127.0.0.1", Util.getIp());
+        // 替换外层 127.0.0.1 为实际 IP（确保 DLNA 设备可以访问），不替换编码在参数里的内层 URL
+        if (url.startsWith("http://127.0.0.1:")) {
+            String ip = Util.getIp();
+            if (!ip.isEmpty()) url = "http://" + ip + ":" + url.substring("http://127.0.0.1:".length());
         }
 
         this.url = url;
@@ -78,6 +79,7 @@ public class CastVideo {
 
     private String buildProxyUrl(String originalUrl, Map<String, String> headers) {
         try {
+            originalUrl = com.github.tvbox.osc.utils.UrlUtil.toLocalhost(originalUrl);
             // 将 headers 编码为 Base64
             StringBuilder headerStr = new StringBuilder();
             if (headers != null) {

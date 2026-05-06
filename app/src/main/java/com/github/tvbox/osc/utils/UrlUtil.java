@@ -47,7 +47,14 @@ public class UrlUtil {
         if ("assets".equals(scheme)) return url.replace("assets://", Server.get().getAddress("/"));
         if ("file".equals(scheme)) return url.replace("file://", Server.get().getAddress("/file/"));
         if ("proxy".equals(scheme)) return url.replace("proxy://", Server.get().getAddress("/proxy?"));
-        return url;
+        return toLocalhost(url);
+    }
+
+    public static String toLocalhost(String url) {
+        if (url == null || url.isEmpty()) return url;
+        String ip = com.github.catvod.utils.Util.getIp();
+        if (ip.isEmpty()) return url;
+        return url.replace("http://" + ip + ":", "http://127.0.0.1:");
     }
 
     public static String fixUrl(String url) {

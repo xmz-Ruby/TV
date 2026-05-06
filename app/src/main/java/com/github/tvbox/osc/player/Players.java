@@ -813,6 +813,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     private void setMediaSource(Map<String, String> headers, String url, String format, Drm drm, List<Sub> subs, int timeout) {
+        url = UrlUtil.toLocalhost(url);
         prepareStartedAt = System.currentTimeMillis();
         clearBufferingWatchdog();
         clearExoSeekFrameWatch();
