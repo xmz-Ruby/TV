@@ -95,6 +95,7 @@ public class PyLoader {
             }
             Object loadingLock = getLoadingLock(compositeKey);
             synchronized (loadingLock) {
+                loadingLocks.remove(compositeKey);
                 cachedSpider = spiders.get(compositeKey);
                 if (cachedSpider != null) {
                     Logger.d("PyLoader: Reusing cached spider after lock - key=" + key + ", compositeKey=" + compositeKey.hashCode());
@@ -119,8 +120,6 @@ public class PyLoader {
         } catch (Throwable e) {
             Logger.e("PyLoader: Failed to load Python spider - " + key, e);
             return new SpiderNull();
-        } finally {
-            loadingLocks.remove(compositeKey);
         }
     }
 
