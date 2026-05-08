@@ -1838,9 +1838,20 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         if (empty) {
             ErrorEvent.flag();
         } else {
+            moveHistoryFlagToFront();
             setFlagActivated(mHistory.getFlag());
             if (mHistory.isRevSort()) reverseEpisode(true);
         }
+    }
+
+    private void moveHistoryFlagToFront() {
+        Flag historyFlag = mHistory.getFlag();
+        int index = mFlagAdapter.indexOf(historyFlag);
+        if (index <= 0) return;
+        List<Flag> flags = new ArrayList<>();
+        for (int i = 0; i < mFlagAdapter.size(); i++) flags.add((Flag) mFlagAdapter.get(i));
+        flags.add(0, flags.remove(index));
+        mFlagAdapter.setItems(flags, null);
     }
 
     private void checkHistory(Vod item) {

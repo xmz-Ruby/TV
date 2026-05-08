@@ -48,6 +48,13 @@ public class FlagAdapter extends RecyclerView.Adapter<FlagAdapter.ViewHolder> {
         return mItems.get(getPosition());
     }
 
+    public void moveToFront(Flag flag) {
+        int index = mItems.indexOf(flag);
+        if (index <= 0) return;
+        mItems.add(0, mItems.remove(index));
+        notifyDataSetChanged();
+    }
+
     public void setActivated(Flag flag) {
         if (!mItems.contains(flag)) flag.setFlag(mItems.get(0).getFlag());
         for (Flag item : mItems) item.setActivated(flag);

@@ -1447,6 +1447,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         if (empty) {
             ErrorEvent.flag();
         } else {
+            mFlagAdapter.moveToFront(mHistory.getFlag());
             onItemClick(mHistory.getFlag());
             if (mHistory.isRevSort()) reverseEpisode(true);
         }
