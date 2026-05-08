@@ -40,6 +40,7 @@ import com.github.tvbox.osc.ui.base.ViewType;
 import com.github.tvbox.osc.ui.custom.CustomScroller;
 import com.github.tvbox.osc.ui.custom.CustomTextListener;
 import com.github.tvbox.osc.ui.dialog.SiteDialog;
+import com.github.tvbox.osc.api.loader.BaseLoader;
 import com.github.tvbox.osc.utils.PauseExecutor;
 import com.github.tvbox.osc.utils.ResUtil;
 import com.github.tvbox.osc.utils.Util;
@@ -206,6 +207,10 @@ public class CollectActivity extends BaseActivity implements CustomScroller.Call
     }
 
     private void search(Site site, String keyword, int token) {
+        if (site.getApi().contains(".py") && !BaseLoader.get().isPySpiderReady(site.getApi(), site.getExt())) {
+            App.post(() -> onSearchFinished(token, keyword, Result.empty(), false));
+            return;
+        }
         Result result = Result.empty();
         boolean success = false;
         try {

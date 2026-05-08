@@ -149,6 +149,7 @@ public class LiveViewModel extends ViewModel {
                 executor4.execute(runnable(type, callable, executor4));
                 break;
             case UPDATE:
+
                 App.execute(runnable(type, callable, null));
                 break;
         }

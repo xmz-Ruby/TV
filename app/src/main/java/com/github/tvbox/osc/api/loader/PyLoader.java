@@ -123,6 +123,10 @@ public class PyLoader {
         }
     }
 
+    public boolean isSpiderReady(String api, String ext) {
+        return spiders.containsKey(api + "|" + ext);
+    }
+
     private Object getLoadingLock(String compositeKey) {
         Object existingLock = loadingLocks.get(compositeKey);
         if (existingLock != null) return existingLock;

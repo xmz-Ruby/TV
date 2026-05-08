@@ -31,6 +31,7 @@ import com.github.tvbox.osc.model.SiteViewModel;
 import com.github.tvbox.osc.ui.base.BaseActivity;
 import com.github.tvbox.osc.ui.fragment.CollectFragment;
 import com.github.tvbox.osc.ui.presenter.CollectPresenter;
+import com.github.tvbox.osc.api.loader.BaseLoader;
 import com.github.tvbox.osc.utils.PauseExecutor;
 import com.github.tvbox.osc.utils.ResUtil;
 
@@ -135,6 +136,10 @@ public class CollectActivity extends BaseActivity {
     }
 
     private void search(Site site, int token) {
+        if (site.getApi().contains(".py") && !BaseLoader.get().isPySpiderReady(site.getApi(), site.getExt())) {
+            App.post(() -> onSearchFinished(token, Result.empty(), false));
+            return;
+        }
         Result result = Result.empty();
         boolean success = false;
         try {
