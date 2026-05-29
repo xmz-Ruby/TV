@@ -995,7 +995,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                     // 切换设备 - 停止当前投屏并打开设备选择对话框
                     stopCasting();
                     App.post(() -> {
-                        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).embyPy(isEmbyPySource()).fm(true).show(this);
+                        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).embyPy(isEmbyPySource()).live(mPlayers.isLive()).fm(true).show(this);
                     }, 500);
                 }
             });
@@ -1003,7 +1003,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
             builder.show();
         } else {
             mCastFormat = mPlayers.getFormat();
-            CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).embyPy(isEmbyPySource()).fm(true).show(this);
+            CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).embyPy(isEmbyPySource()).live(mPlayers.isLive()).fm(true).show(this);
         }
     }
 
@@ -2552,9 +2552,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                                     long position = parseTime(positionInfo.getRelTime());
                                     long duration = parseTime(mediaInfo.getMediaDuration());
 
-                                    // 如果DLNA端没有返回duration，使用本地播放器时长
-                                    if (duration == 0) {
-                                        duration = mCastDuration > 0 ? mCastDuration : mPlayers.getDuration();
+                                    // 如果DLNA端没有返回duration，或返回值比已知时长小（m3u8切片长度），保持已知最大值
+                                    long knownDuration = mCastDuration > 0 ? mCastDuration : mPlayers.getDuration();
+                                    if (duration <= 0 || (knownDuration > 5 * 60 * 1000 && duration < knownDuration)) {
+                                        duration = knownDuration;
                                     }
 
                                     mCastPosition = position;
@@ -3020,6 +3021,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                 mPlayers.getFormat()
             ))
             .embyPy(isEmbyPySource())
+            .live(mPlayers.isLive())
             .fm(true)
             .show(this);
 

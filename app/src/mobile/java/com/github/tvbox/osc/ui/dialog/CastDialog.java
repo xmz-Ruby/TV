@@ -59,6 +59,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     private CastVideo video;
     private boolean fm;
     private boolean embyPy;
+    private boolean live;
     private boolean seekPending;
     private boolean hasSeeked;
 
@@ -99,6 +100,11 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     public CastDialog embyPy(boolean embyPy) {
         this.embyPy = embyPy;
+        return this;
+    }
+
+    public CastDialog live(boolean live) {
+        this.live = live;
         return this;
     }
 
@@ -305,7 +311,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
             public void onFinish() {
                 if (dialog.isShowing()) {
                     dialog.dismiss();
-                    doCast(item, false);
+                    doCast(item, live);
                 }
             }
         }.start();
