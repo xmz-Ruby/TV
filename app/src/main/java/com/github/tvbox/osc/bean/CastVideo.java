@@ -45,7 +45,16 @@ public class CastVideo {
         return new CastVideo(name, url, position, duration, headers, format);
     }
 
+    // 直接投屏：跳过代理逻辑，只做 localhost→局域网IP 替换
+    public static CastVideo direct(String name, String url, long position, long duration, String format) {
+        return new CastVideo(name, url, position, duration, null, format, true);
+    }
+
     private CastVideo(String name, String url, long position, long duration, Map<String, String> headers, String format) {
+        this(name, url, position, duration, headers, format, false);
+    }
+
+    private CastVideo(String name, String url, long position, long duration, Map<String, String> headers, String format, boolean skipProxy) {
         this.originalUrl = url;
         this.format = inferFormat(format, url);
         this.headers = headers;
@@ -62,13 +71,11 @@ public class CastVideo {
             url = Uri.parse(url).getQueryParameter("url");
         }
 
-        // 有些本地代理 URL 会把请求头塞进 query，例如 :1314?url=...&header=...
-        // DLNA 设备直接消费这种 URL 时元数据和回传都不稳定，统一再套一层 cast_proxy。
-        if (shouldUseCastProxy(url, headers)) {
+        if (!skipProxy && shouldUseCastProxy(url, headers)) {
             url = buildProxyUrl(url, headers);
         }
 
-        // 替换外层 127.0.0.1 为实际 IP（确保 DLNA 设备可以访问），不替换编码在参数里的内层 URL
+        // 替换外层 127.0.0.1 为实际 IP
         if (url.startsWith("http://127.0.0.1:")) {
             String ip = Util.getIp();
             if (!ip.isEmpty()) url = "http://" + ip + ":" + url.substring("http://127.0.0.1:".length());
@@ -193,5 +200,26 @@ public class CastVideo {
 
     public long getDuration() {
         return duration;
+    }
+
+    public boolean hasHeaders() {
+        return headers != null && !headers.isEmpty();
+    }
+
+    // 不经过手机代理的直接 URL，localhost 已替换为局域网 IP
+    public String getDirectUrl() {
+        String u = originalUrl;
+        if (u == null) return url;
+        if (u.startsWith("file")) {
+            u = Server.get().getAddress() + "/" + u.replace(Path.rootPath(), "").replace("://", "");
+        } else if (u.startsWith("http://127.0.0.1:7777")) {
+            u = Uri.parse(u).getQueryParameter("url");
+            if (u == null) return url;
+        }
+        if (u.startsWith("http://127.0.0.1:")) {
+            String ip = Util.getIp();
+            if (!ip.isEmpty()) u = "http://" + ip + ":" + u.substring("http://127.0.0.1:".length());
+        }
+        return u;
     }
 }

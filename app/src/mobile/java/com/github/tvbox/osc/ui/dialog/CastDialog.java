@@ -58,6 +58,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     private Listener listener;
     private CastVideo video;
     private boolean fm;
+    private boolean embyPy;
     private boolean seekPending;
     private boolean hasSeeked;
 
@@ -93,6 +94,11 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     public CastDialog fm(boolean fm) {
         this.fm = fm;
+        return this;
+    }
+
+    public CastDialog embyPy(boolean embyPy) {
+        this.embyPy = embyPy;
         return this;
     }
 
@@ -268,13 +274,56 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     public void onItemClick(Device item) {
-        android.util.Log.d("CastDialog", "Device clicked - Name: " + item.getName() + ", Type: " + item.getType() + ", isDLNA: " + item.isDLNA());
+        if (video != null && !embyPy) {
+            showCastModeDialog(item);
+        } else {
+            doCast(item, false);
+        }
+    }
 
+    private void showCastModeDialog(Device item) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(requireContext());
+        builder.setTitle(R.string.cast_mode_title);
+        builder.setItems(new CharSequence[]{
+            getString(R.string.cast_mode_direct),
+            getString(R.string.cast_mode_proxy)
+        }, (d, which) -> {
+            countdown.cancel();
+            doCast(item, which == 0);
+        });
+        android.app.AlertDialog dialog = builder.create();
+        dialog.show();
+
+        countdown = new android.os.CountDownTimer(5000, 1000) {
+            @Override
+            public void onTick(long ms) {
+                if (dialog.isShowing()) {
+                    dialog.setTitle(getString(R.string.cast_mode_title) + " (" + (ms / 1000 + 1) + "s)");
+                }
+            }
+            @Override
+            public void onFinish() {
+                if (dialog.isShowing()) {
+                    dialog.dismiss();
+                    doCast(item, false);
+                }
+            }
+        }.start();
+    }
+
+    private android.os.CountDownTimer countdown;
+
+    private void doCast(Device item, boolean direct) {
+        if (direct) {
+            video = CastVideo.direct(video.getName(), video.getOriginalUrl(), video.getPosition(), video.getDuration(), video.getFormat());
+        }
+        connectDevice(item);
+    }
+
+    private void connectDevice(Device item) {
         if (item.isDLNA()) {
-            android.util.Log.i("CastDialog", "Connecting to DLNA device: " + item.getName());
             control = DLNACastManager.INSTANCE.connectDevice(DLNADevice.get().find(item), this);
         } else {
-            android.util.Log.i("CastDialog", "Sending HTTP cast request to: " + item.getIp());
             OkHttp.newCall(client, item.getIp().concat("/action?do=cast"), body.build()).enqueue(this);
         }
     }

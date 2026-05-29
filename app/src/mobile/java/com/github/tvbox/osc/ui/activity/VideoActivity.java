@@ -192,6 +192,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private com.android.cast.dlna.dmc.control.DeviceControl mCastControl;
     private boolean isCasting = false;
     private boolean isCastPlaying = true; // 投屏播放状态，默认为播放中
+    private String mCastFormat = "";
     private Runnable mCastProgressUpdate;
     private long mCastPosition = 0;
     private long mCastDuration = 0;
@@ -994,15 +995,15 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                     // 切换设备 - 停止当前投屏并打开设备选择对话框
                     stopCasting();
                     App.post(() -> {
-                        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).fm(true).show(this);
+                        CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).embyPy(isEmbyPySource()).fm(true).show(this);
                     }, 500);
                 }
             });
             builder.setNegativeButton("取消", null);
             builder.show();
         } else {
-            // 未投屏，打开设备选择对话框
-            CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).fm(true).show(this);
+            mCastFormat = mPlayers.getFormat();
+            CastDialog.create().history(mHistory).video(CastVideo.get(mBinding.name.getText().toString(), mPlayers.getUrl(), mPlayers.getPosition(), mPlayers.getDuration(), mPlayers.getHeaders(), mPlayers.getFormat())).embyPy(isEmbyPySource()).fm(true).show(this);
         }
     }
 
@@ -2551,9 +2552,9 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                                     long position = parseTime(positionInfo.getRelTime());
                                     long duration = parseTime(mediaInfo.getMediaDuration());
 
-                                    // 如果DLNA端没有返回duration，使用本地保存的时长
+                                    // 如果DLNA端没有返回duration，使用本地播放器时长
                                     if (duration == 0) {
-                                        duration = com.github.tvbox.osc.server.Server.get().getCastDuration();
+                                        duration = mCastDuration > 0 ? mCastDuration : mPlayers.getDuration();
                                     }
 
                                     mCastPosition = position;
@@ -2829,6 +2830,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         android.util.Log.d("VideoActivity", "[CAST] Cast proxy token regenerated");
 
         // 使用 CastVideo 来正确转换 URL（处理 headers、代理等）
+        mCastFormat = mPlayers.getFormat();
         com.github.tvbox.osc.bean.CastVideo castVideo = com.github.tvbox.osc.bean.CastVideo.get(
             title,
             originalUrl,
@@ -3017,6 +3019,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
                 mPlayers.getHeaders(),
                 mPlayers.getFormat()
             ))
+            .embyPy(isEmbyPySource())
             .fm(true)
             .show(this);
 

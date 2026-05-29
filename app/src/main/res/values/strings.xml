@@ -337,4 +337,7 @@
         <item>TCP</item>
     </string-array>
 
+    <string name="cast_mode_title">选择投屏方式</string>
+    <string name="cast_mode_direct">直接投屏</string>
+    <string name="cast_mode_proxy">手机转发</string>
 </resources>
