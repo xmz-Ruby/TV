@@ -19,8 +19,10 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.VideoSize;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.util.EventLogger;
@@ -453,6 +455,16 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     public String getSizeText() {
+        if (isExo() && exoPlayer != null) {
+            VideoSize v = exoPlayer.getVideoSize();
+            Format f = exoPlayer.getVideoFormat();
+            String text = "dec " + v.width + "x" + v.height + " p" + String.format(Locale.getDefault(), "%.2f", v.pixelWidthHeightRatio);
+            if (f != null) {
+                text += " | src " + f.width + "x" + f.height + " p" + String.format(Locale.getDefault(), "%.2f", f.pixelWidthHeightRatio);
+                if (f.rotationDegrees != 0) text += " r" + f.rotationDegrees;
+            }
+            return text;
+        }
         return getVideoWidth() + " x " + getVideoHeight();
     }
 
@@ -1136,6 +1148,11 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public void onRenderedFirstFrame() {
         if (exoAwaitingSeekFrame) Logger.t(TAG).i("exo seek frame rendered, position=" + getPosition());
         clearExoSeekFrameWatch();
+    }
+
+    @Override
+    public void onVideoSizeChanged(@NonNull VideoSize size) {
+        Logger.t(TAG).i("videoSize=%dx%d par=%.4f rotation=%d url=%s", size.width, size.height, size.pixelWidthHeightRatio, size.unappliedRotationDegrees, url);
     }
 
     @Override

@@ -14,7 +14,7 @@
         android:clickable="true"
         android:focusable="true">
 
-        <androidx.media3.ui.PlayerView
+        <com.github.tvbox.osc.player.exo.CustomExoView
             android:id="@+id/exo"
             style="@style/Player.Vod"
             android:layout_width="match_parent"

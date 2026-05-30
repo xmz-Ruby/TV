@@ -33,7 +33,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
-import androidx.media3.ui.PlayerView;
+import com.github.tvbox.osc.player.exo.CustomExoView;
 import androidx.media3.ui.SubtitleView;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
@@ -295,7 +295,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         return mHistory != null && mHistory.getScale() != -1 ? mHistory.getScale() : Setting.getScale();
     }
 
-    private PlayerView getExo() {
+    private CustomExoView getExo() {
         return mBinding.exo;
     }
 
@@ -570,7 +570,7 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void setScale(int scale) {
-        getExo().setResizeMode(scale);
+        getExo().setScale(scale);
         getIjk().setResizeMode(scale);
         mBinding.control.action.scale.setText(ResUtil.getStringArray(R.array.select_scale)[scale]);
     }

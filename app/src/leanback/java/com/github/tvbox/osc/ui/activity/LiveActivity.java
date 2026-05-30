@@ -17,7 +17,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
-import androidx.media3.ui.PlayerView;
+import com.github.tvbox.osc.player.exo.CustomExoView;
 import androidx.media3.ui.SubtitleView;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
@@ -120,7 +120,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
         return getIntent().getBooleanExtra("empty", true);
     }
 
-    private PlayerView getExo() {
+    private CustomExoView getExo() {
         return mBinding.exo;
     }
 
@@ -251,7 +251,7 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
     }
 
     private void setScale(int scale) {
-        getExo().setResizeMode(scale);
+        getExo().setScale(scale);
         getIjk().setResizeMode(scale);
         mBinding.control.scale.setText(ResUtil.getStringArray(R.array.select_scale)[scale]);
     }
