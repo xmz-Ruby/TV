@@ -357,6 +357,14 @@ public class Setting {
         Prefers.put("exo_tunnel", tunnel);
     }
 
+    public static boolean isAudioDownmix() {
+        return Prefers.getBoolean("audio_downmix");
+    }
+
+    public static void putAudioDownmix(boolean downmix) {
+        Prefers.put("audio_downmix", downmix);
+    }
+
     public static boolean isZhuyin() {
         return Prefers.getBoolean("zhuyin");
     }

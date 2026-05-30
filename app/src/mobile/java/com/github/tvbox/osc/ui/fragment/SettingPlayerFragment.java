@@ -54,6 +54,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
         setVisible();
         mBinding.uaText.setText(Setting.getUa());
         mBinding.tunnelText.setText(getSwitch(Setting.isTunnel()));
+        mBinding.downmixText.setText(getSwitch(Setting.isAudioDownmix()));
         mBinding.captionText.setText(getSwitch(Setting.isCaption()));
         mBinding.bufferText.setText(String.valueOf(Setting.getBuffer()));
         mBinding.audioChannelText.setText(String.valueOf(Setting.getDefaultAudioChannel()));
@@ -83,6 +84,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
         mBinding.decode.setOnClickListener(this::setDecode);
         mBinding.render.setOnClickListener(this::setRender);
         mBinding.tunnel.setOnClickListener(this::setTunnel);
+        mBinding.downmix.setOnClickListener(this::setDownmix);
         mBinding.caption.setOnClickListener(this::setCaption);
         mBinding.caption.setOnLongClickListener(this::onCaption);
         mBinding.playWithOthers.setOnClickListener(this::setPlayWithOthers);
@@ -96,6 +98,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
         mBinding.buffer.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.audioChannel.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.tunnel.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
+        mBinding.downmix.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
         mBinding.playWithOthers.setVisibility(Players.isExo(Setting.getPlayer()) ? View.VISIBLE : View.GONE);
     }
 
@@ -188,6 +191,11 @@ public class SettingPlayerFragment extends BaseFragment implements UaCallback, B
         Setting.putTunnel(!Setting.isTunnel());
         mBinding.tunnelText.setText(getSwitch(Setting.isTunnel()));
         if (Setting.isTunnel() && Setting.getRender() == 1) setRender(view);
+    }
+
+    private void setDownmix(View view) {
+        Setting.putAudioDownmix(!Setting.isAudioDownmix());
+        mBinding.downmixText.setText(getSwitch(Setting.isAudioDownmix()));
     }
 
     private void setCaption(View view) {

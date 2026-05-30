@@ -11,13 +11,19 @@ import androidx.media3.ui.AspectRatioFrameLayout;
 import androidx.media3.ui.PlayerView;
 
 /**
- * PlayerView 子类：让缩放档位 "16:9"/"4:3" 真正强制显示比例，与 IJK 行为一致。
+ * PlayerView 子类，做两件事：
  *
- * <p>背景：EXO 的画面形状完全由 {@code videoAspectRatio = width * pixelWidthHeightRatio / height}
- * 决定（见 PlayerView.updateAspectRatio）。原生 PlayerView 的 "16:9"/"4:3" 档位实为
- * FIXED_WIDTH/FIXED_HEIGHT，仍依赖解码器上报的比例，并不强制比例。本类在
- * {@link #onContentAspectRatioChanged} 处把 "16:9"/"4:3" 档位直接覆盖为 16f/9f、4f/3f，
- * 作为遇到比例异常视频时的手动修正手段；Default/Fill/Zoom 行为与原生完全一致。
+ * <p>1) 让缩放档位 "16:9"/"4:3" 真正强制显示比例（与 IJK 一致）。原生 PlayerView 的 "16:9"/"4:3" 档位
+ * 实为 FIXED_WIDTH/FIXED_HEIGHT，仍依赖解码器上报的比例，并不强制比例；本类在
+ * {@link #onContentAspectRatioChanged} 处把这两档直接覆盖为 16f/9f、4f/3f，作为比例异常视频的手动修正。
+ * Default/Fill/Zoom 行为与原生完全一致。
+ *
+ * <p>2) <b>刻意不</b>对 SurfaceView 缓冲区调用 {@code SurfaceHolder.setFixedSize}，保持 media3 默认（缓冲区随
+ * 视图尺寸）。曾照抄 IJK 的 {@code setFixedSize(视频原始尺寸)} 试图修非 16:9 变形——经屏上诊断证伪：移除后
+ * holder 回到视图尺寸（如 800x400）、SurfaceView 屏上矩形已是正确的 2:1 letterbox，但画面仍变形，说明缓冲区
+ * 尺寸不是元凶。同盒子上 IJK 硬解（同样走 MediaCodec + 原始 Surface）正常而 EXO 变形，差异只在 native 渲染实现
+ * 本身（ijk vout vs media3 {@code MediaCodecVideoRenderer}）对该 SoC 硬件视频层的反应不同，App 层难以可靠控制。
+ * 非 16:9 片源如需正确显示，切到 Texture 渲染（GPU 合成绕过硬件视频层，代价是高分辨率下可能掉帧）。
  */
 @UnstableApi
 public class CustomExoView extends PlayerView {
