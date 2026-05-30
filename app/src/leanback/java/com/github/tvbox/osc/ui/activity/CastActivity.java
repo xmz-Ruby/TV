@@ -74,7 +74,9 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
     private long lastMemoryCheck = 0;
 
     private CustomExoView getExo() {
-        return mBinding.exo;
+        // EXO 的 surface 类型在 XML 膨胀时固定、无法运行时切换：布局里并存两套 PlayerView，
+        // 按全局"渲染"设置选激活哪套（0=Surface 默认，1=Texture），未激活的保持 GONE 且不绑定播放器。
+        return Setting.getRender() == 1 ? mBinding.exoTexture : mBinding.exo;
     }
 
     private IjkVideoView getIjk() {
@@ -161,7 +163,7 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
         findViewById(R.id.timeBar).setNextFocusUpId(R.id.reset);
         mBinding.control.reset.setText(ResUtil.getStringArray(R.array.select_reset)[0]);
         setScale(scale = Setting.getScale());
-        ExoUtil.setSubtitleView(mBinding.exo);
+        ExoUtil.setSubtitleView(getExo());
         IjkUtil.setSubtitleView(mBinding.ijk);
         setPlayerView();
         setDecodeView();

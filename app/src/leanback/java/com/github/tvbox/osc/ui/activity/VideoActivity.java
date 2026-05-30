@@ -365,7 +365,9 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private CustomExoView getExo() {
-        return mBinding.exo;
+        // EXO 的 surface 类型在 XML 膨胀时固定、无法运行时切换：布局里并存两套 PlayerView，
+        // 按全局"渲染"设置选激活哪套（0=Surface 默认，1=Texture），未激活的保持 GONE 且不绑定播放器。
+        return Setting.getRender() == 1 ? mBinding.exoTexture : mBinding.exo;
     }
 
     private IjkVideoView getIjk() {
@@ -561,7 +563,7 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void setVideoView() {
         mPlayers.init(getExo(), getIjk());
-        ExoUtil.setSubtitleView(mBinding.exo);
+        ExoUtil.setSubtitleView(getExo());
         IjkUtil.setSubtitleView(mBinding.ijk);
         mBinding.control.reset.setText(ResUtil.getStringArray(R.array.select_reset)[Setting.getReset()]);
     }
