@@ -457,12 +457,13 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     public String getSizeText() {
         if (isExo() && exoPlayer != null) {
             VideoSize v = exoPlayer.getVideoSize();
-            Format f = exoPlayer.getVideoFormat();
-            String text = "dec " + v.width + "x" + v.height + " p" + String.format(Locale.getDefault(), "%.2f", v.pixelWidthHeightRatio);
-            if (f != null) {
-                text += " | src " + f.width + "x" + f.height + " p" + String.format(Locale.getDefault(), "%.2f", f.pixelWidthHeightRatio);
-                if (f.rotationDegrees != 0) text += " r" + f.rotationDegrees;
-            }
+            // Format f = exoPlayer.getVideoFormat();
+            // String text = "dec " + v.width + "x" + v.height + " p" + String.format(Locale.getDefault(), "%.2f", v.pixelWidthHeightRatio);
+            // if (f != null) {
+            //     text += " | src " + f.width + "x" + f.height + " p" + String.format(Locale.getDefault(), "%.2f", f.pixelWidthHeightRatio);
+            //     if (f.rotationDegrees != 0) text += " r" + f.rotationDegrees;
+            // }
+            String text = v.width + "x" + v.height;
             return text;
         }
         return getVideoWidth() + " x " + getVideoHeight();

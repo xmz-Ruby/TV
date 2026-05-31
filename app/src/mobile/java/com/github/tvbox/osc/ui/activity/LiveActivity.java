@@ -1058,7 +1058,8 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, Custom
                 if (isVisible(mBinding.control.getRoot())) showControl();
                 break;
             case Player.STATE_ENDED:
-                checkNext();
+                if (mPlayers.isLive()) fetch();
+                else checkNext();
                 break;
         }
     }

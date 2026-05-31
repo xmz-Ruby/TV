@@ -1005,7 +1005,8 @@ public class LiveActivity extends BaseActivity implements Clock.Callback, GroupP
                 startLineProbeIfNeeded();
                 break;
             case Player.STATE_ENDED:
-                nextEpg();
+                if (mPlayers.isLive()) fetch();
+                else nextEpg();
                 break;
         }
     }
