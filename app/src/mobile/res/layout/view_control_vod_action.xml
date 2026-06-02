@@ -24,6 +24,16 @@
             tools:text="硬解" />
 
         <TextView
+            android:id="@+id/render"
+            style="@style/Control.Action"
+            tools:text="Surface" />
+
+        <TextView
+            android:id="@+id/audioDownmix"
+            style="@style/Control.Action"
+            tools:text="无声音?" />
+
+        <TextView
             android:id="@+id/speed"
             style="@style/Control.Action"
             tools:text="速度" />
@@ -32,18 +42,6 @@
             android:id="@+id/scale"
             style="@style/Control.Action"
             tools:text="縮放" />
-
-        <TextView
-            android:id="@+id/reset"
-            style="@style/Control.Action"
-            android:textColor="@color/text"
-            tools:text="刷新" />
-
-        <TextView
-            android:id="@+id/loop"
-            style="@style/Control.Action"
-            android:text="@string/play_loop"
-            android:textColor="@color/text" />
 
         <View
             android:layout_width="0dp"

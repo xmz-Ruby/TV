@@ -142,9 +142,11 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private long bufferingStartBufferedPosition;
     private long bufferingStartCachedBytes;
     private int decode;
+    private int render;
     private int count;
     private int player;
     private int retry;
+    private boolean audioDownmix;
     private int exoSeekSurfaceRecoveryCount;
     private boolean buffering;
     private boolean exoAwaitingSeekFrame;
@@ -184,6 +186,8 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     private Players(Activity activity) {
         player = Setting.getPlayer();
         decode = Setting.getDecode(player);
+        render = Setting.getRender();
+        audioDownmix = Setting.isAudioDownmix();
         builder = new StringBuilder();
         runnable = ErrorEvent::timeout;
         stallRunnable = this::checkPlaybackStall;
@@ -221,7 +225,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
         ExoPlayer.Builder builder = new ExoPlayer.Builder(App.get())
                 .setLoadControl(ExoUtil.buildLoadControl())
                 .setTrackSelector(ExoUtil.buildTrackSelector())
-                .setRenderersFactory(ExoUtil.buildRenderersFactory(decode))
+                .setRenderersFactory(ExoUtil.buildRenderersFactory(decode, audioDownmix))
                 .setMediaSourceFactory(ExoUtil.buildMediaSourceFactory())
                 .setPlaybackLooper(playbackThread.getLooper());
         if (ExoUtil.isLowPerformanceTv()) {
@@ -242,7 +246,7 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
     }
 
     private void initIjk(IjkVideoView view) {
-        ijkPlayer = view.render(Setting.getRender()).decode(decode);
+        ijkPlayer = view.render(render).decode(decode);
         ijkPlayer.addListener(this);
         ijkPlayer.setPlayer(player);
     }
@@ -545,6 +549,30 @@ public class Players implements Player.Listener, IMediaPlayer.Listener, ParseCal
 
     public void toggleDecode(boolean save) {
         applyDecode(isHard() ? SOFT : HARD, save);
+    }
+
+    public int getRender() {
+        return render;
+    }
+
+    public String getRenderText() {
+        return ResUtil.getStringArray(R.array.select_render)[render];
+    }
+
+    public void toggleRender() {
+        render = (render + 1) % 2;
+    }
+
+    public boolean isAudioDownmix() {
+        return audioDownmix;
+    }
+
+    public String getAudioDownmixText() {
+        return ResUtil.getStringArray(R.array.select_audio_mode)[audioDownmix ? 1 : 0];
+    }
+
+    public void toggleAudioDownmix() {
+        audioDownmix = !audioDownmix;
     }
 
     public String getPositionTime(long time) {

@@ -138,7 +138,7 @@ public class LiveLineProbe {
             player = new ExoPlayer.Builder(App.get())
                     .setLoadControl(ExoUtil.buildLoadControl())
                     .setTrackSelector(trackSelector)
-                    .setRenderersFactory(ExoUtil.buildRenderersFactory(Setting.getDecode(Players.EXO)))
+                    .setRenderersFactory(ExoUtil.buildRenderersFactory(Setting.getDecode(Players.EXO), Setting.isAudioDownmix()))
                     .setMediaSourceFactory(ExoUtil.buildMediaSourceFactory())
                     .build();
             player.setVolume(0f);

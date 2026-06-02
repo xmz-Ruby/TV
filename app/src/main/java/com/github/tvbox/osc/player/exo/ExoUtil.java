@@ -169,8 +169,8 @@ public class ExoUtil {
         return "leanback".equals(BuildConfig.FLAVOR_mode);
     }
 
-    public static RenderersFactory buildRenderersFactory(int decode) {
-        return new NextRenderersFactory(App.get(), decode);
+    public static RenderersFactory buildRenderersFactory(int decode, boolean forceStereo) {
+        return new NextRenderersFactory(App.get(), decode, forceStereo);
     }
 
     public static boolean isAudioDownmix() {

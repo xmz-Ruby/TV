@@ -243,6 +243,11 @@
         <item>重播</item>
     </string-array>
 
+    <string-array name="select_audio_mode">
+        <item>无声音?</item>
+        <item>立体声✓</item>
+    </string-array>
+
     <string-array name="select_exo_http">
         <item>预设</item>
         <item>OkHttp</item>

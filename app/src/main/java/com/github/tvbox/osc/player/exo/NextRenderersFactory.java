@@ -32,10 +32,10 @@ public class NextRenderersFactory extends DefaultRenderersFactory {
     private final boolean lowPerfTv;
     private final boolean forceStereo;
 
-    public NextRenderersFactory(@NonNull Context context, int decode) {
+    public NextRenderersFactory(@NonNull Context context, int decode, boolean forceStereo) {
         super(context);
         lowPerfTv = ExoUtil.isLowPerformanceTv();
-        forceStereo = ExoUtil.isAudioDownmix();
+        this.forceStereo = forceStereo;
         setEnableDecoderFallback(true);
         setExtensionRendererMode(Players.isHard(decode) ? EXTENSION_RENDERER_MODE_ON : EXTENSION_RENDERER_MODE_PREFER);
         if (lowPerfTv) {

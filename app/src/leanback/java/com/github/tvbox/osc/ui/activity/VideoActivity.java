@@ -366,8 +366,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private CustomExoView getExo() {
         // EXO 的 surface 类型在 XML 膨胀时固定、无法运行时切换：布局里并存两套 PlayerView，
-        // 按全局"渲染"设置选激活哪套（0=Surface 默认，1=Texture），未激活的保持 GONE 且不绑定播放器。
-        return Setting.getRender() == 1 ? mBinding.exoTexture : mBinding.exo;
+        // 按会话"渲染"设置选激活哪套（0=Surface 默认，1=Texture），未激活的保持 GONE 且不绑定播放器。
+        return mPlayers.getRender() == 1 ? mBinding.exoTexture : mBinding.exo;
     }
 
     private IjkVideoView getIjk() {
@@ -393,10 +393,6 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
             if (selectedItem != null) selectedItem.requestFocus();
             if (focusedView == mBinding.video) mBinding.video.requestFocus();
         }, 300);
-    }
-
-    private boolean isReplay() {
-        return Setting.getReset() == 1;
     }
 
     private boolean isFromCollect() {
@@ -469,7 +465,6 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mBinding.control.opening.setDownListener(this::onOpeningSub);
         mBinding.control.text.setUpListener(this::onSubtitleClick);
         mBinding.control.text.setDownListener(this::onSubtitleClick);
-        mBinding.control.loop.setOnClickListener(view -> onLoop());
         mBinding.control.danmu.setOnClickListener(view -> onDanmu());
         mBinding.control.danmu.setUpListener(this::onDanmuAdd);
         mBinding.control.danmu.setDownListener(this::onDanmuSub);
@@ -480,14 +475,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mBinding.control.episodes.setOnClickListener(view -> onEpisodes());
         mBinding.control.scale.setOnClickListener(view -> onScale());
         mBinding.control.speed.setOnClickListener(view -> onSpeed());
-        mBinding.control.reset.setOnClickListener(view -> onReset());
         mBinding.control.player.setOnClickListener(view -> onPlayer());
         mBinding.control.decode.setOnClickListener(view -> onDecode());
+        mBinding.control.render.setOnClickListener(view -> onRender());
+        mBinding.control.audioDownmix.setOnClickListener(view -> onAudioDownmix());
         mBinding.control.ending.setOnClickListener(view -> onEnding());
         mBinding.control.opening.setOnClickListener(view -> onOpening());
         mBinding.control.player.setOnLongClickListener(view -> onChoose());
         mBinding.control.speed.setOnLongClickListener(view -> onSpeedLong());
-        mBinding.control.reset.setOnLongClickListener(view -> onResetToggle());
         mBinding.control.ending.setOnLongClickListener(view -> onEndingReset());
         mBinding.control.opening.setOnLongClickListener(view -> onOpeningReset());
         mBinding.video.setOnTouchListener((view, event) -> mKeyDown.onTouchEvent(event));
@@ -565,7 +560,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mPlayers.init(getExo(), getIjk());
         ExoUtil.setSubtitleView(getExo());
         IjkUtil.setSubtitleView(mBinding.ijk);
-        mBinding.control.reset.setText(ResUtil.getStringArray(R.array.select_reset)[Setting.getReset()]);
+        setRenderView();
+        setAudioDownmixView();
     }
 
     private void setDanmuViewSettings() {
@@ -648,6 +644,14 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
 
     private void setDecodeView() {
         mBinding.control.decode.setText(mPlayers.getDecodeText());
+    }
+
+    private void setRenderView() {
+        mBinding.control.render.setText(mPlayers.getRenderText());
+    }
+
+    private void setAudioDownmixView() {
+        mBinding.control.audioDownmix.setText(mPlayers.getAudioDownmixText());
     }
 
     private void setScale(int scale) {
@@ -1409,10 +1413,6 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         checkSearch(true);
     }
 
-    private void onLoop() {
-        mBinding.control.loop.setActivated(!mBinding.control.loop.isActivated());
-    }
-
     private void onDanmu() {
         Setting.putDanmu(!Setting.isDanmu());
         mBinding.control.danmu.setActivated(Setting.isDanmu());
@@ -1527,24 +1527,10 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void onRefresh() {
-        onReset(false);
-    }
-
-    private void onReset() {
-        onReset(isReplay());
-    }
-
-    private void onReset(boolean replay) {
         mClock.setCallback(null);
         if (mFlagAdapter.size() == 0) return;
         if (mEpisodeAdapter.size() == 0) return;
-        getPlayer(getFlag(), getEpisode(), replay);
-    }
-
-    private boolean onResetToggle() {
-        Setting.putReset(Math.abs(Setting.getReset() - 1));
-        mBinding.control.reset.setText(ResUtil.getStringArray(R.array.select_reset)[Setting.getReset()]);
-        return true;
+        getPlayer(getFlag(), getEpisode(), false);
     }
 
     private void onOpening() {
@@ -1617,6 +1603,25 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
         mPlayers.init(getExo(), getIjk());
         mPlayers.setMediaSource();
         setDecodeView();
+    }
+
+    private void onRender() {
+        // 渲染模式在 Surface/Texture 之间切换会改变 getExo() 返回的物理 View，
+        // 先把两套 PlayerView 都隐藏，重建播放器后由 setPlayerView() 只点亮当前激活的那套。
+        mPlayers.toggleRender();
+        mBinding.exo.setVisibility(View.GONE);
+        mBinding.exoTexture.setVisibility(View.GONE);
+        mPlayers.init(getExo(), getIjk());
+        mPlayers.setMediaSource();
+        setPlayerView();
+        setRenderView();
+    }
+
+    private void onAudioDownmix() {
+        mPlayers.toggleAudioDownmix();
+        mPlayers.init(getExo(), getIjk());
+        mPlayers.setMediaSource();
+        setAudioDownmixView();
     }
 
     private void onTrack(View view) {
@@ -2213,12 +2218,8 @@ public class VideoActivity extends BaseActivity implements CustomKeyDownVod.List
     }
 
     private void checkEnded() {
-        if (mBinding.control.loop.isActivated()) {
-            onReset(true);
-        } else {
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            checkNext();
-        }
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        checkNext();
     }
 
     private void setTrackVisible(boolean visible) {

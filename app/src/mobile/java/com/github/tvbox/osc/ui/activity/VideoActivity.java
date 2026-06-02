@@ -297,8 +297,8 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
 
     private CustomExoView getExo() {
         // EXO 的 surface 类型在 XML 膨胀时固定、无法运行时切换：布局里并存两套 PlayerView，
-        // 按全局"渲染"设置选激活哪套（0=Surface 默认，1=Texture），未激活的保持 GONE 且不绑定播放器。
-        return Setting.getRender() == 1 ? mBinding.exoTexture : mBinding.exo;
+        // 按会话"渲染"设置选激活哪套（0=Surface 默认，1=Texture），未激活的保持 GONE 且不绑定播放器。
+        return mPlayers.getRender() == 1 ? mBinding.exoTexture : mBinding.exo;
     }
 
     private IjkVideoView getIjk() {
@@ -308,10 +308,6 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     private Drawable getDefaultArtwork() {
         if (mPlayers.isExo()) return getExo().getDefaultArtwork();
         return getIjk().getDefaultArtwork();
-    }
-
-    private boolean isReplay() {
-        return Setting.getReset() == 1;
     }
 
     private boolean isFromCollect() {
@@ -433,12 +429,12 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mBinding.control.action.text.setOnClickListener(this::onTrack);
         mBinding.control.action.audio.setOnClickListener(this::onTrack);
         mBinding.control.action.video.setOnClickListener(this::onTrack);
-        mBinding.control.action.loop.setOnClickListener(view -> onLoop());
         mBinding.control.action.scale.setOnClickListener(view -> onScale());
         mBinding.control.action.speed.setOnClickListener(view -> onSpeed());
-        mBinding.control.action.reset.setOnClickListener(view -> onReset());
         mBinding.control.action.player.setOnClickListener(view -> onPlayer());
         mBinding.control.action.decode.setOnClickListener(view -> onDecode());
+        mBinding.control.action.render.setOnClickListener(view -> onRender());
+        mBinding.control.action.audioDownmix.setOnClickListener(view -> onAudioDownmix());
         mBinding.control.action.ending.setOnClickListener(view -> onEnding());
         mBinding.control.action.opening.setOnClickListener(view -> onOpening());
         mBinding.control.action.episodes.setOnClickListener(view -> onEpisodes());
@@ -446,7 +442,6 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mBinding.control.action.text.setOnLongClickListener(view -> onTextLong());
         mBinding.control.action.player.setOnLongClickListener(view -> onChoose());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
-        mBinding.control.action.reset.setOnLongClickListener(view -> onResetToggle());
         mBinding.control.action.ending.setOnLongClickListener(view -> onEndingReset());
         mBinding.control.action.opening.setOnLongClickListener(view -> onOpeningReset());
         mBinding.video.setOnTouchListener((view, event) -> mKeyDown.onTouchEvent(event));
@@ -503,12 +498,23 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         if (mControlDialog != null && mControlDialog.isVisible()) mControlDialog.updateDecode();
     }
 
+    private void setRenderView() {
+        mBinding.control.action.render.setText(mPlayers.getRenderText());
+        if (mControlDialog != null && mControlDialog.isVisible()) mControlDialog.updateRender();
+    }
+
+    private void setAudioDownmixView() {
+        mBinding.control.action.audioDownmix.setText(mPlayers.getAudioDownmixText());
+        if (mControlDialog != null && mControlDialog.isVisible()) mControlDialog.updateAudioDownmix();
+    }
+
     private void setVideoView() {
         mPlayers.init(getExo(), getIjk());
         ExoUtil.setSubtitleView(getExo());
         IjkUtil.setSubtitleView(mBinding.ijk);
         if (isPort() && ResUtil.isLand(this)) enterFullscreen();
-        mBinding.control.action.reset.setText(ResUtil.getStringArray(R.array.select_reset)[Setting.getReset()]);
+        setRenderView();
+        setAudioDownmixView();
         mBinding.video.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> mPiP.update(getActivity(), view));
     }
 
@@ -1112,10 +1118,6 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         hideControl();
     }
 
-    private void onLoop() {
-        mBinding.control.action.loop.setActivated(!mBinding.control.action.loop.isActivated());
-    }
-
     private void onScale() {
         int index = getScale();
         String[] array = ResUtil.getStringArray(R.array.select_scale);
@@ -1138,24 +1140,10 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void onRefresh() {
-        onReset(false);
-    }
-
-    private void onReset() {
-        onReset(isReplay());
-    }
-
-    private void onReset(boolean replay) {
         mClock.setCallback(null);
         if (mFlagAdapter.isEmpty()) return;
         if (mEpisodeAdapter.isEmpty()) return;
-        getPlayer(getFlag(), getEpisode(), replay);
-    }
-
-    private boolean onResetToggle() {
-        Setting.putReset(Math.abs(Setting.getReset() - 1));
-        mBinding.control.action.reset.setText(ResUtil.getStringArray(R.array.select_reset)[Setting.getReset()]);
-        return true;
+        getPlayer(getFlag(), getEpisode(), false);
     }
 
     private void onPlayer() {
@@ -1172,6 +1160,27 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
         mPlayers.init(getExo(), getIjk());
         mPlayers.setMediaSource();
         setDecodeView();
+        setR1Callback();
+    }
+
+    private void onRender() {
+        // 渲染模式在 Surface/Texture 之间切换会改变 getExo() 返回的物理 View，
+        // 先把两套 PlayerView 都隐藏，重建播放器后由 setPlayerView() 只点亮当前激活的那套。
+        mPlayers.toggleRender();
+        mBinding.exo.setVisibility(View.GONE);
+        mBinding.exoTexture.setVisibility(View.GONE);
+        mPlayers.init(getExo(), getIjk());
+        mPlayers.setMediaSource();
+        setPlayerView();
+        setRenderView();
+        setR1Callback();
+    }
+
+    private void onAudioDownmix() {
+        mPlayers.toggleAudioDownmix();
+        mPlayers.init(getExo(), getIjk());
+        mPlayers.setMediaSource();
+        setAudioDownmixView();
         setR1Callback();
     }
 
@@ -1648,13 +1657,9 @@ public class VideoActivity extends BaseActivity implements Clock.Callback, Custo
     }
 
     private void checkEnded() {
-        if (mBinding.control.action.loop.isActivated()) {
-            onReset(true);
-        } else {
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            checkPlayImg(false);
-            checkNext();
-        }
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        checkPlayImg(false);
+        checkNext();
     }
 
     private void setTrackVisible(boolean visible) {

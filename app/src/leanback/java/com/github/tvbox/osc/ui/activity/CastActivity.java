@@ -128,7 +128,6 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
         mBinding.control.video.setOnClickListener(this::onTrack);
         mBinding.control.scale.setOnClickListener(view -> onScale());
         mBinding.control.speed.setOnClickListener(view -> onSpeed());
-        mBinding.control.reset.setOnClickListener(view -> onReset());
         mBinding.control.player.setOnClickListener(view -> onPlayer());
         mBinding.control.decode.setOnClickListener(view -> onDecode());
         mBinding.control.speed.setOnLongClickListener(view -> onSpeedLong());
@@ -160,8 +159,7 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
     private void setVideoView() {
         mPlayers.init(getExo(), getIjk());
         mPlayers.setPlayer(Setting.getPlayer());
-        findViewById(R.id.timeBar).setNextFocusUpId(R.id.reset);
-        mBinding.control.reset.setText(ResUtil.getStringArray(R.array.select_reset)[0]);
+        findViewById(R.id.timeBar).setNextFocusUpId(R.id.player);
         setScale(scale = Setting.getScale());
         ExoUtil.setSubtitleView(getExo());
         IjkUtil.setSubtitleView(mBinding.ijk);
@@ -277,7 +275,7 @@ public class CastActivity extends BaseActivity implements CustomKeyDownCast.List
 
     private void showControl() {
         mBinding.control.getRoot().setVisibility(View.VISIBLE);
-        mBinding.control.reset.requestFocus();
+        mBinding.control.player.requestFocus();
         setR1Callback();
     }
 

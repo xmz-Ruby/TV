@@ -91,9 +91,10 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
         if (player == null) return;
         binding.player.setText(parent.control.action.player.getText());
         binding.decode.setText(parent.control.action.decode.getText());
+        binding.render.setText(parent.control.action.render.getText());
+        binding.audioDownmix.setText(parent.control.action.audioDownmix.getText());
         binding.ending.setText(parent.control.action.ending.getText());
         binding.opening.setText(parent.control.action.opening.getText());
-        binding.loop.setActivated(parent.control.action.loop.isActivated());
         binding.timer.setActivated(Timer.get().isRunning());
         binding.dptime.setActivated(Setting.isDisplayTime());
         binding.dpspeed.setActivated(Setting.isDisplaySpeed());
@@ -114,9 +115,10 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
         binding.text.setOnClickListener(v -> dismiss(parent.control.action.text));
         binding.audio.setOnClickListener(v -> dismiss(parent.control.action.audio));
         binding.video.setOnClickListener(v -> dismiss(parent.control.action.video));
-        binding.loop.setOnClickListener(v -> active(binding.loop, parent.control.action.loop));
         binding.player.setOnClickListener(v -> click(binding.player, parent.control.action.player));
         binding.decode.setOnClickListener(v -> click(binding.decode, parent.control.action.decode));
+        binding.render.setOnClickListener(v -> click(binding.render, parent.control.action.render));
+        binding.audioDownmix.setOnClickListener(v -> click(binding.audioDownmix, parent.control.action.audioDownmix));
         binding.ending.setOnClickListener(v -> click(binding.ending, parent.control.action.ending));
         binding.opening.setOnClickListener(v -> click(binding.opening, parent.control.action.opening));
         binding.player.setOnLongClickListener(v -> longClick(binding.player, parent.control.action.player));
@@ -195,11 +197,6 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
         view.setActivated(true);
     }
 
-    private void active(View view, TextView target) {
-        target.performClick();
-        view.setActivated(target.isActivated());
-    }
-
     private void click(TextView view, TextView target) {
         target.performClick();
         view.setText(target.getText());
@@ -226,6 +223,14 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
 
     public void updateDecode() {
         binding.decode.setText(parent.control.action.decode.getText());
+    }
+
+    public void updateRender() {
+        binding.render.setText(parent.control.action.render.getText());
+    }
+
+    public void updateAudioDownmix() {
+        binding.audioDownmix.setText(parent.control.action.audioDownmix.getText());
     }
 
     public void setPlayer() {
