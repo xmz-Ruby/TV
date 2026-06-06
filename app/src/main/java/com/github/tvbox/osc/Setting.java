@@ -365,6 +365,14 @@ public class Setting {
         Prefers.put("audio_downmix", downmix);
     }
 
+    public static boolean isLoudnessEnhance() {
+        return Prefers.getBoolean("loudness_enhance");
+    }
+
+    public static void putLoudnessEnhance(boolean enhance) {
+        Prefers.put("loudness_enhance", enhance);
+    }
+
     public static boolean isZhuyin() {
         return Prefers.getBoolean("zhuyin");
     }

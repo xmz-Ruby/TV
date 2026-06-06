@@ -127,6 +127,7 @@
     <string name="player_default_audio_channel">默认声道数</string>
     <string name="player_exo_tunnel">隧道模式</string>
     <string name="player_downmix">强制立体声</string>
+    <string name="player_loudness">响度均衡</string>
     <string name="player_exo_http">连线方式</string>
     <string name="player_exo_buffer">缓冲时间</string>
     <string name="player_rtsp">RTSP 通道</string>

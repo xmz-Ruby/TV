@@ -17,8 +17,6 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.audio.AudioProcessor;
-import androidx.media3.common.audio.ChannelMixingAudioProcessor;
-import androidx.media3.common.audio.ChannelMixingMatrix;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.LoadControl;
@@ -169,8 +167,8 @@ public class ExoUtil {
         return "leanback".equals(BuildConfig.FLAVOR_mode);
     }
 
-    public static RenderersFactory buildRenderersFactory(int decode, boolean forceStereo) {
-        return new NextRenderersFactory(App.get(), decode, forceStereo);
+    public static RenderersFactory buildRenderersFactory(int decode, boolean forceStereo, boolean loudnessNormalize) {
+        return new NextRenderersFactory(App.get(), decode, forceStereo, loudnessNormalize);
     }
 
     public static boolean isAudioDownmix() {
@@ -178,80 +176,24 @@ public class ExoUtil {
     }
 
     /**
-     * 「强制立体声」开关使用的下混处理器：把任意 1..8 声道统一下混为立体声 PCM。
+     * 「强制立体声」开关使用的下混处理器：把 3..8 声道 PCM 下混为带响度补偿的立体声。
      *
-     * <p>{@link ChannelMixingAudioProcessor} 对未注册的输入声道数会抛 UnhandledAudioFormatException，
-     * 故必须覆盖 1..8 全部声道：1/2 声道用恒等矩阵（{@link ChannelMixingMatrix#isIdentity()} 为真 →
-     * isActive()=false，管线直接跳过，单声道/立体声内容零影响），3..8 给出标准 L/R 下混系数。
+     * <p>1/2 声道返回 inactive，保持原生单声道/立体声内容不变；多声道内容在
+     * {@link StereoDownmixAudioProcessor} 中提高中置声道权重、做整体增益补偿，并用软限幅兜底。
      */
     public static AudioProcessor buildStereoDownmixProcessor() {
-        ChannelMixingAudioProcessor processor = new ChannelMixingAudioProcessor();
-        for (int channelCount = 1; channelCount <= 8; channelCount++) {
-            processor.putChannelMixingMatrix(buildStereoMixingMatrix(channelCount));
-        }
-        return processor;
+        return new StereoDownmixAudioProcessor();
     }
 
-    /**
-     * 构造 {@code channelCount → 立体声} 的下混矩阵。
-     *
-     * <p>系数按 {@link ChannelMixingMatrix#getMixingCoefficient(int, int)} 的实际取值方式以「输入主序」给出：
-     * 下标为 {@code inputChannel * outputChannelCount + outputChannel}，即每个输入声道连续两个系数依次为
-     * [→L, →R]。声道布局与 {@code ChannelMixingMatrix.createForConstantPower} 文档一致（FL, FR, FC, LFE, …），
-     * 7/8 声道按 6.1/7.1 标准布局补全。下混系数：FL/FR 直达(1.0)，FC/后中/环绕 0.7071，LFE 0.5。
-     */
-    private static ChannelMixingMatrix buildStereoMixingMatrix(int channelCount) {
-        switch (channelCount) {
-            case 1: // [MONO] 恒等：保持单声道，由 AudioTrack 自行播放
-                return new ChannelMixingMatrix(1, 1, new float[]{1f});
-            case 2: // [FL, FR] 恒等：立体声原样直通
-                return new ChannelMixingMatrix(2, 2, new float[]{1f, 0f, 0f, 1f});
-            case 3: // [FL, FR, FC]
-                return new ChannelMixingMatrix(3, 2, new float[]{
-                        /* FL  */ 1f, 0f,
-                        /* FR  */ 0f, 1f,
-                        /* FC  */ 0.7071f, 0.7071f});
-            case 4: // [FL, FR, BL, BR]
-                return new ChannelMixingMatrix(4, 2, new float[]{
-                        /* FL  */ 1f, 0f,
-                        /* FR  */ 0f, 1f,
-                        /* BL  */ 0.7071f, 0f,
-                        /* BR  */ 0f, 0.7071f});
-            case 5: // [FL, FR, FC, BL, BR]
-                return new ChannelMixingMatrix(5, 2, new float[]{
-                        /* FL  */ 1f, 0f,
-                        /* FR  */ 0f, 1f,
-                        /* FC  */ 0.7071f, 0.7071f,
-                        /* BL  */ 0.7071f, 0f,
-                        /* BR  */ 0f, 0.7071f});
-            case 6: // [FL, FR, FC, LFE, BL, BR]
-                return new ChannelMixingMatrix(6, 2, new float[]{
-                        /* FL  */ 1f, 0f,
-                        /* FR  */ 0f, 1f,
-                        /* FC  */ 0.7071f, 0.7071f,
-                        /* LFE */ 0.5f, 0.5f,
-                        /* BL  */ 0.7071f, 0f,
-                        /* BR  */ 0f, 0.7071f});
-            case 7: // [FL, FR, FC, LFE, BC, SL, SR]
-                return new ChannelMixingMatrix(7, 2, new float[]{
-                        /* FL  */ 1f, 0f,
-                        /* FR  */ 0f, 1f,
-                        /* FC  */ 0.7071f, 0.7071f,
-                        /* LFE */ 0.5f, 0.5f,
-                        /* BC  */ 0.7071f, 0.7071f,
-                        /* SL  */ 0.7071f, 0f,
-                        /* SR  */ 0f, 0.7071f});
-            default: // 8 [FL, FR, FC, LFE, BL, BR, SL, SR]
-                return new ChannelMixingMatrix(8, 2, new float[]{
-                        /* FL  */ 1f, 0f,
-                        /* FR  */ 0f, 1f,
-                        /* FC  */ 0.7071f, 0.7071f,
-                        /* LFE */ 0.5f, 0.5f,
-                        /* BL  */ 0.7071f, 0f,
-                        /* BR  */ 0f, 0.7071f,
-                        /* SL  */ 0.7071f, 0f,
-                        /* SR  */ 0f, 0.7071f});
-        }
+    public static AudioProcessor buildLoudnessNormalizerProcessor() {
+        return new LoudnessNormalizerAudioProcessor();
+    }
+
+    public static AudioProcessor[] buildAudioProcessors(boolean forceStereo, boolean loudnessNormalize) {
+        ArrayList<AudioProcessor> processors = new ArrayList<>();
+        if (forceStereo) processors.add(buildStereoDownmixProcessor());
+        if (loudnessNormalize) processors.add(buildLoudnessNormalizerProcessor());
+        return processors.toArray(new AudioProcessor[0]);
     }
 
     public static MediaSource.Factory buildMediaSourceFactory() {

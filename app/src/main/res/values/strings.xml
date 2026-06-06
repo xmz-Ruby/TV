@@ -142,6 +142,7 @@
     <string name="player_default_audio_channel">Default audio channels</string>
     <string name="player_exo_tunnel">Tunnel mode</string>
     <string name="player_downmix">Force stereo</string>
+    <string name="player_loudness">Loudness leveling</string>
     <string name="player_exo_http">HTTP method</string>
     <string name="player_exo_buffer">Buffer time</string>
     <string name="player_rtsp">RTSP channel</string>
